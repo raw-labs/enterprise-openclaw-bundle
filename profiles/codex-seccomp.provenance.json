@@ -1,0 +1,42 @@
+{
+  "codexVersion": "0.158.0",
+  "sourceProvenance": [
+    {
+      "name": "containerd RuntimeDefault seccomp",
+      "source": "operator-captured RuntimeDefault OCI runtimeSpec.linux.seccomp"
+    },
+    {
+      "name": "Codex 0.158.0 bubblewrap launcher",
+      "source": "openai/codex rust-v0.158.0 codex-rs/linux-sandbox/src/bwrap.rs",
+      "sha256": "0049ed2a31ad66150d1f7e07056bf1732b6ae3c5e8f6ac33749b36475e069069"
+    },
+    {
+      "name": "Codex 0.158.0 sandbox entry point",
+      "source": "openai/codex rust-v0.158.0 codex-rs/linux-sandbox/src/linux_run_main.rs",
+      "sha256": "0dd784f70ff95b16c97dd9e8420c30db2ff39002a57e357c6da686c353464270"
+    },
+    {
+      "name": "bubblewrap mount setup",
+      "source": "openai/codex rust-v0.158.0 codex-rs/vendor/bubblewrap/bubblewrap.c",
+      "sha256": "9bc38fb46080b6854e0c414ccb5fbd369d9d7c0230fdfa877283d31aef0c5720"
+    },
+    {
+      "name": "bubblewrap bind mount flags",
+      "source": "openai/codex rust-v0.158.0 codex-rs/vendor/bubblewrap/bind-mount.c",
+      "sha256": "19a6ae020803e342667dd562efab027967b1c1f2965525ec7ee09521554f8f71"
+    }
+  ],
+  "architectures": [
+    "SCMP_ARCH_X86_64",
+    "SCMP_ARCH_X86",
+    "SCMP_ARCH_X32"
+  ],
+  "runtimeDefaultSha256": "6859cfffc59c9f163e0b493a6ef93a0854f888c255f86cf7866cb7b1a53dc1b3",
+  "profileSha256": "71a2871a066a696a171049a15db3f065122c153cd11ef451cee3341ddbd9697f",
+  "addedRules": 78,
+  "proofLimits": [
+    "Generated from an operator-captured RuntimeDefault OCI seccomp profile.",
+    "Architecture proof is limited to native x86_64 with x86/x32 compat entries or native aarch64 with ARM compat entries.",
+    "The generated profile must still be installed and verified on each selected node."
+  ]
+}

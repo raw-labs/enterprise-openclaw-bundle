@@ -1,0 +1,31 @@
+name: Validate bundle
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v3.21.3
+      - name: Export exact public upstream source
+        run: python3 scripts/bundle.py --release releases/pilot-baseline.json source --output .work/verified-source
+      - name: Verify selection, package behavior and installation profiles
+        run: python3 -m unittest discover -s tests -v
+      - name: Package review artifact
+        run: python3 scripts/bundle.py --release releases/pilot-baseline.json package --source .work/verified-source --output dist/bundle.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bundle-review
+          path: dist/bundle.tar.gz*
+          retention-days: 7

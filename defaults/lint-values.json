@@ -1,0 +1,34 @@
+{
+  "images": {
+    "controller": "684130658470.dkr.ecr.eu-west-1.amazonaws.com/raw-claw/controller@sha256:442449fbdbb79cbfa3a1ef9a0ecdd2c731f07a828db61301adbf52c0814052fe"
+  },
+  "auth": {
+    "baseUrl": "https://console.example.invalid"
+  },
+  "bootstrap": {
+    "adminEmail": "operator@example.invalid",
+    "password": {
+      "claimName": "occ-bootstrap-admin-password"
+    }
+  },
+  "database": {
+    "cidrs": [
+      "10.45.0.12/32"
+    ]
+  },
+  "cluster": {
+    "cidrs": [
+      "10.43.0.1/32"
+    ]
+  },
+  "api": {
+    "clients": [
+      {
+        "namespace": "operator-tools",
+        "podLabels": {
+          "app": "operator"
+        }
+      }
+    ]
+  }
+}

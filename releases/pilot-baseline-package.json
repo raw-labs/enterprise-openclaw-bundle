@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "pilot-baseline-2026-10-07",
+  "artifact": "pilot-baseline-2026-10-07-bundle.tar.gz",
+  "artifactSha256": "7a12cb4c221ac4e1582fd209db68f3c1b2de6346c4e5419dbc60e74112eeaa9f",
+  "status": "packaging-verified",
+  "checks": {
+    "unitAndPackagingTests": 23,
+    "passing": 23,
+    "freshUpstreamFetchAndArchiveInventory": true,
+    "chartProfiles": [
+      "openclaw",
+      "codex"
+    ],
+    "digestPreservingMirrorRender": true,
+    "negativeInputAndTamperChecks": true,
+    "byteReproducibility": true,
+    "pythonCompile": true,
+    "ruff": "passed"
+  },
+  "proofLimits": [
+    "No fresh image builds or runtime qualification performed.",
+    "AWS SSO expired; current private ECR availability not verified.",
+    "Docker host is ARM; native AMD64 Linux qualification required.",
+    "Customer infrastructure, model calls, isolation and backup/restore acceptance not performed.",
+    "Build workflow requires a protected environment, OIDC role and existing private ECR repositories."
+  ]
+}

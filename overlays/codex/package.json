@@ -1,0 +1,8 @@
+{
+  "name": "raw-claw-codex-runtime-overlay",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@openai/codex": "0.160.1"
+  }
+}

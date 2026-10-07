@@ -1,0 +1,8 @@
+.work/
+dist/
+local/
+__pycache__/
+*.pyc
+*.tfstate*
+*.tfplan
+.env*
