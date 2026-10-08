@@ -652,6 +652,44 @@ def publish(args, release):
         repo["full_name"] == "raw-labs/enterprise-openclaw-bundle",
         "destination repository identity mismatch",
     )
+    expected_workflow = {
+        key: os.environ.get(key)
+        for key in (
+            "GITHUB_REPOSITORY",
+            "GITHUB_SHA",
+            "GITHUB_RUN_ID",
+            "GITHUB_RUN_ATTEMPT",
+        )
+    }
+    if args.build_run_id:
+        require(
+            re.fullmatch(r"[1-9]\d*", args.build_run_id), "invalid source build run"
+        )
+        prior = github_json(
+            "repos/raw-labs/enterprise-openclaw-bundle/actions/runs/"
+            + args.build_run_id
+        )
+        require(
+            prior
+            and prior["conclusion"] == "success"
+            and prior["status"] == "completed"
+            and prior["event"] == "workflow_dispatch"
+            and prior["head_branch"] == "main",
+            "source build is not a successful trusted main dispatch",
+        )
+        workflow = github_json(
+            "repos/raw-labs/enterprise-openclaw-bundle/actions/workflows/"
+            + str(prior["workflow_id"])
+        )
+        require(
+            workflow and workflow["path"] == ".github/workflows/build.yml",
+            "source artifacts belong to another workflow",
+        )
+        expected_workflow.update(
+            GITHUB_SHA=prior["head_sha"],
+            GITHUB_RUN_ID=str(prior["id"]),
+            GITHUB_RUN_ATTEMPT=str(prior["run_attempt"]),
+        )
     source = Path(args.inputs)
     out = Path(args.output).resolve()
     require(not out.exists(), "publication output exists")
@@ -668,8 +706,7 @@ def publish(args, release):
         receipt = load(path / "proof/native-receipt.json")
         verify_receipt(receipt, release, arch, identities)
         require(
-            receipt["workflow"]
-            == {key: os.environ.get(key) for key in receipt["workflow"]},
+            receipt["workflow"] == expected_workflow,
             "native receipts belong to another workflow run",
         )
         for name, hash in receipt["confinement"]["reviewedInputs"].items():
@@ -824,6 +861,7 @@ def main():
     p.add_argument("--inputs", required=True)
     p.add_argument("--output", required=True)
     p.add_argument("--authfile", required=True)
+    p.add_argument("--build-run-id")
     args = parser.parse_args()
     if args.command == "new":
         new(args)

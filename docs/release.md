@@ -42,6 +42,8 @@ Build timestamps use the selected commit epoch. Apt and other dependency executi
 can still change image bytes; rebuilds need not reproduce old image digests.
 Registry publication is disabled by default. Run the build and checks first and
 obtain explicit authorization for the private GHCR destination before publication.
+Use `publish.yml` with that successful build's run ID to copy its existing exports;
+it validates the trusted main run and receipts and performs no image rebuild.
 
 Before installing test dependencies, the build verifies the complete source
 inventory. Native checks bind each export manifest to its loaded config ID, source
