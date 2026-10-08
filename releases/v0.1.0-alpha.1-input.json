@@ -12,7 +12,7 @@
     "nodeRuntimeBaseImage": "docker.io/library/node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03",
     "noticeLayer": {
       "fragment": "overlays/notices.fragment",
-      "sha256": "119a5a277bfc9948c193ce32aa05ec3e1a4a101a1ea097ebf768091cbc09c9dc"
+      "sha256": "a89354adb23ffb76f9a875e4bddd1a026d81dbafe23b5e8739895982bc90890f"
     },
     "repositoryCredentials": {
       "dockerfile": "deploy/runtime/Dockerfile",
