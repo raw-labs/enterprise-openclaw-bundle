@@ -237,7 +237,7 @@ def package(args, release):
             payload = safe_path(Path(args.release).parent, name)
         files[name] = (payload.read_bytes(), 0o644)
     files["INSTALL.md"] = ((ROOT / "docs/install.md").read_bytes(), 0o644)
-    files["SCOPE.md"] = ((ROOT / "docs/scope.md").read_bytes(), 0o644)
+    files["OPERATE.md"] = ((ROOT / "docs/operate.md").read_bytes(), 0o644)
     # Runtime build overlay/private build inputs are deliberately excluded.
     copy = json.loads(json.dumps(release))
     copy["chart"]["artifact"] = chart_name

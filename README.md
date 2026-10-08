@@ -9,7 +9,7 @@ separate private installation repositories.
 - [Build workflow](.github/workflows/build.yml): native builds and checks.
 - [Publication workflow](.github/workflows/publish.yml): publish existing checked exports.
 - [Validation workflow](.github/workflows/validate.yml): release-input and packaging checks.
-- [SE installation procedure](docs/install.md): delivered artifact entry point.
-- [Release procedure](docs/release.md): package, build, qualify and distribute.
-- [Versions and distribution](docs/distribution.md): prereleases, private registry and customer delivery.
-- [Scope and ownership](docs/scope.md): bundle and installation responsibilities.
+- [Installation procedure](docs/install.md): sales engineers and installation operators.
+- [Operations procedure](docs/operate.md): acceptance, diagnosis, upgrades and recovery.
+- [Release procedure](docs/release.md): bundle maintainers selecting, building and publishing.
+- [Distribution procedure](docs/distribution.md): maintainers and sales engineers arranging access and mirrors.

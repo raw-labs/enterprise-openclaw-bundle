@@ -1,5 +1,8 @@
 # Select, build and release
 
+For bundle maintainers selecting sources, running CI and publishing releases.
+Run commands from this repository with authorized GitHub access.
+
 Release JSON owns source pins, image digests, inventories and evidence. Build inputs
 are in the [checkpoint](../releases/source-checkpoint.json); runtime/tool setup and
 test commands are in the [workflows](../.github/workflows/). See
@@ -7,7 +10,7 @@ test commands are in the [workflows](../.github/workflows/). See
 
 ## Prepare
 
-Choose a new prerelease identity and export its exact sources:
+Set `RELEASE_ID` to a new prerelease identity and export its exact sources:
 
 ```bash
 python3 scripts/stock.py new --id "$RELEASE_ID" --output .work/candidate.json
@@ -15,9 +18,11 @@ python3 scripts/stock.py --selection .work/candidate.json source --output .work/
 python3 scripts/stock.py --selection .work/candidate.json dependencies --output .work/renderer-dependencies
 ```
 
-Set `RELEASE_ID` to the chosen identity. Use `stock.py new --checkpoint <file>`
-to select a different recorded checkpoint. Source exports use Git objects, not
-working-tree content; `source --from-git <path>` can use a read-only local repository.
+For new source pins, update and verify the
+checkpoint and its inventory, then commit them before dispatch: CI reads the
+repository checkpoint. `stock.py new --checkpoint <file>` supports local preparation.
+Source exports use Git objects, not working-tree content; `source --from-git <path>`
+can use a read-only local repository.
 
 ## Build and publish images
 
@@ -47,11 +52,12 @@ a Git tag or GitHub Release.
 Review the final image digests, native receipts and confinement profiles. Record
 acceptance in a JSON review record bound to those exact artifacts; the CLI validates
 its required fields. Provider access and customer installation checks remain separate.
+Set `REVIEW_RECORD` to that record's path and `RELEASE_SELECTION` to a new output path.
 
 ```bash
 python3 scripts/stock.py --selection .work/published/candidate.json accept \
-  --review <review-record.json> --output <new-release-selection.json>
-python3 scripts/bundle.py --release <new-release-selection.json> package \
+  --review "$REVIEW_RECORD" --output "$RELEASE_SELECTION"
+python3 scripts/bundle.py --release "$RELEASE_SELECTION" package \
   --source .work/source --dependencies .work/renderer-dependencies --output dist/bundle.tar.gz
 ```
 

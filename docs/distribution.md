@@ -1,5 +1,8 @@
 # Versions and distribution
 
+For release maintainers and sales engineers arranging artifact access or customer
+mirrors. Installation operators use the access handoff with the delivered install guide.
+
 Bundle versions are independent of the upstream chart version. Use immutable
 SemVer prerelease tags with numbered `alpha`, `beta` or `rc` suffixes. Alpha denotes
 early artifact preparation, beta denotes evaluation, and an RC is intended for
