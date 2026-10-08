@@ -14,7 +14,7 @@ cluster, database, DNS/TLS and backup policy. Prepare Kubernetes according to th
 selected OCE requirements, enforced NetworkPolicies, Ready disjoint control/agent node pools,
 RWO storage, cert-manager, Gateway API CRDs, Envoy and an existing GatewayClass.
 On AWS, supply VPC CNI policy enforcement, EBS CSI and ALB ingress separately;
-recorded pilot dependency versions are in the baseline `release.json`. Configure
+selected dependency requirements are in the bundled upstream documentation. Configure
 node pulls for the authorized customer registry, not just workstation login.
 
 Supply a PostgreSQL database with separate restricted application and migration
@@ -51,7 +51,7 @@ controllers also need installation-owned API/DNS/webhook policies. Keep the Envo
    export SECURE=/absolute/path/to/private-inputs
    umask 077
    python3 scripts/install.py render --input "$SITE/site.json" --profile codex \
-     --output "$SITE/rendered" --allow-pilot-baseline
+     --output "$SITE/rendered" --architecture linux/amd64
    ```
 
    Use `openclaw` for an embedded-only installation. Expect validated chart output,
@@ -60,11 +60,10 @@ controllers also need installation-owned API/DNS/webhook policies. Keep the Envo
    prerequisites and output before applying. Dedicated Codex requires the reviewed
    seccomp artifact installed through node provisioning at
    `/var/lib/kubelet/seccomp/openclaw/codex-<release-seccomp-sha256>.json` on every
-   harness node. For a reviewed stock release, add `--architecture linux/amd64`
-   or `--architecture linux/arm64`; the renderer selects that policy and pins the
-   dedicated Agent node selector to its architecture. The policy artifacts and native
-   receipts are in `release.json`; the legacy pilot origin is in its separate
-   provenance file. Verify sandbox execution on each customer's node configuration before acceptance.
+   harness node. Select `linux/amd64` or `linux/arm64` from `release.json`; the
+   renderer selects its policy and pins the dedicated Agent node selector to that
+   architecture. Historical baseline evaluation additionally requires
+   `--allow-pilot-baseline`. Verify sandbox execution on each customer's node configuration before acceptance.
    Do not disable confinement to make a test pass.
 
 3. In `$SECURE` retain raw files `application-url`, `migration-url`, `database-ca.pem`,
@@ -136,7 +135,8 @@ controllers also need installation-owned API/DNS/webhook policies. Keep the Envo
    Repeat into a new output after the gateway namespace appears. Require OCE
    Namespace `ready`. Import an optional `defaults/*-preset.json` through the
    authenticated Namespace preset API or use seeded presets. Create model Secrets,
-   grant Agent access, and deploy through the Console. For reviewed coding public
+   grant Agent access, and deploy through the Console. Review the preset configuration
+   and add the deployed Agent's exact HTTPS origin before using native UI. For reviewed coding public
    TCP access, generate grants with `--public-egress --agent-id '<agt_ID>'` and review
    the policy before applying. Agent IDs and tenant grants belong to the installation.
 
