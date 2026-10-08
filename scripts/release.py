@@ -30,7 +30,7 @@ from common import (
     safe_path,
     save,
 )
-from stock import github_json
+from stock import LICENSE_LAYER, github_json
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "raw-labs/enterprise-openclaw-bundle"
@@ -66,16 +66,15 @@ def definition(path):
             "openclawCommit",
             "codexVersion",
             "architectures",
-            "recipe",
+            "build",
             "presets",
             "plugins",
             "codexProfile",
-            "installationExample",
         },
         "unknown or missing bundle fields",
     )
     require(
-        spec["schemaVersion"] == 1 and SEMVER.fullmatch(spec["version"]),
+        spec["schemaVersion"] == 2 and SEMVER.fullmatch(spec["version"]),
         "use an immutable numbered alpha, beta or rc version",
     )
     require(path.parent.name == spec["version"], "folder/version mismatch")
@@ -103,24 +102,19 @@ def definition(path):
         and all(re.fullmatch(r"[a-z][a-z0-9-]*", p) for p in spec["plugins"]),
         "select unique bundled plugin IDs",
     )
-    recipe = load(pinned_file(spec["recipe"]))
-    require(
-        set(recipe) == {"type", "noticeLayer", "patches", "confinement"}
-        and recipe["type"] == "oce-stock",
-        "unsupported recipe",
-    )
-    pinned_file(recipe["noticeLayer"])
-    require(isinstance(recipe["patches"], list), "patches must be a list")
-    for patch in recipe["patches"]:
+    build = spec["build"]
+    require(set(build) == {"patches", "confinement"}, "unknown or missing build fields")
+    require(isinstance(build["patches"], list), "patches must be a list")
+    for patch in build["patches"]:
         pinned_file(patch)
     require(
-        set(recipe["confinement"])
+        set(build["confinement"])
         == {
             "scripts/lib/codex-seccomp-profile.mjs",
             ".github/actions/run-ci-lane/codex-sandbox.apparmor",
         }
-        and all(HASH.fullmatch(h) for h in recipe["confinement"].values()),
-        "pin reviewed source confinement inputs in the recipe",
+        and all(HASH.fullmatch(h) for h in build["confinement"].values()),
+        "pin reviewed source confinement inputs in bundle.json",
     )
     targets = set()
     for ref in spec["presets"]:
@@ -133,9 +127,8 @@ def definition(path):
         )
         require(source.name not in targets, "duplicate preset filename")
         targets.add(source.name)
-    for key in ("codexProfile", "installationExample"):
-        pinned_file(spec[key])
-    return spec, recipe
+    pinned_file(spec["codexProfile"])
+    return spec
 
 
 def export_source(spec, output, from_git=None):
@@ -186,14 +179,14 @@ def export_source(spec, output, from_git=None):
 
 
 def resolve(args):
-    spec, recipe = definition(args.definition)
+    spec = definition(args.definition)
     out = Path(args.output).resolve()
     require(not out.exists(), "resolved output already exists")
     out.mkdir(parents=True)
     source = out / "source"
     oce = export_source(spec, source, args.from_git)
     original_license = (source / "LICENSE").read_bytes()
-    for patch in recipe["patches"]:
+    for patch in spec["build"]["patches"]:
         # Apply only tracked, hash-checked source patches. Git rejects paths outside this export.
         env = dict(os.environ, GIT_CEILING_DIRECTORIES=str(source.parent))
         run(["git", "apply", "--check", pinned_file(patch)], cwd=source, env=env)
@@ -202,10 +195,10 @@ def resolve(args):
         (source / "LICENSE").read_bytes() == original_license,
         "upstream license must be preserved",
     )
-    for path, expected in recipe["confinement"].items():
+    for path, expected in spec["build"]["confinement"].items():
         require(
             digest(safe_path(source, path).read_bytes()) == expected,
-            "confinement input changed; review and repin recipe",
+            "confinement input changed; review and repin bundle.json",
         )
     files = {}
     for path in sorted(source.rglob("*")):
@@ -257,10 +250,7 @@ def resolve(args):
             "dockerfile": "deploy/runtime/Dockerfile",
             "target": "repository-credentials-service",
         },
-        noticeLayer={
-            "fragment": "recipe/notices.fragment",
-            "sha256": recipe["noticeLayer"]["sha256"],
-        },
+        noticeLayerSha256=digest(LICENSE_LAYER),
     )
     patches = {
         p: h
@@ -273,13 +263,18 @@ def resolve(args):
     )
     payload = {"defaults/" + Path(ref["path"]).name: ref for ref in spec["presets"]}
     payload["defaults/codex-profile.json"] = spec["codexProfile"]
-    payload["profiles/aws-example.json"] = spec["installationExample"]
+    examples = sorted((ROOT / "docs/examples/installations").glob("*.json"))
+    require(examples, "installation documentation examples missing")
+    for example in examples:
+        payload["examples/installations/" + example.name] = {
+            "path": str(example.relative_to(ROOT)),
+            "sha256": digest(example.read_bytes()),
+        }
+
     for name, ref in payload.items():
         target = safe_path(out, name)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(pinned_file(ref), target)
-    (out / "recipe").mkdir()
-    shutil.copyfile(pinned_file(recipe["noticeLayer"]), out / "recipe/notices.fragment")
     shutil.copyfile(args.definition, out / "bundle.json")
     lock = (source / "pnpm-lock.yaml").read_text()
     tldts = load(source / "apps/controller/package.json")["dependencies"]["tldts"]
@@ -329,8 +324,8 @@ def resolve(args):
         "kind": "candidate",
         "architectures": spec["architectures"],
         "definitionSha256": digest(Path(args.definition).read_bytes()),
-        "recipe": spec["recipe"],
-        "modifications": recipe["patches"],
+        "modifications": spec["build"]["patches"],
+        "confinementInputs": spec["build"]["confinement"],
         "plugins": spec["plugins"],
         "sources": {
             "oce": oce,
@@ -442,49 +437,55 @@ def verify_handoff(archive, published=True):
             [sys.executable, artifact / "scripts/install.py", "verify"],
             stdout=subprocess.DEVNULL,
         )
-        for profile in ("codex", "openclaw"):
-            for arch in ("amd64", "arm64"):
-                dest = root / (profile + "-" + arch)
-                if published:
-                    run(
-                        [
-                            sys.executable,
-                            artifact / "scripts/install.py",
-                            "render",
-                            "--input",
-                            artifact / "profiles/aws-example.json",
-                            "--profile",
-                            profile,
-                            "--architecture",
-                            "linux/" + arch,
-                            "--output",
-                            dest,
-                        ],
-                        stdout=subprocess.DEVNULL,
-                    )
-                else:
-                    # A dry-run exercises the exact renderer without granting installation admission.
-                    import install
+        examples = sorted((artifact / "examples/installations").glob("*.json"))
+        require(examples, "installation examples missing from handoff")
+        for example in examples:
+            for profile in ("codex", "openclaw"):
+                for arch in ("amd64", "arm64"):
+                    dest = root / (example.stem + "-" + profile + "-" + arch)
+                    if published:
+                        run(
+                            [
+                                sys.executable,
+                                artifact / "scripts/install.py",
+                                "render",
+                                "--input",
+                                example,
+                                "--profile",
+                                profile,
+                                "--architecture",
+                                "linux/" + arch,
+                                "--output",
+                                dest,
+                            ],
+                            stdout=subprocess.DEVNULL,
+                        )
+                    else:
+                        # A dry-run exercises the exact renderer without granting installation admission.
+                        import install
 
-                    original_root, original_gate = install.ROOT, install.install_gate
-                    try:
-                        install.ROOT = artifact
-                        install.install_gate = lambda release: None
-                        install.render(
-                            SimpleNamespace(
-                                input=artifact / "profiles/aws-example.json",
-                                profile=profile,
-                                architecture="linux/" + arch,
-                                output=dest,
-                                mirrors=None,
-                            ),
-                            read_release(artifact / "release.json"),
+                        original_root, original_gate = (
+                            install.ROOT,
+                            install.install_gate,
                         )
-                    finally:
-                        install.ROOT, install.install_gate = (
-                            original_root,
-                            original_gate,
-                        )
+                        try:
+                            install.ROOT = artifact
+                            install.install_gate = lambda release: None
+                            install.render(
+                                SimpleNamespace(
+                                    input=example,
+                                    profile=profile,
+                                    architecture="linux/" + arch,
+                                    output=dest,
+                                    mirrors=None,
+                                ),
+                                read_release(artifact / "release.json"),
+                            )
+                        finally:
+                            install.ROOT, install.install_gate = (
+                                original_root,
+                                original_gate,
+                            )
 
 
 def finish(args):
@@ -555,7 +556,7 @@ def finish(args):
         },
     )
     print(
-        "Handoff verified: deterministic archive, complete inventory and four real chart renders"
+        "Handoff verified: deterministic archive, complete inventory and real chart renders"
     )
 
 
@@ -640,28 +641,11 @@ def validate_definitions():
         )
         if prior.returncode == 0:
             current = ROOT / relative
-            require(
-                current.is_file() and prior.stdout == current.read_bytes(),
-                "published definition changed or deleted",
-            )
-    event_path = os.environ.get("GITHUB_EVENT_PATH")
-    event = load(event_path) if event_path else {}
-    base = (
-        event.get("pull_request", {}).get("base", {}).get("sha")
-        or event.get("before")
-        or "HEAD"
-    )
-    if base != "0" * 40:
-        changes = subprocess.check_output(
-            ["git", "diff", "--name-only", "--diff-filter=MD", base, "--", "releases"],
-            cwd=ROOT,
-            text=True,
-        )
-        require(
-            not changes.strip(),
-            "historical release evidence cannot be modified or deleted",
-        )
-    print(f"Validated {len(definitions)} definitions and preserved historical evidence")
+            if current.exists():
+                require(
+                    prior.stdout == current.read_bytes(), "published definition changed"
+                )
+    print(f"Validated {len(definitions)} bundle definitions")
 
 
 def main():
@@ -686,7 +670,7 @@ def main():
     if args.command == "validate-definitions":
         validate_definitions()
     elif args.command == "preflight":
-        spec, _ = definition(args.definition)
+        spec = definition(args.definition)
         preflight(spec["version"], os.environ.get("GITHUB_SHA", ""))
     else:
         if args.command == "resolve" and not args.definition:

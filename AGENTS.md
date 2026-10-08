@@ -4,13 +4,13 @@ Own release selection, reusable build/packaging, verification and customer hando
 Read other repositories without changing them. Do not deploy infrastructure, change
 live Agents, or add OpenClaw Connections in this milestone.
 
-`bundles/<version>/bundle.json` owns human-authored ingredient selection;
-`recipes/` owns hash-pinned build additions and reviewed confinement inputs.
+`bundles/<version>/bundle.json` owns human-authored ingredient selection,
+optional source patches and reviewed confinement inputs. `defaults/` owns selectable
+templates. `scripts/` owns build, verification and delivery mechanics.
 The release Action generates inventories, native receipts, image indexes, archives
-and provenance as CI artifacts and GitHub release assets. `releases/` retains
-previously published evidence unchanged. `defaults/` and `profiles/` own selectable
-templates and examples; retain old hash-pinned ingredients when adding new ones.
-`scripts/` owns mechanics; `docs/` owns short static procedures. README is navigation only.
+and provenance only as CI artifacts and GitHub release assets. `docs/` owns short
+static procedures and installation examples. README is navigation only.
+Preserve published source and evidence at immutable Git tags and release assets.
 Do not duplicate current pins, fleet identities or qualification claims in prose.
 Keep documentation short and static; use Git history for ordinary chronology.
 

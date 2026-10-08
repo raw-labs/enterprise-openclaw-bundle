@@ -200,11 +200,6 @@ def package(args, release):
             safe_path(Path(args.release).parent, receipt["path"]).read_bytes(),
             0o644,
         )
-    if q["status"] == "qualified":
-        files[q["receipt"]] = (
-            safe_path(Path(args.release).parent, q["receipt"]).read_bytes(),
-            0o644,
-        )
     manifest = {name: digest(data) for name, (data, _) in files.items()}
     files["manifest.json"] = (
         (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(),

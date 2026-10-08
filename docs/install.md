@@ -20,7 +20,7 @@ Cloud prerequisites and node confinement are the installation operator's respons
 
 ## Render installation inputs
 
-Copy `profiles/aws-example.json` into the private installation directory as
+Copy `examples/installations/aws.json` into the private installation directory as
 `site.json`. Replace its example addresses, domains, email, selectors and storage
 settings. Review the cluster requirements against the chosen source revision in
 `release.json`; the example does not establish support for another environment.

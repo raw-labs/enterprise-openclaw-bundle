@@ -36,7 +36,7 @@ jobs:
           if [ "$PUBLISH" = true ]; then
             python3 scripts/release.py preflight --definition "$DEFINITION"
           fi
-      - name: Resolve exact source, recipe, presets and dependencies
+      - name: Resolve exact source, build settings, presets and dependencies
         id: version
         env:
           DEFINITION: ${{ inputs.definition }}

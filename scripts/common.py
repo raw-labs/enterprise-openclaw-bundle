@@ -75,12 +75,6 @@ def read_release(path, root=None):
     release = validate(load(path))
     if release["schemaVersion"] == 2:
         if root is not None:
-            notice = release["build"]["noticeLayer"]
-            require(
-                digest(release_file(path, root, notice["fragment"]).read_bytes())
-                == notice["sha256"],
-                "notice layer integrity mismatch",
-            )
             for name, expected in release["payloadFiles"].items():
                 source = release_file(path, root, name)
                 require(
@@ -141,14 +135,6 @@ def read_release(path, root=None):
             require(
                 workflows[0] == workflows[1], "native receipts belong to different runs"
             )
-        if release["qualification"]["status"] == "qualified":
-            q = release["qualification"]
-            review = safe_path(path.parent, q["receipt"])
-            require(
-                digest(review.read_bytes()) == q["receiptSha256"],
-                "review receipt integrity mismatch",
-            )
-            validate_stock_review(release, load(review))
         return release
 
 
@@ -184,6 +170,10 @@ def validate_stock(release):
         re.fullmatch(r"\d+\.\d+\.\d+", runtime["codexVersion"]), "invalid Codex version"
     )
     require(HASH.fullmatch(runtime["inventoryHelperSha256"]), "helper hash required")
+    require(
+        HASH.fullmatch(release["build"]["noticeLayerSha256"]),
+        "license build hash required",
+    )
     for image in ("nodeBaseImage", "nodeRuntimeBaseImage"):
         require(IMAGE.fullmatch(release["build"][image]), "base image digest required")
     for role, expected in {
@@ -245,20 +235,13 @@ def validate_stock(release):
         )
     else:
         require(
-            q["status"] in ("qualified", "native-verified")
-            and release["kind"] == "release",
+            q["status"] == "native-verified" and release["kind"] == "release",
             "release requires native artifact verification",
         )
-        if q["status"] == "qualified":
-            require(
-                q.get("receipt") and HASH.fullmatch(q.get("receiptSha256", "")),
-                "historical acceptance receipt required",
-            )
-        else:
-            require(
-                HASH.fullmatch(release.get("definitionSha256", "")),
-                "native release must bind its bundle definition",
-            )
+        require(
+            HASH.fullmatch(release.get("definitionSha256", "")),
+            "native release must bind its bundle definition",
+        )
         require(
             all(image["reference"] for image in release["images"].values()),
             "review requires all shipping image digests",
@@ -284,24 +267,6 @@ def validate_stock(release):
         "unexpected distribution destination",
     )
     return release
-
-
-def validate_stock_review(release, review):
-    require(
-        review["status"] == "reviewed-native-artifacts"
-        and isinstance(review.get("reviewedBy"), str)
-        and review["reviewedBy"].strip()
-        and review["releaseId"] == release["id"]
-        and review["images"] == identities(release)
-        and review["oceCommit"] == release["sources"]["oce"]["commit"]
-        and review["openclawCommit"] == release["sources"]["openclaw"]["commit"]
-        and review["codexVersion"] == release["runtime"]["codexVersion"]
-        and review["nativeReceipts"] == release["qualification"]["nativeReceipts"]
-        and review["confinementProfiles"] == release["seccomp"]["profiles"]
-        and review["scope"]
-        == "native shipping artifacts; provider access and customer installation acceptance remain separate",
-        "review does not accept these exact native artifacts",
-    )
 
 
 def install_gate(release):

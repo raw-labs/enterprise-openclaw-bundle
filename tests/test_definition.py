@@ -17,7 +17,6 @@ from release import (  # noqa: E402
     latest_definition,
     pinned_file,
     preflight,
-    validate_definitions,
 )
 from stock import publish  # noqa: E402
 
@@ -47,41 +46,22 @@ class DefinitionInputs(unittest.TestCase):
         ):
             self.rejected(mutate)
 
-    def test_changed_recipe_and_path_escape_rejected(self):
+    def test_changed_ingredient_and_path_escape_rejected(self):
         for ref in (
             {"path": "../outside", "sha256": "0" * 64},
-            {"path": self.spec["recipe"]["path"], "sha256": "0" * 64},
+            {"path": self.spec["codexProfile"]["path"], "sha256": "0" * 64},
         ):
             with self.assertRaises(ValueError):
                 pinned_file(ref)
 
-    def test_all_ingredients_are_checked_and_old_definition_matches_published_inputs(
-        self,
-    ):
-        for path in (ROOT / "bundles").glob("*/bundle.json"):
-            spec, recipe = definition(path)
-            if (ROOT / "releases" / spec["version"] / "release.json").exists():
-                published = read_release(
-                    ROOT / "releases" / spec["version"] / "release.json", ROOT
-                )
-                self.assertEqual(
-                    spec["oce"]["commit"], published["sources"]["oce"]["commit"]
-                )
-                self.assertEqual(
-                    spec["openclawCommit"], published["sources"]["openclaw"]["commit"]
-                )
-                self.assertEqual(
-                    spec["codexVersion"], published["runtime"]["codexVersion"]
-                )
-                self.assertEqual(
-                    recipe["noticeLayer"]["sha256"],
-                    published["build"]["noticeLayer"]["sha256"],
-                )
-                for ref in spec["presets"]:
-                    self.assertEqual(
-                        ref["sha256"],
-                        published["payloadFiles"]["defaults/" + Path(ref["path"]).name],
-                    )
+    def test_all_definitions_have_one_complete_selection(self):
+        paths = list((ROOT / "bundles").glob("*/bundle.json"))
+        self.assertTrue(paths)
+        for path in paths:
+            spec = definition(path)
+            self.assertEqual(set(spec["build"]), {"patches", "confinement"})
+            self.assertNotIn("recipe", spec)
+            self.assertNotIn("installationExample", spec)
 
     def test_generated_inventory_covers_exact_source(self):
         selection = ROOT / ".work/resolved/candidate.json"
@@ -111,14 +91,6 @@ class DefinitionInputs(unittest.TestCase):
         release["distribution"]["published"] = False
         with self.assertRaisesRegex(ValueError, "unpublished"):
             install_gate(release)
-
-    def test_historical_changes_rejected(self):
-        with patch(
-            "release.subprocess.check_output",
-            return_value="releases/old/release.json\n",
-        ):
-            with self.assertRaisesRegex(ValueError, "historical release evidence"):
-                validate_definitions()
 
 
 class ReleaseDestination(unittest.TestCase):

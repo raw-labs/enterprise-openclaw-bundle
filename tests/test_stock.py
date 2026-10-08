@@ -23,7 +23,6 @@ from common import (  # noqa: E402
     read_release,
     save,
     validate,
-    validate_stock_review,
 )
 from stock import (  # noqa: E402
     assemble_index,
@@ -84,36 +83,10 @@ class StockInputs(unittest.TestCase):
             with self.assertRaises(ValueError):
                 tap_counts(text)
 
-    def test_review_cannot_change_selected_images_or_scope(self):
-        self.release["qualification"]["nativeReceipts"] = {
-            "amd64": {"path": "test-only.json", "sha256": "1" * 64}
-        }
-        review = {
-            "status": "reviewed-native-artifacts",
-            "reviewedBy": "synthetic contract test; not runtime evidence",
-            "releaseId": self.release["id"],
-            "images": {r: None for r in self.release["images"]},
-            "oceCommit": self.release["sources"]["oce"]["commit"],
-            "openclawCommit": self.release["sources"]["openclaw"]["commit"],
-            "codexVersion": self.release["runtime"]["codexVersion"],
-            "nativeReceipts": self.release["qualification"]["nativeReceipts"],
-            "confinementProfiles": {},
-            "scope": "native shipping artifacts; provider access and customer installation acceptance remain separate",
-        }
-        validate_stock_review(self.release, review)
-        for key, wrong in (
-            ("images", {"controller": "fixture.invalid/new@sha256:" + "0" * 64}),
-            ("scope", "customer-qualified"),
-            ("nativeReceipts", {}),
-        ):
-            changed = copy.deepcopy(review)
-            changed[key] = wrong
-            with self.assertRaises(ValueError):
-                validate_stock_review(self.release, changed)
-        # A parser match cannot promote unbuilt artifacts or supply missing native evidence.
+    def test_native_promotion_requires_built_images_and_both_receipts(self):
         self.release["kind"] = "release"
         self.release["qualification"].update(
-            status="qualified", receipt="test-only.json", receiptSha256="1" * 64
+            status="native-verified", nativeReceipts={}
         )
         with self.assertRaises(ValueError):
             validate(self.release)
@@ -121,30 +94,29 @@ class StockInputs(unittest.TestCase):
 
 class ReleaseSnapshots(unittest.TestCase):
     def test_archived_inputs_survive_changed_current_defaults(self):
-        records = list((ROOT / "releases").glob("*/release.json"))
-        self.assertTrue(records)
+        import shutil
+
         with tempfile.TemporaryDirectory() as temp:
-            current = Path(temp)
-            for record in records:
-                release = read_release(record, ROOT)
-                names = [
-                    *release["payloadFiles"],
-                    release["build"]["noticeLayer"]["fragment"],
-                ]
-                for name in names:
-                    path = current / name
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text("changed current input\n")
-                self.assertEqual(read_release(record, current), release)
+            root = Path(temp)
+            snapshots, current = root / "snapshot", root / "current"
+            shutil.copytree(
+                SELECTION.parent,
+                snapshots,
+                ignore=shutil.ignore_patterns("source", "dependencies"),
+            )
+            release = read_release(snapshots / "candidate.json", ROOT)
+            for name in release["payloadFiles"]:
+                path = current / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("changed current input")
+            self.assertEqual(
+                read_release(snapshots / "candidate.json", current), release
+            )
 
     def test_tampered_snapshot_cannot_fall_back_to_current_defaults(self):
         with tempfile.TemporaryDirectory() as temp:
             record = Path(temp) / "release.json"
             record.write_bytes(SELECTION.read_bytes())
-            notice = load(SELECTION)["build"]["noticeLayer"]["fragment"]
-            notice_path = record.parent / notice
-            notice_path.parent.mkdir(parents=True)
-            notice_path.write_bytes((SELECTION.parent / notice).read_bytes())
             name = "defaults/coding-preset.json"
             tampered = record.parent / name
             tampered.parent.mkdir(parents=True)
@@ -370,7 +342,7 @@ class StockArtifact(unittest.TestCase):
                 str(self.artifact / "scripts/install.py"),
                 "render",
                 "--input",
-                str(self.artifact / "profiles/aws-example.json"),
+                str(self.artifact / "examples/installations/aws.json"),
                 "--profile",
                 "codex",
                 "--output",
@@ -388,7 +360,7 @@ class StockArtifact(unittest.TestCase):
         with tarfile.open(self.artifact / release["chart"]["artifact"]) as tar:
             tar.extractall(chart, filter="data")
         for profile in ("openclaw", "codex"):
-            site = load(self.artifact / "profiles/aws-example.json")
+            site = load(self.artifact / "examples/installations/aws.json")
             site["controlPlane"]["controllerImage"] = (
                 "fixture.invalid/controller@sha256:" + "0" * 64
             )
@@ -489,7 +461,7 @@ class StockArtifact(unittest.TestCase):
             for arch in ("amd64", "arm64"):
                 output = self.out / ("arch-contract-" + arch)
                 args = SimpleNamespace(
-                    input=self.artifact / "profiles/aws-example.json",
+                    input=self.artifact / "examples/installations/aws.json",
                     profile="codex",
                     output=output,
                     mirrors=None,

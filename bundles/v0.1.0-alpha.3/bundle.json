@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "version": "v0.1.0-alpha.1",
+  "schemaVersion": 2,
+  "version": "v0.1.0-alpha.3",
   "oce": {
     "repository": "https://github.com/raw-labs/openclaw-enterprise.git",
     "commit": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db"
@@ -11,10 +11,6 @@
     "linux/amd64",
     "linux/arm64"
   ],
-  "recipe": {
-    "path": "recipes/stock/recipe.json",
-    "sha256": "38b5e6914fce19a47d8953c323a1162e2cc3d1bda119b9be536a739ad128ec3f"
-  },
   "presets": [
     {
       "path": "defaults/coding-preset.json",
@@ -33,8 +29,11 @@
     "path": "defaults/codex-profile.json",
     "sha256": "993df48904fb8a2ee68f29bec6d857af5f830ce08a91ba48fd7f4ddbc9c6964b"
   },
-  "installationExample": {
-    "path": "profiles/aws-example.json",
-    "sha256": "4ff05c26e3a6ebb89075fc9b14a9d9823fbc078e47465d1d8d1f96eb2240d94a"
+  "build": {
+    "patches": [],
+    "confinement": {
+      "scripts/lib/codex-seccomp-profile.mjs": "d0aa9a9db8e6ff8a1c2a00f8778f8c4193010888cc80e5cf0cdd3b99b9bb68a7",
+      ".github/actions/run-ci-lane/codex-sandbox.apparmor": "188c9142ca4de344a7f0e0c8252d0b9e37f233e3f12814f1a29b4f9210cec32b"
+    }
   }
 }

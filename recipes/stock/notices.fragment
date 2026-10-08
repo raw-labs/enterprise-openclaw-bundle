@@ -1,7 +1,0 @@
-
-FROM __UPSTREAM_TARGET__ AS bundle-notices
-USER root
-COPY LICENSE /usr/share/licenses/openclaw-enterprise/LICENSE
-RUN chmod 0755 /usr/share/licenses /usr/share/licenses/openclaw-enterprise \
-    && chmod 0444 /usr/share/licenses/openclaw-enterprise/LICENSE
-USER node

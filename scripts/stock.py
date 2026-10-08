@@ -37,16 +37,21 @@ ROLE_NAMES = {"repositoryCredentials": "repository-credentials"}
 DIGEST = re.compile(r"sha256:[a-f0-9]{64}$")
 
 
+LICENSE_LAYER = b"""
+FROM __UPSTREAM_TARGET__ AS bundle-notices
+USER root
+COPY LICENSE /usr/share/licenses/openclaw-enterprise/LICENSE
+RUN chmod 0755 /usr/share/licenses /usr/share/licenses/openclaw-enterprise \\
+    && chmod 0444 /usr/share/licenses/openclaw-enterprise/LICENSE
+USER node
+"""
+
+
 def snapshot_inputs(release, selection, directory):
     files = {
         name: (release_file(selection, ROOT, name), expected)
         for name, expected in release["payloadFiles"].items()
     }
-    notice = release["build"]["noticeLayer"]
-    files[notice["fragment"]] = (
-        release_file(selection, ROOT, notice["fragment"]),
-        notice["sha256"],
-    )
     definition = Path(selection).parent / "bundle.json"
     require(definition.is_file(), "missing bundle definition snapshot")
     files["bundle.json"] = (definition, release["definitionSha256"])
@@ -253,9 +258,11 @@ def build(args, release):
                     "type=gha,mode=max,scope=" + scope,
                 ]
             )
-        notice = release["build"]["noticeLayer"]
-        fragment = release_file(args.selection, ROOT, notice["fragment"]).read_bytes()
-        require(digest(fragment) == notice["sha256"], "notice layer input mismatch")
+        fragment = LICENSE_LAYER
+        require(
+            digest(fragment) == release["build"]["noticeLayerSha256"],
+            "license build code changed",
+        )
         # Preserve the selected recipe and append only the required upstream notice.
         with tempfile.TemporaryDirectory() as temporary:
             dockerfile = Path(temporary) / "Dockerfile"
