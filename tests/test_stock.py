@@ -437,6 +437,42 @@ class StockArtifact(unittest.TestCase):
             with self.assertRaises(ValueError):
                 renderer_files(release, out)
 
+    def test_mirrors_preserve_every_shipping_digest(self):
+        release = load(self.artifact / "release.json")
+        for role, image in release["images"].items():
+            image["reference"] = "fixture.invalid/" + role + "@sha256:" + "1" * 64
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "mirrors.json"
+            mirrors = {
+                role: "mirror.invalid/" + role + "@sha256:" + "1" * 64
+                for role in release["images"]
+            }
+            save(path, mirrors)
+            self.assertEqual(installer.selected_images(release, path), mirrors)
+            for changed in (
+                mirrors | {"runtime": "mirror.invalid/runtime:latest"},
+                mirrors | {"runtime": "mirror.invalid/runtime@sha256:" + "2" * 64},
+                {"runtime": mirrors["runtime"]},
+            ):
+                save(path, changed)
+                with self.assertRaises(ValueError):
+                    installer.selected_images(release, path)
+
+    def test_delivered_file_tampering_is_detected(self):
+        path = self.artifact / "defaults/coding-preset.json"
+        original = path.read_bytes()
+        try:
+            path.write_bytes(original + b" ")
+            result = subprocess.run(
+                [sys.executable, str(self.artifact / "scripts/install.py"), "verify"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("file integrity mismatch", result.stderr)
+        finally:
+            path.write_bytes(original)
+
     def test_architecture_selects_agent_policy_and_preserves_gateway_pool(self):
         # Bypass admission only in this renderer contract test. No qualification is recorded.
         release = load(self.artifact / "release.json")

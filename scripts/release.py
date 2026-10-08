@@ -627,21 +627,23 @@ def validate_definitions():
     definitions = list((ROOT / "bundles").glob("*/bundle.json"))
     require(definitions, "no bundle definitions")
     for path in definitions:
-        spec, _ = definition(path)
-        tag = subprocess.run(
-            ["git", "rev-parse", "--verify", "refs/tags/" + spec["version"]],
-            capture_output=True,
-            text=True,
+        definition(path)
+    tags = subprocess.check_output(
+        ["git", "tag", "--list"], cwd=ROOT, text=True
+    ).splitlines()
+    for tag in tags:
+        if not SEMVER.fullmatch(tag):
+            continue
+        relative = "bundles/" + tag + "/bundle.json"
+        prior = subprocess.run(
+            ["git", "show", tag + ":" + relative], cwd=ROOT, capture_output=True
         )
-        if tag.returncode == 0:
-            relative = str(path.relative_to(ROOT))
-            prior = subprocess.run(
-                ["git", "show", spec["version"] + ":" + relative], capture_output=True
+        if prior.returncode == 0:
+            current = ROOT / relative
+            require(
+                current.is_file() and prior.stdout == current.read_bytes(),
+                "published definition changed or deleted",
             )
-            if prior.returncode == 0:
-                require(
-                    prior.stdout == path.read_bytes(), "published definition changed"
-                )
     event_path = os.environ.get("GITHUB_EVENT_PATH")
     event = load(event_path) if event_path else {}
     base = (
