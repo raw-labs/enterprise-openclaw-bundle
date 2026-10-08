@@ -12,7 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-SELECTION = ROOT / ".work/validation-input/candidate.json"
+SELECTION = ROOT / ".work/resolved/candidate.json"
 sys.path.insert(0, str(ROOT / "scripts"))
 import install as installer  # noqa: E402
 from common import (  # noqa: E402
@@ -46,12 +46,12 @@ class StockInputs(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(release)
 
-    def test_unbuilt_has_no_pilot_images(self):
+    def test_unbuilt_has_no_shipping_images(self):
         self.assertTrue(
             all(i["reference"] is None for i in self.release["images"].values())
         )
         with self.assertRaises(ValueError):
-            install_gate(self.release, True)
+            install_gate(self.release)
 
     def test_mutable_source_and_partial_platforms_rejected(self):
         self.reject(lambda r: r["sources"]["oce"].update(commit="main"))
@@ -141,6 +141,10 @@ class ReleaseSnapshots(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             record = Path(temp) / "release.json"
             record.write_bytes(SELECTION.read_bytes())
+            notice = load(SELECTION)["build"]["noticeLayer"]["fragment"]
+            notice_path = record.parent / notice
+            notice_path.parent.mkdir(parents=True)
+            notice_path.write_bytes((SELECTION.parent / notice).read_bytes())
             name = "defaults/coding-preset.json"
             tampered = record.parent / name
             tampered.parent.mkdir(parents=True)
@@ -297,8 +301,8 @@ class OciInputs(unittest.TestCase):
 class StockArtifact(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.source = ROOT / ".work/stock-verified-source"
-        cls.dependencies = ROOT / ".work/stock-renderer-dependencies"
+        cls.source = ROOT / ".work/resolved/source"
+        cls.dependencies = ROOT / ".work/resolved/dependencies"
         if not cls.source.exists() or not cls.dependencies.exists():
             raise RuntimeError(
                 "Export the stock source and verified dependency archives before packaging tests; no skips"
@@ -454,7 +458,6 @@ class StockArtifact(unittest.TestCase):
                     output=output,
                     mirrors=None,
                     architecture="linux/" + arch,
-                    allow_pilot_baseline=False,
                 )
                 installer.render(args, release)
                 installation = helm_values(output / "installation.yaml")

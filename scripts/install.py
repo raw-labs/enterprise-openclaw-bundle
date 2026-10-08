@@ -51,7 +51,7 @@ def selected_images(release, mapping):
 
 
 def render(args, release):
-    install_gate(release, args.allow_pilot_baseline)
+    install_gate(release)
     out = Path(args.output).resolve()
     require(not out.exists(), "render output exists; use a new directory")
     input = load(args.input)
@@ -73,11 +73,6 @@ def render(args, release):
                 "runtime node selector architecture mismatch",
             )
             selector["kubernetes.io/arch"] = arch
-    elif architecture is not None:
-        require(
-            architecture == release["architecture"],
-            "legacy release architecture mismatch",
-        )
     for obj, key, role in [
         (cp, "controllerImage", "controller"),
         (rt, "image", "runtime"),
@@ -108,11 +103,7 @@ def render(args, release):
     )
     if args.profile == "codex":
         input.setdefault("codex", {}).setdefault("modelDiscoveryCidrs", [])
-        policy = (
-            release["seccomp"]["profiles"][architecture]
-            if release["schemaVersion"] == 2
-            else release["seccomp"]
-        )
+        policy = release["seccomp"]["profiles"][architecture]
         expected = "openclaw/codex-" + policy["sha256"] + ".json"
         require(
             "codexSeccompProfile" not in rt or rt["codexSeccompProfile"] == expected,
@@ -492,7 +483,6 @@ def main():
     p.add_argument("--output", required=True)
     p.add_argument("--mirrors")
     p.add_argument("--architecture", choices=("linux/amd64", "linux/arm64"))
-    p.add_argument("--allow-pilot-baseline", action="store_true")
     p = sub.add_parser("check")
     p.add_argument("--directory", required=True)
     p = sub.add_parser("tenant-resources")

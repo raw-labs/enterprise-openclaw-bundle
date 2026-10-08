@@ -66,108 +66,8 @@ def identities(release):
 
 
 def validate(release):
-    if release.get("schemaVersion") == 2:
-        return validate_stock(release)
-    require(release["schemaVersion"] == 1, "unsupported release schema")
-    require(
-        bool(re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,79}", release["id"])),
-        "invalid release identity",
-    )
-    require(
-        release["kind"] in ("recorded-baseline", "candidate", "release"),
-        "invalid release kind",
-    )
-    require(release["architecture"] == "linux/amd64", "only linux/amd64 is selected")
-    for src in release["sources"].values():
-        require(bool(SHA.fullmatch(src["commit"])), "source must pin a full commit")
-        require(
-            bool(HASH.fullmatch(src["archiveSha256"])),
-            "source archive checksum required",
-        )
-        require(
-            bool(
-                re.fullmatch(
-                    r"https://github.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.git",
-                    src["repository"],
-                )
-            ),
-            "invalid source repository",
-        )
-    oce = release["sources"]["oce"]["commit"]
-    require(release["chart"]["sourceCommit"] == oce, "chart/source mismatch")
-    require(release["chart"]["name"] == "openclaw-enterprise", "unexpected chart name")
-    require(
-        bool(
-            re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][\w.-]+)?", release["chart"]["version"])
-        ),
-        "invalid chart version",
-    )
-    require(set(release["images"]) == set(ROLES), "exactly three image roles required")
-    for role, image in release["images"].items():
-        require(
-            bool(IMAGE.fullmatch(image["reference"])),
-            f"{role} must use immutable image digest",
-        )
-        require(image["oceCommit"] == oce, f"{role} image/source mismatch")
-    runtime = release["images"]["runtime"]
-    require(
-        runtime["openclawCommit"] == release["sources"]["openclaw"]["commit"],
-        "runtime/OpenClaw mismatch",
-    )
-    overlay = release["overlay"]
-    require(
-        overlay["id"] == "codex-" + overlay["codexVersion"], "overlay identity mismatch"
-    )
-    require(
-        runtime["codexVersion"] == overlay["codexVersion"],
-        "runtime/overlay version mismatch",
-    )
-    require(
-        overlay["files"] and overlay["qualificationPatch"] in overlay["files"],
-        "tracked qualification patch required",
-    )
-    require(
-        bool(IMAGE.fullmatch(release["build"]["nodeBaseImage"]))
-        and bool(IMAGE.fullmatch(release["build"]["nodeRuntimeBaseImage"])),
-        "base images must be digest pinned",
-    )
-    require(bool(HASH.fullmatch(release["seccomp"]["sha256"])), "seccomp hash required")
-    q = release["qualification"]
-    require(
-        q["status"] in ("unqualified", "pilot-recorded", "qualified"),
-        "invalid qualification status",
-    )
-    require(
-        isinstance(q["customerQualified"], bool),
-        "customer qualification must be explicit",
-    )
-    if q["status"] == "pilot-recorded":
-        require(
-            release["kind"] == "recorded-baseline" and not q["customerQualified"],
-            "pilot is not a customer release",
-        )
-        require(
-            q["evidence"]["images"] == identities(release),
-            "pilot evidence image mismatch",
-        )
-        require(
-            q["evidence"]["oceCommit"] == oce
-            and q["evidence"]["openclawCommit"] == runtime["openclawCommit"],
-            "pilot evidence source mismatch",
-        )
-    if q["status"] == "unqualified":
-        require(
-            release["kind"] == "candidate" and not q["customerQualified"],
-            "unqualified input must be a candidate",
-        )
-    if q["status"] == "qualified":
-        require(
-            release["kind"] == "release"
-            and q.get("receipt")
-            and HASH.fullmatch(q.get("receiptSha256", "")),
-            "qualified release requires reviewed receipt",
-        )
-    return release
+    require(release.get("schemaVersion") == 2, "unsupported release schema")
+    return validate_stock(release)
 
 
 def read_release(path, root=None):
@@ -221,6 +121,26 @@ def read_release(path, root=None):
                     and all(counts[k] == 0 for k in ("fail", "skipped", "cancelled")),
                     "native receipt failed or skipped tests",
                 )
+        if release["qualification"]["status"] == "native-verified":
+            workflows = []
+            for ref in release["qualification"]["nativeReceipts"].values():
+                proof = load(safe_path(path.parent, ref["path"]))
+                require(
+                    proof.get("definitionSha256") == release["definitionSha256"]
+                    and proof["workflow"]["GITHUB_REPOSITORY"]
+                    == "raw-labs/enterprise-openclaw-bundle",
+                    "native receipt definition/repository mismatch",
+                )
+                workflows.append(
+                    {
+                        k: v
+                        for k, v in proof["workflow"].items()
+                        if k != "GITHUB_RUN_ATTEMPT"
+                    }
+                )
+            require(
+                workflows[0] == workflows[1], "native receipts belong to different runs"
+            )
         if release["qualification"]["status"] == "qualified":
             q = release["qualification"]
             review = safe_path(path.parent, q["receipt"])
@@ -230,75 +150,10 @@ def read_release(path, root=None):
             )
             validate_stock_review(release, load(review))
         return release
-    if root is not None:
-        verify_files(root, release["overlay"]["files"])
-        verify_files(root, release["payloadFiles"])
-        overlay = release["overlay"]
-        package = load(safe_path(root, overlay["directory"] + "/package.json"))
-        lock = load(safe_path(root, overlay["directory"] + "/package-lock.json"))
-        version = overlay["codexVersion"]
-        require(
-            package["dependencies"]["@openai/codex"] == version,
-            "overlay package/release version mismatch",
-        )
-        require(
-            lock["packages"]["node_modules/@openai/codex"]["version"] == version,
-            "overlay lock/release version mismatch",
-        )
-        require(
-            lock["packages"]["node_modules/@openai/codex-linux-x64"]["version"]
-            == version + "-linux-x64",
-            "overlay binary/release version mismatch",
-        )
-        dockerfile = safe_path(root, overlay["directory"] + "/Dockerfile").read_text()
-        require(
-            release["sources"]["openclaw"]["commit"] in dockerfile
-            and release["sources"]["openclaw"]["archiveSha256"] in dockerfile,
-            "overlay/source selection mismatch",
-        )
-        require(
-            "OPENAI_CODEX_VERSION=" + version in dockerfile,
-            "overlay Dockerfile/release version mismatch",
-        )
-    if release["qualification"]["status"] == "qualified":
-        q = release["qualification"]
-        receipt = safe_path(path.parent, q["receipt"])
-        require(
-            digest(receipt.read_bytes()) == q["receiptSha256"],
-            "qualification receipt integrity mismatch",
-        )
-        proof = load(receipt)
-        require(
-            proof["status"] == "passed" and proof["images"] == identities(release),
-            "qualification receipt image mismatch",
-        )
-        require(
-            proof["oceCommit"] == release["sources"]["oce"]["commit"]
-            and proof["openclawCommit"] == release["sources"]["openclaw"]["commit"],
-            "qualification receipt source mismatch",
-        )
-        require(
-            proof["architecture"] == release["architecture"]
-            and proof["codexVersion"] == release["overlay"]["codexVersion"],
-            "qualification receipt runtime mismatch",
-        )
-        require(
-            proof["seccompSha256"] == release["seccomp"]["sha256"]
-            and proof["qualificationPatchSha256"]
-            == release["overlay"]["files"][release["overlay"]["qualificationPatch"]],
-            "qualification input mismatch",
-        )
-        require(
-            proof["counts"]["tests"] > 0
-            and proof["counts"]["pass"] == proof["counts"]["tests"]
-            and all(proof["counts"][k] == 0 for k in ("fail", "skipped", "cancelled")),
-            "qualification must pass without skips",
-        )
-    return release
 
 
 def validate_stock(release):
-    """New stock inputs cannot inherit pilot images or claim automatic promotion."""
+    """Validate resolved ingredients and native artifact admission."""
     require(
         re.fullmatch(r"v\d+\.\d+\.\d+-(alpha|beta|rc)\.[1-9]\d*", release["id"]),
         "stock candidate requires a numbered SemVer prerelease",
@@ -390,12 +245,20 @@ def validate_stock(release):
         )
     else:
         require(
-            q["status"] == "qualified"
-            and release["kind"] == "release"
-            and q.get("receipt")
-            and HASH.fullmatch(q.get("receiptSha256", "")),
-            "stock promotion requires reviewed acceptance",
+            q["status"] in ("qualified", "native-verified")
+            and release["kind"] == "release",
+            "release requires native artifact verification",
         )
+        if q["status"] == "qualified":
+            require(
+                q.get("receipt") and HASH.fullmatch(q.get("receiptSha256", "")),
+                "historical acceptance receipt required",
+            )
+        else:
+            require(
+                HASH.fullmatch(release.get("definitionSha256", "")),
+                "native release must bind its bundle definition",
+            )
         require(
             all(image["reference"] for image in release["images"].values()),
             "review requires all shipping image digests",
@@ -441,14 +304,14 @@ def validate_stock_review(release, review):
     )
 
 
-def install_gate(release, allow_pilot):
+def install_gate(release):
+    require(
+        release["distribution"].get("published", True),
+        "unpublished verification artifact cannot be installed",
+    )
     require(
         release["qualification"]["status"] != "unqualified",
         "candidate cannot be installed through bundle tooling",
-    )
-    require(
-        release["qualification"]["status"] != "pilot-recorded" or allow_pilot,
-        "pilot baseline requires --allow-pilot-baseline for evaluation",
     )
 
 

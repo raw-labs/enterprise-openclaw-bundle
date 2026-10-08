@@ -1,0 +1,187 @@
+name: Release bundle
+on:
+  workflow_dispatch:
+    inputs:
+      definition:
+        description: Versioned bundle definition to build
+        required: true
+        type: string
+      publish:
+        description: Publish private images, tag and GitHub prerelease after all checks
+        required: true
+        default: true
+        type: boolean
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: bundle-${{ inputs.definition }}
+  cancel-in-progress: false
+jobs:
+  resolve:
+    if: github.ref == 'refs/heads/main' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event.repository.private
+    runs-on: depot-ubuntu-24.04-8
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate definition and immutable publication destination
+        env:
+          DEFINITION: ${{ inputs.definition }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          if [ "$PUBLISH" = true ]; then
+            python3 scripts/release.py preflight --definition "$DEFINITION"
+          fi
+      - name: Resolve exact source, recipe, presets and dependencies
+        id: version
+        env:
+          DEFINITION: ${{ inputs.definition }}
+        run: |
+          python3 scripts/release.py resolve --definition "$DEFINITION" --output .work/resolved
+          python3 -c 'import json, os; d=json.load(open(".work/resolved/candidate.json")); open(os.environ["GITHUB_OUTPUT"], "a").write("version="+d["id"]+"\n")'
+          tar -czf .work/resolved.tar.gz -C .work resolved
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: resolved-inputs
+          path: .work/resolved.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+  native:
+    needs: resolve
+    name: Native ${{ matrix.arch }} build and checks
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: depot-ubuntu-24.04-16
+          - arch: arm64
+            runner: depot-ubuntu-24.04-arm-16
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.16.0'
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+        with:
+          buildkitd-config-inline: |
+            [worker.oci]
+              max-parallelism = 2
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: resolved-inputs
+          path: .work
+      - run: tar -xzf .work/resolved.tar.gz -C .work
+      - name: Build actual shipping exports on native hardware
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: python3 scripts/stock.py --selection .work/resolved/candidate.json build --arch "$ARCH" --source .work/resolved/source --output .work/native
+      - name: Prepare selected source test prerequisites
+        working-directory: .work/resolved/source
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install --no-install-recommends -y skopeo
+          skopeo --version | grep -Fx 'skopeo version 1.13.3'
+          corepack pnpm install --frozen-lockfile --ignore-scripts
+          bash scripts/ci/setup-tools.sh k3d
+          bash .github/actions/run-ci-lane/codex-sandbox.sh load
+      - name: Test exact exports with confinement and no skips
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: python3 scripts/stock.py --selection .work/resolved/candidate.json check --arch "$ARCH" --source .work/resolved/source --build .work/native --logs .work/private-check-logs
+      - name: Clean up owned native test resources
+        if: always()
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          if test -f .work/resolved/source/scripts/ci/cleanup.mjs; then
+            node .work/resolved/source/scripts/ci/cleanup.mjs --state "$RUNNER_TEMP/bundle-runtime-$ARCH.json"
+            bash .work/resolved/source/.github/actions/run-ci-lane/codex-sandbox.sh unload
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-${{ matrix.arch }}
+          path: .work/native
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+  handoff:
+    needs: [resolve, native]
+    runs-on: depot-ubuntu-24.04-8
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.16.0'
+      - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+        with:
+          version: v3.21.3
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: resolved-inputs
+          path: .work
+      - run: tar -xzf .work/resolved.tar.gz -C .work
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: native-*
+          path: .work/inputs
+      - name: Verify both native outputs and assemble checked indexes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/stock.py --selection .work/resolved/candidate.json assemble --inputs .work/inputs --output .work/assembled
+      - name: Verify reproducibility and real chart rendering before publication
+        run: python3 scripts/release.py finish --selection .work/assembled/candidate.json --source .work/resolved/source --dependencies .work/resolved/dependencies --output .work/checked-handoff
+      - name: Publish exact checked image indexes
+        if: inputs.publish
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFINITION: ${{ inputs.definition }}
+        run: |
+          python3 scripts/release.py preflight --definition "$DEFINITION"
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install --no-install-recommends -y skopeo
+          mkdir -m 700 "$RUNNER_TEMP/registry-auth"
+          printf '%s' "$REGISTRY_TOKEN" | skopeo login --authfile "$RUNNER_TEMP/registry-auth/auth.json" --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+          python3 scripts/stock.py --selection .work/resolved/candidate.json publish --inputs .work/inputs --output .work/published --authfile "$RUNNER_TEMP/registry-auth/auth.json"
+      - name: Package and verify customer handoff
+        env:
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          if [ "$PUBLISH" = true ]; then
+            python3 scripts/release.py finish --selection .work/published/candidate.json --source .work/resolved/source --dependencies .work/resolved/dependencies --output dist
+          else
+            mv .work/checked-handoff dist
+          fi
+      - name: Create immutable tag and private prerelease with generated evidence
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/release.py publish --output dist
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: release-artifacts
+          path: |
+            dist
+            .work/published/publication.json
+          retention-days: 14
+          if-no-files-found: error
+      - name: Remove job credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/registry-auth/auth.json"

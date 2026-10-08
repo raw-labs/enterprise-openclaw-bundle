@@ -1,4 +1,4 @@
-name: Validate bundle
+name: Validate bundle factory
 on:
   pull_request:
   push:
@@ -6,32 +6,22 @@ on:
 permissions:
   contents: read
 jobs:
-  package:
+  validate:
     runs-on: depot-ubuntu-24.04-8
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24'
-      - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+          node-version: '24.16.0'
+      - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
         with:
           version: v3.21.3
-      - name: Prepare current candidate and export pinned regression sources
-        env:
-          VALIDATION_ID: v0.0.0-alpha.${{ github.run_id }}
-        run: |
-          python3 scripts/stock.py new --id "$VALIDATION_ID" --output .work/validation-input/candidate.json
-          python3 scripts/bundle.py --release tests/fixtures/legacy-pilot/release.json source --output .work/verified-source
-          python3 scripts/stock.py --selection .work/validation-input/candidate.json source --output .work/stock-verified-source
-          python3 scripts/stock.py --selection .work/validation-input/candidate.json dependencies --output .work/stock-renderer-dependencies
-      - name: Verify selection, package behavior and installation profiles
+      - name: Check all definitions and preserve published history
+        run: python3 scripts/release.py validate-definitions
+      - name: Resolve source and dependencies for packaging tests
+        run: python3 scripts/release.py resolve --output .work/resolved
+      - name: Check rejection paths, provenance, reproducibility and actual chart rendering
         run: python3 -m unittest discover -s tests -v
-      - name: Package unbuilt stock review artifact
-        run: python3 scripts/bundle.py --release .work/validation-input/candidate.json package --source .work/stock-verified-source --dependencies .work/stock-renderer-dependencies --output dist/bundle.tar.gz
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: bundle-review
-          path: dist/bundle.tar.gz*
-          retention-days: 7

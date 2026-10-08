@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from bundle import prepare, source_files, verify_source
+from bundle import source_files, verify_source
 from common import (
     ROLES,
     digest,
@@ -29,7 +29,6 @@ from common import (
     safe_path,
     save,
     validate,
-    validate_stock_review,
     verify_files,
 )
 
@@ -38,7 +37,7 @@ ROLE_NAMES = {"repositoryCredentials": "repository-credentials"}
 DIGEST = re.compile(r"sha256:[a-f0-9]{64}$")
 
 
-def snapshot_inputs(release, selection, directory, checkpoint=None):
+def snapshot_inputs(release, selection, directory):
     files = {
         name: (release_file(selection, ROOT, name), expected)
         for name, expected in release["payloadFiles"].items()
@@ -48,9 +47,10 @@ def snapshot_inputs(release, selection, directory, checkpoint=None):
         release_file(selection, ROOT, notice["fragment"]),
         notice["sha256"],
     )
-    checkpoint = Path(checkpoint or Path(selection).parent / "checkpoint.json")
-    if checkpoint.exists():
-        files["checkpoint.json"] = (checkpoint, release["checkpointSha256"])
+    definition = Path(selection).parent / "bundle.json"
+    require(definition.is_file(), "missing bundle definition snapshot")
+    files["bundle.json"] = (definition, release["definitionSha256"])
+    files["resolved.json"] = (Path(selection), digest(Path(selection).read_bytes()))
     for name, (source, expected) in files.items():
         require(digest(source.read_bytes()) == expected, "snapshot input mismatch")
         target = safe_path(directory, name)
@@ -61,79 +61,6 @@ def snapshot_inputs(release, selection, directory, checkpoint=None):
         )
         if target != source.resolve():
             shutil.copyfile(source, target)
-
-
-def new(args):
-    checkpoint = load(args.checkpoint)
-    require(
-        checkpoint["recordType"] == "source-checkpoint", "expected source checkpoint"
-    )
-    out = Path(args.output).resolve()
-    require(not out.exists(), "candidate output exists")
-    images = {
-        role: {
-            "reference": None,
-            "platforms": {},
-            "oceCommit": checkpoint["sources"]["oce"]["commit"],
-        }
-        for role in ROLES
-    }
-    images["runtime"].update(
-        openclawCommit=checkpoint["sources"]["openclaw"]["commit"],
-        codexVersion=checkpoint["runtime"]["codexVersion"],
-    )
-    payload = {
-        name: digest((ROOT / name).read_bytes())
-        for name in (
-            "defaults/assistant-preset.json",
-            "defaults/coding-preset.json",
-            "defaults/codex-profile.json",
-        )
-    }
-    payload["profiles/aws-example.json"] = digest(
-        (ROOT / "profiles/aws-example.json").read_bytes()
-    )
-    release = {
-        "schemaVersion": 2,
-        "id": args.id,
-        "kind": "candidate",
-        "architectures": checkpoint["targetArchitectures"],
-        "sources": checkpoint["sources"],
-        "chart": checkpoint["chart"],
-        "runtime": checkpoint["runtime"],
-        "build": {k: v for k, v in checkpoint["build"].items() if k != "recipes"}
-        | checkpoint["build"]["recipes"],
-        "distribution": checkpoint["distribution"] | {"productVersion": args.id},
-        "rendererDependencies": checkpoint["rendererDependencies"],
-        "images": images,
-        "seccomp": {"profiles": {}},
-        "payloadFiles": payload,
-        "qualification": {"status": "unqualified", "customerQualified": False},
-        "checkpointSha256": digest(Path(args.checkpoint).read_bytes()),
-    }
-    validate(release)
-    release["build"]["noticeLayer"] = {
-        "fragment": "overlays/notices.fragment",
-        "sha256": digest((ROOT / "overlays/notices.fragment").read_bytes()),
-    }
-    out.parent.mkdir(parents=True, exist_ok=True)
-    inventory = safe_path(
-        Path(args.checkpoint).parent, checkpoint["sources"]["oce"]["files"]
-    )
-    require(
-        digest(inventory.read_bytes()) == checkpoint["sources"]["oce"]["filesSha256"],
-        "checkpoint inventory mismatch",
-    )
-    target = safe_path(out.parent, release["sources"]["oce"]["files"])
-    if target != inventory.resolve():
-        require(
-            not target.exists() or target.read_bytes() == inventory.read_bytes(),
-            "inventory output differs",
-        )
-        shutil.copyfile(inventory, target)
-    snapshot_inputs(release, out, out.parent, args.checkpoint)
-    save(out, release)
-    print(f"Unbuilt, unqualified stock candidate: {out}")
 
 
 def dependency_bytes(release, directory):
@@ -418,6 +345,8 @@ def check(args, release):
             )
         },
         "images": record["images"],
+        "selectionSha256": digest(Path(args.selection).read_bytes()),
+        "definitionSha256": release["definitionSha256"],
         "lanes": {},
         "scope": "native shipping export tests; no provider workflow or customer installation qualification",
     }
@@ -565,9 +494,7 @@ def check(args, release):
             p.name: digest(p.read_bytes()) for p in logs.glob("*.tap")
         }
         save(report / "native-receipt.json", receipt)
-    print(
-        "Native export checks passed without skips; release remains unqualified pending review"
-    )
+    print("Native export checks passed without skips")
 
 
 def verify_receipt(receipt, release, arch, identities):
@@ -697,20 +624,22 @@ def publish(args, release):
     require(
         release["kind"] == "candidate", "publication requires an unqualified candidate"
     )
-    require(
-        os.environ.get("GITHUB_REPOSITORY") == "raw-labs/enterprise-openclaw-bundle"
-        and os.environ.get("GITHUB_REF") == "refs/heads/main",
-        "publication only from private bundle main workflow",
-    )
-    repo = github_json("repos/raw-labs/enterprise-openclaw-bundle")
-    require(
-        repo and repo["private"] is True and repo["default_branch"] == "main",
-        "publication repository mismatch",
-    )
-    require(
-        repo["full_name"] == "raw-labs/enterprise-openclaw-bundle",
-        "destination repository identity mismatch",
-    )
+    publishing = args.command == "publish"
+    if publishing:
+        require(
+            os.environ.get("GITHUB_REPOSITORY") == "raw-labs/enterprise-openclaw-bundle"
+            and os.environ.get("GITHUB_REF") == "refs/heads/main",
+            "publication only from private bundle main workflow",
+        )
+        repo = github_json("repos/raw-labs/enterprise-openclaw-bundle")
+        require(
+            repo and repo["private"] is True and repo["default_branch"] == "main",
+            "publication repository mismatch",
+        )
+        require(
+            repo["full_name"] == "raw-labs/enterprise-openclaw-bundle",
+            "destination repository identity mismatch",
+        )
     expected_workflow = {
         key: os.environ.get(key)
         for key in (
@@ -720,35 +649,6 @@ def publish(args, release):
             "GITHUB_RUN_ATTEMPT",
         )
     }
-    if args.build_run_id:
-        require(
-            re.fullmatch(r"[1-9]\d*", args.build_run_id), "invalid source build run"
-        )
-        prior = github_json(
-            "repos/raw-labs/enterprise-openclaw-bundle/actions/runs/"
-            + args.build_run_id
-        )
-        require(
-            prior
-            and prior["conclusion"] == "success"
-            and prior["status"] == "completed"
-            and prior["event"] == "workflow_dispatch"
-            and prior["head_branch"] == "main",
-            "source build is not a successful trusted main dispatch",
-        )
-        workflow = github_json(
-            "repos/raw-labs/enterprise-openclaw-bundle/actions/workflows/"
-            + str(prior["workflow_id"])
-        )
-        require(
-            workflow and workflow["path"] == ".github/workflows/build.yml",
-            "source artifacts belong to another workflow",
-        )
-        expected_workflow.update(
-            GITHUB_SHA=prior["head_sha"],
-            GITHUB_RUN_ID=str(prior["id"]),
-            GITHUB_RUN_ATTEMPT=str(prior["run_attempt"]),
-        )
     source = Path(args.inputs)
     out = Path(args.output).resolve()
     require(not out.exists(), "publication output exists")
@@ -765,8 +665,23 @@ def publish(args, release):
         receipt = load(path / "proof/native-receipt.json")
         verify_receipt(receipt, release, arch, identities)
         require(
-            receipt["workflow"] == expected_workflow,
-            "native receipts belong to another workflow run",
+            all(
+                receipt["workflow"][key] == value
+                for key, value in expected_workflow.items()
+                if key != "GITHUB_RUN_ATTEMPT"
+            )
+            and re.fullmatch(r"[1-9]\d*", receipt["workflow"]["GITHUB_RUN_ATTEMPT"])
+            and receipt["selectionSha256"] == digest(Path(args.selection).read_bytes())
+            and receipt["definitionSha256"] == release["definitionSha256"],
+            "native receipts belong to another workflow or definition",
+        )
+        require(
+            set(receipt["confinement"]["reviewedInputs"])
+            == {
+                "scripts/lib/codex-seccomp-profile.mjs",
+                ".github/actions/run-ci-lane/codex-sandbox.apparmor",
+            },
+            "native confinement input inventory incomplete",
         )
         for name, hash in receipt["confinement"]["reviewedInputs"].items():
             require(
@@ -796,60 +711,67 @@ def publish(args, release):
             + "/"
             + ROLE_NAMES.get(role, role)
         )
-        private_package(name)
+        if publishing:
+            private_package(name)
         ref = "ghcr.io/raw-labs/" + name + ":" + release["id"]
-        result = subprocess.run(
-            [
-                "skopeo",
-                "inspect",
-                "--authfile",
-                args.authfile,
-                "--raw",
-                "docker://" + ref,
-            ],
-            capture_output=True,
-            text=True,
-        )
-        exists = identical_tag(result, dg)
-        if exists:
-            require(
-                private_package(name) is not None, "existing package is unverifiable"
+        exists = False
+        if publishing:
+            result = subprocess.run(
+                [
+                    "skopeo",
+                    "inspect",
+                    "--authfile",
+                    args.authfile,
+                    "--raw",
+                    "docker://" + ref,
+                ],
+                capture_output=True,
+                text=True,
             )
+            exists = identical_tag(result, dg)
+            if exists:
+                require(
+                    private_package(name) is not None,
+                    "existing package is unverifiable",
+                )
         destinations[role] = (name, ref, dg, exists)
     candidate = json.loads(json.dumps(release))
     publication = {"status": "incomplete", "releaseId": release["id"], "roles": {}}
     try:
         for role, (name, ref, dg, exists) in destinations.items():
             directory = out / "oci" / role
-            if not exists:
-                run(
+            if publishing:
+                if not exists:
+                    run(
+                        [
+                            "skopeo",
+                            "copy",
+                            "--all",
+                            "--preserve-digests",
+                            "--authfile",
+                            args.authfile,
+                            "oci:" + str(directory) + ":" + release["id"],
+                            "docker://" + ref,
+                        ],
+                        stdout=subprocess.DEVNULL,
+                    )
+                actual = subprocess.check_output(
                     [
                         "skopeo",
-                        "copy",
-                        "--all",
-                        "--preserve-digests",
+                        "inspect",
+                        "--raw",
                         "--authfile",
                         args.authfile,
-                        "oci:" + str(directory) + ":" + release["id"],
                         "docker://" + ref,
-                    ],
-                    stdout=subprocess.DEVNULL,
+                    ]
                 )
-            actual = subprocess.check_output(
-                [
-                    "skopeo",
-                    "inspect",
-                    "--raw",
-                    "--authfile",
-                    args.authfile,
-                    "docker://" + ref,
-                ]
-            )
-            require("sha256:" + digest(actual) == dg, "published index digest changed")
-            require(
-                private_package(name) is not None,
-                "published package access could not be verified",
-            )
+                require(
+                    "sha256:" + digest(actual) == dg, "published index digest changed"
+                )
+                require(
+                    private_package(name) is not None,
+                    "published package access could not be verified",
+                )
             candidate["images"][role].update(
                 reference=ref.rsplit(":", 1)[0] + "@" + dg,
                 platforms={"linux/" + arch: copies[arch][role] for arch in copies},
@@ -889,72 +811,13 @@ def publish(args, release):
             out / candidate["sources"]["oce"]["files"],
         )
         snapshot_inputs(release, args.selection, out)
-        publication["status"] = "published-private-unqualified"
+        publication["status"] = (
+            "published-private-unqualified" if publishing else "checked-unpublished"
+        )
     finally:
         save(out / "publication.json", publication)
     print(
-        "Both native manifests published under verified private index digests; candidate remains unqualified"
-    )
-
-
-def accept(args, release):
-    """Record an explicit owner's reviewed acceptance; CI never invokes this."""
-    require(
-        release["kind"] == "candidate"
-        and all(i["reference"] for i in release["images"].values()),
-        "acceptance requires built shipping digests",
-    )
-    require(
-        set(release["qualification"].get("nativeReceipts", {})) == {"amd64", "arm64"},
-        "both native receipts required",
-    )
-    validate_stock_review(release, load(args.review))
-    out = Path(args.output).resolve()
-    require(not out.exists(), "accepted release output already exists")
-    new = json.loads(json.dumps(release))
-    new["kind"] = "release"
-    new["qualification"].update(
-        status="qualified",
-        receipt=release["id"] + "-native-acceptance.json",
-        receiptSha256=digest(Path(args.review).read_bytes()),
-    )
-    validate(new)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    sources = {new["qualification"]["receipt"]: Path(args.review)}
-    for receipt in new["qualification"]["nativeReceipts"].values():
-        sources[receipt["path"]] = safe_path(
-            Path(args.selection).parent, receipt["path"]
-        )
-    inventory = new["sources"]["oce"]["files"]
-    sources[inventory] = safe_path(Path(args.selection).parent, inventory)
-    for name in new["payloadFiles"]:
-        sources[name] = release_file(args.selection, ROOT, name)
-    notice = new["build"]["noticeLayer"]["fragment"]
-    sources[notice] = release_file(args.selection, ROOT, notice)
-    checkpoint = Path(args.selection).parent / "checkpoint.json"
-    if checkpoint.exists():
-        require(
-            digest(checkpoint.read_bytes()) == new["checkpointSha256"],
-            "checkpoint snapshot mismatch",
-        )
-        sources["checkpoint.json"] = checkpoint
-    for profile in new["seccomp"]["profiles"].values():
-        sources[profile["path"]] = safe_path(
-            Path(args.selection).parent, profile["path"]
-        )
-    for name, source in sources.items():
-        target = safe_path(out.parent, name)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        require(
-            not target.exists() or target.read_bytes() == source.read_bytes(),
-            "acceptance would replace existing evidence",
-        )
-        if target.resolve() != source.resolve():
-            shutil.copyfile(source, target)
-    save(out, new)
-    read_release(out, ROOT)
-    print(
-        "Reviewed native artifact release recorded; customer qualification remains false"
+        "Both native manifests verified and assembled; publication=" + str(publishing)
     )
 
 
@@ -962,14 +825,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--selection")
     sub = parser.add_subparsers(dest="command", required=True)
-    p = sub.add_parser("new")
-    p.add_argument("--checkpoint", default="inputs/source-checkpoint.json")
-    p.add_argument("--id", required=True)
-    p.add_argument("--output", required=True)
     p = sub.add_parser("dependencies")
-    p.add_argument("--output", required=True)
-    p = sub.add_parser("source")
-    p.add_argument("--from-git")
     p.add_argument("--output", required=True)
     p = sub.add_parser("build")
     p.add_argument("--source", required=True)
@@ -981,27 +837,18 @@ def main():
     p.add_argument("--arch", choices=("amd64", "arm64"), required=True)
     p.add_argument("--build", required=True)
     p.add_argument("--logs", required=True)
-    p = sub.add_parser("publish")
-    p.add_argument("--inputs", required=True)
-    p.add_argument("--output", required=True)
-    p.add_argument("--authfile", required=True)
-    p.add_argument("--build-run-id")
-    p = sub.add_parser("accept")
-    p.add_argument("--review", required=True)
-    p.add_argument("--output", required=True)
+    for command in ("publish", "assemble"):
+        p = sub.add_parser(command)
+        p.add_argument("--inputs", required=True)
+        p.add_argument("--output", required=True)
+        if command == "publish":
+            p.add_argument("--authfile", required=True)
     args = parser.parse_args()
-    if args.command == "new":
-        new(args)
-        return
     require(args.selection, "--selection is required")
     release = read_release(args.selection, ROOT)
     require(release["schemaVersion"] == 2, "stock tooling requires stock candidate")
     source_files(release, args.selection)
-    if args.command == "source":
-        args.release = args.selection
-        prepare(args, release)
-    else:
-        globals()[args.command](args, release)
+    (publish if args.command == "assemble" else globals()[args.command])(args, release)
 
 
 if __name__ == "__main__":
