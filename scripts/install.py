@@ -58,6 +58,26 @@ def render(args, release):
     refs = selected_images(release, args.mirrors)
     cp = input["controlPlane"]
     rt = input["runtime"]
+    architecture = getattr(args, "architecture", None)
+    if release["schemaVersion"] == 2:
+        if args.profile == "codex" or architecture is not None:
+            require(
+                architecture in release["architectures"],
+                "select the reviewed runtime --architecture",
+            )
+        if architecture is not None:
+            selector = rt.setdefault("nodeSelector", {})
+            arch = architecture.split("/")[1]
+            require(
+                selector.get("kubernetes.io/arch", arch) == arch,
+                "runtime node selector architecture mismatch",
+            )
+            selector["kubernetes.io/arch"] = arch
+    elif architecture is not None:
+        require(
+            architecture == release["architecture"],
+            "legacy release architecture mismatch",
+        )
     for obj, key, role in [
         (cp, "controllerImage", "controller"),
         (rt, "image", "runtime"),
@@ -88,7 +108,12 @@ def render(args, release):
     )
     if args.profile == "codex":
         input.setdefault("codex", {}).setdefault("modelDiscoveryCidrs", [])
-        expected = "openclaw/codex-" + release["seccomp"]["sha256"] + ".json"
+        policy = (
+            release["seccomp"]["profiles"][architecture]
+            if release["schemaVersion"] == 2
+            else release["seccomp"]
+        )
+        expected = "openclaw/codex-" + policy["sha256"] + ".json"
         require(
             "codexSeccompProfile" not in rt or rt["codexSeccompProfile"] == expected,
             "seccomp/release mismatch",
@@ -181,6 +206,7 @@ def render(args, release):
             "releaseId": release["id"],
             "images": refs,
             "profile": args.profile,
+            "architecture": architecture,
             "namespace": cp["namespace"],
             "releaseName": cp["releaseName"],
             "inputSha256": digest(Path(args.input).read_bytes()),
@@ -465,6 +491,7 @@ def main():
     p.add_argument("--profile", choices=["openclaw", "codex"], required=True)
     p.add_argument("--output", required=True)
     p.add_argument("--mirrors")
+    p.add_argument("--architecture", choices=("linux/amd64", "linux/arm64"))
     p.add_argument("--allow-pilot-baseline", action="store_true")
     p = sub.add_parser("check")
     p.add_argument("--directory", required=True)

@@ -28,6 +28,7 @@ from common import (
     safe_path,
     save,
     validate,
+    validate_stock_review,
     verify_files,
 )
 
@@ -639,6 +640,9 @@ def private_package(name):
 
 def publish(args, release):
     require(
+        release["kind"] == "candidate", "publication requires an unqualified candidate"
+    )
+    require(
         os.environ.get("GITHUB_REPOSITORY") == "raw-labs/enterprise-openclaw-bundle"
         and os.environ.get("GITHUB_REF") == "refs/heads/main",
         "publication only from private bundle main workflow",
@@ -797,7 +801,7 @@ def publish(args, release):
             )
             publication["roles"][role] = candidate["images"][role]
         for arch, receipt in receipts.items():
-            path = "profiles/" + arch + "/codex-seccomp.json"
+            path = "profiles/" + release["id"] + "/" + arch + "/codex-seccomp.json"
             dest = out / path
             dest.parent.mkdir(parents=True)
             shutil.copyfile(
@@ -808,13 +812,15 @@ def publish(args, release):
                 "path": path,
                 "sha256": candidate["payloadFiles"][path],
             }
-            save(out / ("native-" + arch + "-receipt.json"), receipt)
+            save(out / (release["id"] + "-native-" + arch + "-receipt.json"), receipt)
         validate(candidate)
         candidate["qualification"]["nativeReceipts"] = {
             arch: {
-                "path": "native-" + arch + "-receipt.json",
+                "path": release["id"] + "-native-" + arch + "-receipt.json",
                 "sha256": digest(
-                    (out / ("native-" + arch + "-receipt.json")).read_bytes()
+                    (
+                        out / (release["id"] + "-native-" + arch + "-receipt.json")
+                    ).read_bytes()
                 ),
             }
             for arch in receipts
@@ -831,6 +837,56 @@ def publish(args, release):
         save(out / "publication.json", publication)
     print(
         "Both native manifests published under verified private index digests; candidate remains unqualified"
+    )
+
+
+def accept(args, release):
+    """Record an explicit owner's reviewed acceptance; CI never invokes this."""
+    require(
+        release["kind"] == "candidate"
+        and all(i["reference"] for i in release["images"].values()),
+        "acceptance requires built shipping digests",
+    )
+    require(
+        set(release["qualification"].get("nativeReceipts", {})) == {"amd64", "arm64"},
+        "both native receipts required",
+    )
+    validate_stock_review(release, load(args.review))
+    out = Path(args.output).resolve()
+    require(not out.exists(), "accepted release output already exists")
+    new = json.loads(json.dumps(release))
+    new["kind"] = "release"
+    new["qualification"].update(
+        status="qualified",
+        receipt=release["id"] + "-native-acceptance.json",
+        receiptSha256=digest(Path(args.review).read_bytes()),
+    )
+    validate(new)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    sources = {new["qualification"]["receipt"]: Path(args.review)}
+    for receipt in new["qualification"]["nativeReceipts"].values():
+        sources[receipt["path"]] = safe_path(
+            Path(args.selection).parent, receipt["path"]
+        )
+    inventory = new["sources"]["oce"]["files"]
+    sources[inventory] = safe_path(Path(args.selection).parent, inventory)
+    for profile in new["seccomp"]["profiles"].values():
+        sources[profile["path"]] = safe_path(
+            Path(args.selection).parent, profile["path"]
+        )
+    for name, source in sources.items():
+        target = safe_path(out.parent, name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        require(
+            not target.exists() or target.read_bytes() == source.read_bytes(),
+            "acceptance would replace existing evidence",
+        )
+        if target.resolve() != source.resolve():
+            shutil.copyfile(source, target)
+    save(out, new)
+    read_release(out, ROOT)
+    print(
+        "Reviewed native artifact release recorded; customer qualification remains false"
     )
 
 
@@ -862,6 +918,9 @@ def main():
     p.add_argument("--output", required=True)
     p.add_argument("--authfile", required=True)
     p.add_argument("--build-run-id")
+    p = sub.add_parser("accept")
+    p.add_argument("--review", required=True)
+    p.add_argument("--output", required=True)
     args = parser.parse_args()
     if args.command == "new":
         new(args)

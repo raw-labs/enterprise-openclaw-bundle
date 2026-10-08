@@ -204,6 +204,11 @@ def read_release(path, root=None):
                 },
                 "native receipt identity mismatch",
             )
+            require(
+                release["seccomp"]["profiles"]["linux/" + arch]["sha256"]
+                == proof["confinement"]["seccompSha256"],
+                "native receipt confinement mismatch",
+            )
             require(set(proof["lanes"]) == set(ROLES), "all native test lanes required")
             for counts in proof["lanes"].values():
                 require(
@@ -212,6 +217,14 @@ def read_release(path, root=None):
                     and all(counts[k] == 0 for k in ("fail", "skipped", "cancelled")),
                     "native receipt failed or skipped tests",
                 )
+        if release["qualification"]["status"] == "qualified":
+            q = release["qualification"]
+            review = safe_path(path.parent, q["receipt"])
+            require(
+                digest(review.read_bytes()) == q["receiptSha256"],
+                "review receipt integrity mismatch",
+            )
+            validate_stock_review(release, load(review))
         return release
     if root is not None:
         verify_files(root, release["overlay"]["files"])
@@ -286,7 +299,7 @@ def validate_stock(release):
         re.fullmatch(r"v\d+\.\d+\.\d+-(alpha|beta|rc)\.[1-9]\d*", release["id"]),
         "stock candidate requires a numbered SemVer prerelease",
     )
-    require(release["kind"] == "candidate", "stock promotion requires separate review")
+    require(release["kind"] in ("candidate", "release"), "invalid stock release kind")
     require(
         release["architectures"] == ["linux/amd64", "linux/arm64"],
         "both native architectures are required",
@@ -361,11 +374,41 @@ def validate_stock(release):
         and release["images"]["runtime"]["codexVersion"] == runtime["codexVersion"],
         "runtime/source metadata mismatch",
     )
+    q = release["qualification"]
     require(
-        release["qualification"]["status"] == "unqualified"
-        and release["qualification"]["customerQualified"] is False,
-        "new artifacts remain unqualified pending review",
+        q["customerQualified"] is False,
+        "generic artifact cannot qualify a customer installation",
     )
+    if q["status"] == "unqualified":
+        require(
+            release["kind"] == "candidate",
+            "unqualified artifacts must remain candidates",
+        )
+    else:
+        require(
+            q["status"] == "qualified"
+            and release["kind"] == "release"
+            and q.get("receipt")
+            and HASH.fullmatch(q.get("receiptSha256", "")),
+            "stock promotion requires reviewed acceptance",
+        )
+        require(
+            all(image["reference"] for image in release["images"].values()),
+            "review requires all shipping image digests",
+        )
+        require(
+            set(q.get("nativeReceipts", {})) == {"amd64", "arm64"},
+            "review requires both native receipts",
+        )
+        require(
+            set(release["seccomp"]["profiles"]) == set(release["architectures"]),
+            "review requires both confinement artifacts",
+        )
+        for profile in release["seccomp"]["profiles"].values():
+            require(
+                release["payloadFiles"].get(profile["path"]) == profile["sha256"],
+                "reviewed policy inventory mismatch",
+            )
     require(
         release["distribution"]["registry"] == "ghcr.io"
         and release["distribution"]["visibility"] == "private"
@@ -374,6 +417,24 @@ def validate_stock(release):
         "unexpected distribution destination",
     )
     return release
+
+
+def validate_stock_review(release, review):
+    require(
+        review["status"] == "reviewed-native-artifacts"
+        and isinstance(review.get("reviewedBy"), str)
+        and review["reviewedBy"].strip()
+        and review["releaseId"] == release["id"]
+        and review["images"] == identities(release)
+        and review["oceCommit"] == release["sources"]["oce"]["commit"]
+        and review["openclawCommit"] == release["sources"]["openclaw"]["commit"]
+        and review["codexVersion"] == release["runtime"]["codexVersion"]
+        and review["nativeReceipts"] == release["qualification"]["nativeReceipts"]
+        and review["confinementProfiles"] == release["seccomp"]["profiles"]
+        and review["scope"]
+        == "native shipping artifacts; provider access and customer installation acceptance remain separate",
+        "review does not accept these exact native artifacts",
+    )
 
 
 def install_gate(release, allow_pilot):

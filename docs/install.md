@@ -10,12 +10,12 @@ requires the explicit flag below. Candidates cannot be installed through this to
 
 Use Bash, Python 3.12+, Node 24+, Helm 3, kubectl compatible with the cluster,
 and a dedicated kubeconfig/context. The installation repository owns a reviewed
-cluster, database, DNS/TLS and backup policy. Prepare Kubernetes at the minimum in
-`release.json`, enforced NetworkPolicies, Ready disjoint control/agent node pools,
+cluster, database, DNS/TLS and backup policy. Prepare Kubernetes according to the
+selected OCE requirements, enforced NetworkPolicies, Ready disjoint control/agent node pools,
 RWO storage, cert-manager, Gateway API CRDs, Envoy and an existing GatewayClass.
 On AWS, supply VPC CNI policy enforcement, EBS CSI and ALB ingress separately;
-recorded dependency versions are in `release.json`. Configure node ECR pull IAM
-(and cross-account policy/endpoints where needed), not just workstation login.
+recorded pilot dependency versions are in the baseline `release.json`. Configure
+node pulls for the authorized customer registry, not just workstation login.
 
 Supply a PostgreSQL database with separate restricted application and migration
 roles, TLS CA, cluster/database/proxy CIDRs, DNS selectors and operator labels.
@@ -60,8 +60,11 @@ controllers also need installation-owned API/DNS/webhook policies. Keep the Envo
    prerequisites and output before applying. Dedicated Codex requires the reviewed
    seccomp artifact installed through node provisioning at
    `/var/lib/kubelet/seccomp/openclaw/codex-<release-seccomp-sha256>.json` on every
-   harness node. Its pilot origin is in `profiles/codex-seccomp.provenance.json`;
-   verify sandbox execution on each customer's node configuration before acceptance.
+   harness node. For a reviewed stock release, add `--architecture linux/amd64`
+   or `--architecture linux/arm64`; the renderer selects that policy and pins the
+   dedicated Agent node selector to its architecture. The policy artifacts and native
+   receipts are in `release.json`; the legacy pilot origin is in its separate
+   provenance file. Verify sandbox execution on each customer's node configuration before acceptance.
    Do not disable confinement to make a test pass.
 
 3. In `$SECURE` retain raw files `application-url`, `migration-url`, `database-ca.pem`,

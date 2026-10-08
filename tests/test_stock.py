@@ -8,16 +8,21 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+import install as installer  # noqa: E402
 from common import (  # noqa: E402
     digest,
+    helm_values,
     install_gate,
     load,
     read_release,
     save,
     validate,
+    validate_stock_review,
 )
 from stock import (  # noqa: E402
     assemble_index,
@@ -75,6 +80,40 @@ class StockInputs(unittest.TestCase):
             )
             with self.assertRaises(ValueError):
                 tap_counts(text)
+
+    def test_review_cannot_change_selected_images_or_scope(self):
+        self.release["qualification"]["nativeReceipts"] = {
+            "amd64": {"path": "test-only.json", "sha256": "1" * 64}
+        }
+        review = {
+            "status": "reviewed-native-artifacts",
+            "reviewedBy": "synthetic contract test; not runtime evidence",
+            "releaseId": self.release["id"],
+            "images": {r: None for r in self.release["images"]},
+            "oceCommit": self.release["sources"]["oce"]["commit"],
+            "openclawCommit": self.release["sources"]["openclaw"]["commit"],
+            "codexVersion": self.release["runtime"]["codexVersion"],
+            "nativeReceipts": self.release["qualification"]["nativeReceipts"],
+            "confinementProfiles": {},
+            "scope": "native shipping artifacts; provider access and customer installation acceptance remain separate",
+        }
+        validate_stock_review(self.release, review)
+        for key, wrong in (
+            ("images", {"controller": "fixture.invalid/new@sha256:" + "0" * 64}),
+            ("scope", "customer-qualified"),
+            ("nativeReceipts", {}),
+        ):
+            changed = copy.deepcopy(review)
+            changed[key] = wrong
+            with self.assertRaises(ValueError):
+                validate_stock_review(self.release, changed)
+        # A parser match cannot promote unbuilt artifacts or supply missing native evidence.
+        self.release["kind"] = "release"
+        self.release["qualification"].update(
+            status="qualified", receipt="test-only.json", receiptSha256="1" * 64
+        )
+        with self.assertRaises(ValueError):
+            validate(self.release)
 
 
 class OciInputs(unittest.TestCase):
@@ -320,3 +359,42 @@ class StockArtifact(unittest.TestCase):
             (out / "tldts-7.0.18.tgz").write_bytes(b"corrupt")
             with self.assertRaises(ValueError):
                 renderer_files(release, out)
+
+    def test_architecture_selects_agent_policy_and_preserves_gateway_pool(self):
+        # Bypass admission only in this renderer contract test. No qualification is recorded.
+        release = load(self.artifact / "release.json")
+        for role, image in release["images"].items():
+            image["reference"] = "fixture.invalid/" + role + "@sha256:" + "0" * 64
+        release["seccomp"]["profiles"] = {
+            "linux/" + arch: {"sha256": str(index) * 64}
+            for index, arch in enumerate(("amd64", "arm64"), 1)
+        }
+        with (
+            patch.object(installer, "ROOT", self.artifact),
+            patch.object(installer, "install_gate"),
+        ):
+            for arch in ("amd64", "arm64"):
+                output = self.out / ("arch-contract-" + arch)
+                args = SimpleNamespace(
+                    input=self.artifact / "profiles/aws-example.json",
+                    profile="codex",
+                    output=output,
+                    mirrors=None,
+                    architecture="linux/" + arch,
+                    allow_pilot_baseline=False,
+                )
+                installer.render(args, release)
+                installation = helm_values(output / "installation.yaml")
+                runtime = installation["drivers"]["compute"]["configuration"]["runtime"]
+                self.assertEqual(runtime["nodeSelector"]["kubernetes.io/arch"], arch)
+                self.assertNotIn("kubernetes.io/arch", runtime["gatewayNodeSelector"])
+                self.assertEqual(
+                    runtime["codexSeccompProfile"],
+                    "openclaw/codex-"
+                    + release["seccomp"]["profiles"]["linux/" + arch]["sha256"]
+                    + ".json",
+                )
+            args.architecture = None
+            args.output = self.out / "missing-arch-contract"
+            with self.assertRaisesRegex(ValueError, "select the reviewed runtime"):
+                installer.render(args, release)

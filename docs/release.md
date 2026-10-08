@@ -78,9 +78,14 @@ or promote a stable version automatically.
 
 Review the final digests, confinement and test scope before customer handoff.
 Model/provider access and customer infrastructure acceptance are separate from
-these native export checks. Stable promotion and enabling installation of a new
-release require an explicit reviewed acceptance record and tooling that validates
-that record. The current stock tool deliberately rejects automatic promotion.
+these native export checks. An owner-reviewed JSON acceptance record must bind
+the exact image references, source commits, Codex version, both native receipt
+hashes and both confinement profiles. Use `stock.py accept --review <record>
+--output <new-release-selection>` with the built candidate as `--selection`.
+The command preserves the source inventory and receipts and refuses to replace
+existing evidence. Neither build nor publication CI calls it. The delivered tool
+verifies the same review record; customer qualification remains false.
+Stable version promotion is a separate release-owner decision.
 
 Preserve published history. Before pushing source or creating a release, verify
 identity, origin, private visibility and the expected remote head. Deliver through
