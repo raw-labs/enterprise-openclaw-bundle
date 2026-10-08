@@ -66,6 +66,8 @@ jobs:
           path: |
             .work/published/*.json
             .work/published/profiles
+            .work/published/defaults
+            .work/published/overlays/notices.fragment
             dist/bundle.tar.gz*
           include-hidden-files: true
           retention-days: 14

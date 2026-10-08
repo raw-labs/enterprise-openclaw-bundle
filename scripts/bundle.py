@@ -21,6 +21,7 @@ from common import (
     identities,
     load,
     read_release,
+    release_file,
     require,
     run,
     safe_path,
@@ -222,7 +223,7 @@ def package(args, release):
         )
     # Explicit profile configuration overlay; renderer and chart remain unchanged.
     files["upstream/deploy/profiles/codex.json"] = (
-        (ROOT / "defaults/codex-profile.json").read_bytes(),
+        release_file(args.release, ROOT, "defaults/codex-profile.json").read_bytes(),
         0o644,
     )
     files["notices/OCE-LICENSE"] = ((source / "LICENSE").read_bytes(), 0o644)
@@ -232,9 +233,7 @@ def package(args, release):
     for name in ["common.py", "install.py"]:
         files["scripts/" + name] = ((ROOT / "scripts" / name).read_bytes(), 0o755)
     for name in release["payloadFiles"]:
-        payload = safe_path(ROOT, name)
-        if release["schemaVersion"] == 2 and not payload.exists():
-            payload = safe_path(Path(args.release).parent, name)
+        payload = release_file(args.release, ROOT, name)
         files[name] = (payload.read_bytes(), 0o644)
     files["INSTALL.md"] = ((ROOT / "docs/install.md").read_bytes(), 0o644)
     files["OPERATE.md"] = ((ROOT / "docs/operate.md").read_bytes(), 0o644)

@@ -23,6 +23,7 @@ from common import (
     digest,
     load,
     read_release,
+    release_file,
     require,
     run,
     safe_path,
@@ -35,6 +36,31 @@ from common import (
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_NAMES = {"repositoryCredentials": "repository-credentials"}
 DIGEST = re.compile(r"sha256:[a-f0-9]{64}$")
+
+
+def snapshot_inputs(release, selection, directory, checkpoint=None):
+    files = {
+        name: (release_file(selection, ROOT, name), expected)
+        for name, expected in release["payloadFiles"].items()
+    }
+    notice = release["build"]["noticeLayer"]
+    files[notice["fragment"]] = (
+        release_file(selection, ROOT, notice["fragment"]),
+        notice["sha256"],
+    )
+    checkpoint = Path(checkpoint or Path(selection).parent / "checkpoint.json")
+    if checkpoint.exists():
+        files["checkpoint.json"] = (checkpoint, release["checkpointSha256"])
+    for name, (source, expected) in files.items():
+        require(digest(source.read_bytes()) == expected, "snapshot input mismatch")
+        target = safe_path(directory, name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        require(
+            not target.exists() or target.read_bytes() == source.read_bytes(),
+            "snapshot would replace existing inputs",
+        )
+        if target != source.resolve():
+            shutil.copyfile(source, target)
 
 
 def new(args):
@@ -105,6 +131,7 @@ def new(args):
             "inventory output differs",
         )
         shutil.copyfile(inventory, target)
+    snapshot_inputs(release, out, out.parent, args.checkpoint)
     save(out, release)
     print(f"Unbuilt, unqualified stock candidate: {out}")
 
@@ -300,7 +327,7 @@ def build(args, release):
                 ]
             )
         notice = release["build"]["noticeLayer"]
-        fragment = safe_path(ROOT, notice["fragment"]).read_bytes()
+        fragment = release_file(args.selection, ROOT, notice["fragment"]).read_bytes()
         require(digest(fragment) == notice["sha256"], "notice layer input mismatch")
         # Preserve the selected recipe and append only the required upstream notice.
         with tempfile.TemporaryDirectory() as temporary:
@@ -861,6 +888,7 @@ def publish(args, release):
             ),
             out / candidate["sources"]["oce"]["files"],
         )
+        snapshot_inputs(release, args.selection, out)
         publication["status"] = "published-private-unqualified"
     finally:
         save(out / "publication.json", publication)
@@ -899,6 +927,17 @@ def accept(args, release):
         )
     inventory = new["sources"]["oce"]["files"]
     sources[inventory] = safe_path(Path(args.selection).parent, inventory)
+    for name in new["payloadFiles"]:
+        sources[name] = release_file(args.selection, ROOT, name)
+    notice = new["build"]["noticeLayer"]["fragment"]
+    sources[notice] = release_file(args.selection, ROOT, notice)
+    checkpoint = Path(args.selection).parent / "checkpoint.json"
+    if checkpoint.exists():
+        require(
+            digest(checkpoint.read_bytes()) == new["checkpointSha256"],
+            "checkpoint snapshot mismatch",
+        )
+        sources["checkpoint.json"] = checkpoint
     for profile in new["seccomp"]["profiles"].values():
         sources[profile["path"]] = safe_path(
             Path(args.selection).parent, profile["path"]
@@ -924,7 +963,7 @@ def main():
     parser.add_argument("--selection")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("new")
-    p.add_argument("--checkpoint", default="releases/source-checkpoint.json")
+    p.add_argument("--checkpoint", default="inputs/source-checkpoint.json")
     p.add_argument("--id", required=True)
     p.add_argument("--output", required=True)
     p = sub.add_parser("dependencies")

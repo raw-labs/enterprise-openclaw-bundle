@@ -4,8 +4,10 @@ Own release selection, reusable build/packaging, verification and customer hando
 Read other repositories without changing them. Do not deploy infrastructure, change
 live Agents, or add OpenClaw Connections in this milestone.
 
-`releases/*.json` owns pins and evidence; `profiles/` owns cloud examples and
-seccomp artifacts; `defaults/` owns optional Agent templates and catalog selection;
+`releases/<version>/` owns immutable selections, snapshots and evidence; `inputs/`
+owns the current build checkpoint and inventory; `profiles/` owns cloud examples
+and legacy fixture policies. Release folders retain their seccomp artifacts.
+`defaults/` owns optional Agent templates and catalog selection;
 `scripts/` owns mechanics; `docs/` owns procedures. README is navigation only.
 Do not duplicate current pins, fleet identities or qualification claims in prose.
 Keep documentation short and static; use Git history for ordinary chronology.

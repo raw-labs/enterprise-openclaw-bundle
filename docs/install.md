@@ -36,8 +36,8 @@ python3 scripts/install.py render --input "$SITE/site.json" --profile "$PROFILE"
 ```
 
 For mirrors, add `--mirrors "$SITE/mirrors.json"`: map each role in `release.json`
-to an authorized destination with the same digest. Historical baseline evaluation
-requires `--allow-pilot-baseline`; unqualified candidates cannot be installed.
+to an authorized destination with the same digest. Unqualified candidates cannot
+be installed.
 
 Review `preflight.json`, `selection.json`, `values.yaml`, `installation.yaml`,
 `rendered.yaml` and supplemental resources. Preserve the paired Installation

@@ -17,7 +17,7 @@ from common import install_gate, read_release, validate  # noqa: E402
 
 class ReleaseContract(unittest.TestCase):
     def setUp(self):
-        self.release = read_release(ROOT / "releases/pilot-baseline.json", ROOT)
+        self.release = read_release(ROOT / "tests/fixtures/legacy-pilot/release.json", ROOT)
 
     def reject(self, change):
         release = copy.deepcopy(self.release)
@@ -99,7 +99,7 @@ class ArtifactBehavior(unittest.TestCase):
                 [
                     "scripts/bundle.py",
                     "--release",
-                    "releases/pilot-baseline.json",
+                    "tests/fixtures/legacy-pilot/release.json",
                     "package",
                     "--source",
                     cls.source,
@@ -109,7 +109,9 @@ class ArtifactBehavior(unittest.TestCase):
             )
         with tarfile.open(cls.out / "one.tar.gz") as tar:
             tar.extractall(cls.out / "unpacked", filter="data")
-        cls.artifact = cls.out / "unpacked" / "pilot-baseline-2026-10-07"
+        cls.artifact = cls.out / "unpacked" / read_release(
+            ROOT / "tests/fixtures/legacy-pilot/release.json", ROOT
+        )["id"]
 
     @classmethod
     def tearDownClass(cls):
@@ -150,7 +152,7 @@ class ArtifactBehavior(unittest.TestCase):
                 for n in names
             )
         )
-        self.assertFalse((self.artifact / "releases/source-files.json").exists())
+        self.assertFalse((self.artifact / "source-files.json").exists())
 
     def test_both_supported_profiles_render(self):
         for profile in ["openclaw", "codex"]:
@@ -314,7 +316,7 @@ class ArtifactBehavior(unittest.TestCase):
             [
                 "scripts/bundle.py",
                 "--release",
-                "releases/pilot-baseline.json",
+                "tests/fixtures/legacy-pilot/release.json",
                 "package",
                 "--source",
                 source,

@@ -44,6 +44,12 @@ def safe_path(root, relative):
     return path
 
 
+def release_file(selection, root, relative):
+    """Prefer the release's pinned snapshot to mutable repository defaults."""
+    path = safe_path(Path(selection).parent, relative)
+    return path if path.exists() else safe_path(root, relative)
+
+
 def verify_files(root, files):
     require(isinstance(files, dict) and files, "missing file integrity map")
     for name, expected in files.items():
@@ -171,14 +177,12 @@ def read_release(path, root=None):
         if root is not None:
             notice = release["build"]["noticeLayer"]
             require(
-                digest(safe_path(root, notice["fragment"]).read_bytes())
+                digest(release_file(path, root, notice["fragment"]).read_bytes())
                 == notice["sha256"],
                 "notice layer integrity mismatch",
             )
             for name, expected in release["payloadFiles"].items():
-                source = safe_path(root, name)
-                if not source.exists():
-                    source = safe_path(path.parent, name)
+                source = release_file(path, root, name)
                 require(
                     digest(source.read_bytes()) == expected, f"payload mismatch: {name}"
                 )

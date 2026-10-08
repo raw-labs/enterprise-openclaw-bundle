@@ -1,0 +1,71 @@
+{
+  "controlPlane": {
+    "releaseName": "oce",
+    "namespace": "openclaw-system",
+    "clusterName": "customer-evaluation",
+    "authBaseUrl": "https://console.example.invalid",
+    "adminEmail": "operator@example.invalid",
+    "bootstrapPasswordClaimName": "occ-bootstrap-admin-password",
+    "apiClients": [
+      {
+        "namespace": "operator-tools",
+        "podLabels": {
+          "app": "operator"
+        }
+      }
+    ],
+    "databaseCidrs": [
+      "10.45.0.12/32"
+    ],
+    "clusterCidrs": [
+      "10.43.0.1/32"
+    ],
+    "dns": {
+      "namespace": "kube-system",
+      "podLabels": {
+        "k8s-app": "kube-dns"
+      }
+    },
+    "gatewayClassName": "eg",
+    "gatewayApiKeySecretName": "occ-private-gateway-key",
+    "agentNativeAdminDomain": "agents.example.invalid",
+    "sharedCookieDomain": "example.invalid",
+    "gatewayTrustedProxyCidrs": [
+      "10.46.0.0/24"
+    ],
+    "pluginStatusProxySourceCidrs": [
+      "10.47.0.10/32"
+    ],
+    "nodeSelector": {
+      "oce-role": "control"
+    },
+    "databaseCa": {
+      "secretName": "occ-database-ca",
+      "key": "ca.pem",
+      "mountPath": "/etc/openclaw/database-ca"
+    },
+    "trustedProxy": {
+      "preset": "aws",
+      "cidrs": [
+        "10.44.0.0/24",
+        "10.44.1.0/24"
+      ]
+    }
+  },
+  "runtime": {
+    "gatewayStorageClassName": "occ-gateway-rwo",
+    "nodeSelector": {
+      "oce-role": "agents"
+    },
+    "gatewayNodeSelector": {
+      "oce-role": "control"
+    },
+    "transportSecretPrefix": "openclaw-agent-transport"
+  },
+  "channels": {
+    "managedSlackProxy": false
+  },
+  "repository": {
+    "enabled": false
+  }
+}

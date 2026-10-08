@@ -5,7 +5,7 @@ and digest-pinned images; their infrastructure, credentials and state stay in
 separate private installation repositories.
 
 - [Release records](releases/): source pins, image digests, qualification and artifact inventories.
-- [Build checkpoint](releases/source-checkpoint.json): input for new candidates.
+- [Build checkpoint](inputs/source-checkpoint.json): input for new candidates.
 - [Build workflow](.github/workflows/build.yml): native builds and checks.
 - [Publication workflow](.github/workflows/publish.yml): publish existing checked exports.
 - [Validation workflow](.github/workflows/validate.yml): release-input and packaging checks.

@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
+SELECTION = ROOT / ".work/validation-input/candidate.json"
 sys.path.insert(0, str(ROOT / "scripts"))
 import install as installer  # noqa: E402
 from common import (  # noqa: E402
@@ -37,7 +38,7 @@ from stock import (  # noqa: E402
 
 class StockInputs(unittest.TestCase):
     def setUp(self):
-        self.release = read_release(ROOT / "releases/v0.1.0-alpha.1-input.json", ROOT)
+        self.release = read_release(SELECTION, ROOT)
 
     def reject(self, mutate):
         release = copy.deepcopy(self.release)
@@ -118,6 +119,36 @@ class StockInputs(unittest.TestCase):
             validate(self.release)
 
 
+class ReleaseSnapshots(unittest.TestCase):
+    def test_archived_inputs_survive_changed_current_defaults(self):
+        records = list((ROOT / "releases").glob("*/release.json"))
+        self.assertTrue(records)
+        with tempfile.TemporaryDirectory() as temp:
+            current = Path(temp)
+            for record in records:
+                release = read_release(record, ROOT)
+                names = [
+                    *release["payloadFiles"],
+                    release["build"]["noticeLayer"]["fragment"],
+                ]
+                for name in names:
+                    path = current / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("changed current input\n")
+                self.assertEqual(read_release(record, current), release)
+
+    def test_tampered_snapshot_cannot_fall_back_to_current_defaults(self):
+        with tempfile.TemporaryDirectory() as temp:
+            record = Path(temp) / "release.json"
+            record.write_bytes(SELECTION.read_bytes())
+            name = "defaults/coding-preset.json"
+            tampered = record.parent / name
+            tampered.parent.mkdir(parents=True)
+            tampered.write_text("changed historical input\n")
+            with self.assertRaisesRegex(ValueError, "payload mismatch"):
+                read_release(record, ROOT)
+
+
 class RegistryInputs(unittest.TestCase):
     def test_private_package_checks_documented_owner_and_optional_repository(self):
         name = "enterprise-openclaw-bundle/controller"
@@ -161,7 +192,7 @@ class OciInputs(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        self.release = read_release(ROOT / "releases/v0.1.0-alpha.1-input.json", ROOT)
+        self.release = read_release(SELECTION, ROOT)
         self.sha = self.release["sources"]["oce"]["commit"]
 
     def tearDown(self):
@@ -280,7 +311,7 @@ class StockArtifact(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/bundle.py"),
                     "--release",
-                    str(ROOT / "releases/v0.1.0-alpha.1-input.json"),
+                    str(SELECTION),
                     "package",
                     "--source",
                     str(cls.source),
@@ -294,7 +325,7 @@ class StockArtifact(unittest.TestCase):
             )
         with tarfile.open(cls.out / "one.tgz") as tar:
             tar.extractall(cls.out, filter="data")
-        cls.artifact = cls.out / "v0.1.0-alpha.1"
+        cls.artifact = cls.out / read_release(SELECTION, ROOT)["id"]
 
     @classmethod
     def tearDownClass(cls):
