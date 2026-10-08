@@ -43,7 +43,13 @@ jobs:
         run: |
           python3 scripts/release.py resolve --definition "$DEFINITION" --output .work/resolved
           python3 -c 'import json, os; d=json.load(open(".work/resolved/candidate.json")); open(os.environ["GITHUB_OUTPUT"], "a").write("version="+d["id"]+"\n")'
-          tar -czf .work/resolved.tar.gz -C .work resolved
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: .work/resolved/source/go.sum
+      - name: Build and test unchanged matched upstream CLI binaries
+        run: python3 scripts/cli.py build --selection .work/resolved/candidate.json --source .work/resolved/source --output .work/resolved/cli
+      - run: tar -czf .work/resolved.tar.gz -C .work resolved
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: resolved-inputs
@@ -80,6 +86,8 @@ jobs:
           name: resolved-inputs
           path: .work
       - run: tar -xzf .work/resolved.tar.gz -C .work
+      - name: Test the delivered upstream CLI on the native target
+        run: python3 scripts/cli.py check --directory .work/resolved/cli
       - name: Build actual shipping exports on native hardware
         env:
           ARCH: ${{ matrix.arch }}

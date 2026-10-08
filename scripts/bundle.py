@@ -105,6 +105,43 @@ def deterministic_tar(files, prefix=""):
     return out.getvalue()
 
 
+def cli_files(directory, release):
+    directory = Path(directory)
+    cli = load(directory / "cli.json")
+    require(
+        cli["oceCommit"] == release["sources"]["oce"]["commit"]
+        and cli["sourceInventorySha256"] == release["sources"]["oce"]["filesSha256"],
+        "CLI belongs to another resolved source",
+    )
+    require(
+        release.get("operatorCli", cli) == cli, "CLI differs from release provenance"
+    )
+    require(
+        set(cli["binaries"])
+        == {
+            f"occ-{os_name}-{arch}"
+            for os_name in ("darwin", "linux")
+            for arch in ("amd64", "arm64")
+        },
+        "all operator CLI binaries required",
+    )
+    require(
+        cli["tests"]["pass"] > 0 and cli["tests"]["fail"] == cli["tests"]["skip"] == 0,
+        "CLI tests must pass without skips",
+    )
+    files = {}
+    for name, info in cli["binaries"].items():
+        binary = directory / name
+        require(not binary.is_symlink(), "CLI binary links rejected")
+        require(
+            name == f"occ-{info['os']}-{info['architecture']}"
+            and digest(binary.read_bytes()) == info["sha256"],
+            "CLI binary changed after verification",
+        )
+        files["cli/" + name] = (binary.read_bytes(), 0o755)
+    return cli, files
+
+
 def package(args, release):
     source = Path(args.source).resolve()
     verify_source(release, args.release, source)
@@ -129,7 +166,8 @@ def package(args, release):
         ],
         stdout=subprocess.PIPE,
     )
-    files = {}
+    cli, files = cli_files(Path(args.dependencies).parent / "cli", release)
+    files["bin/occ"] = ((ROOT / "bin/occ").read_bytes(), 0o755)
     if release["schemaVersion"] == 2:
         from stock import renderer_files
 
@@ -202,6 +240,7 @@ def package(args, release):
     files["OPERATE.md"] = ((ROOT / "docs/operate.md").read_bytes(), 0o644)
     # Runtime build overlay/private build inputs are deliberately excluded.
     copy = json.loads(json.dumps(release))
+    copy["operatorCli"] = cli
     copy["chart"]["artifact"] = chart_name
     copy["chart"]["sha256"] = digest(chart_data)
     files["release.json"] = (

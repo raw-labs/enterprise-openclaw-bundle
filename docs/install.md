@@ -6,8 +6,19 @@ credentials in the operator's private installation directory.
 
 ## Obtain artifacts and prepare the cluster
 
-Obtain the archive and checksum through an authorized private release, then verify,
-extract and run `python3 scripts/install.py verify`. Read `release.json` for the
+Download only `bundle.tar.gz` and `bundle.tar.gz.sha256` for installation; the other
+release assets are provenance and test evidence. With GitHub CLI authenticated,
+set `VERSION` to the selected release and `DOWNLOAD` to an empty download directory:
+
+```bash
+gh release download "$VERSION" --repo raw-labs/enterprise-openclaw-bundle \
+  --pattern 'bundle.tar.gz*' --dir "$DOWNLOAD"
+```
+
+In that directory, run `sha256sum -c bundle.tar.gz.sha256` (macOS:
+`shasum -a 256 -c bundle.tar.gz.sha256`), then `tar -xzf bundle.tar.gz`.
+Enter the extracted version directory and run
+`python3 scripts/install.py verify`. Read `release.json` for the
 selected images, architectures and acceptance scope. Image access is separate:
 authorize node pulls or arrange a digest-preserving customer mirror. Installation
 uses the delivered chart and images; it does not require building from source.
@@ -17,6 +28,19 @@ Prepare a dedicated kubeconfig/context, PostgreSQL with separate restricted
 application/migration roles and TLS CA, DNS/TLS, RWO storage, disjoint control/Agent
 node pools, enforced NetworkPolicies, cert-manager, Gateway API and Envoy.
 Cloud prerequisites and node confinement are the installation operator's responsibility.
+
+The archive includes unchanged upstream `occ` for macOS/Linux AMD64/ARM64:
+
+```bash
+export PATH="$PWD/bin:$PATH"
+occ --version
+occ --help
+```
+
+The launcher selects the native executable and checks its delivered checksum.
+Use `--url`, `--service-key-file` and `--namespace` to select the controller,
+protected service API key file and OCE Namespace. Command help describes the
+upstream operations. Human accounts and browser sign-in remain OCE procedures.
 
 ## Render installation inputs
 

@@ -23,8 +23,10 @@ gh workflow run release.yml --ref main -f definition="$BUNDLE_DEFINITION" -f pub
 ```
 
 The single Action resolves Git sources and locked renderer dependencies, generates
-a file inventory, builds three images on native AMD64 and ARM64 Depot runners,
-runs the selected source's controller, runtime and credential isolation tests with
+a file inventory, builds unchanged `occ` from that same source for macOS/Linux
+AMD64/ARM64 and runs its CLI tests. Native AMD64 and ARM64 Depot runners check the
+Linux executables and build three images, then run the selected source's controller,
+runtime and credential isolation tests with
 confinement and no skips, and assembles their exact tested manifests. It verifies
 the archive and real chart renders before publishing private GHCR indexes, checks
 the published handoff again, then creates the immutable tag and private prerelease.
@@ -33,8 +35,8 @@ the published handoff again, then creates the immutable tag and private prerelea
 
 Publication produces three multiarchitecture images: controller, runtime and
 repository credentials. Each has AMD64 and ARM64 manifests. The customer archive
-contains the chart, installer, templates, examples, license notices and verification
-records; images are pulled separately.
+contains the chart, matched `occ` binaries, installer, templates, examples, license
+notices and verification records; images are pulled separately.
 
 The GitHub release has ten attachments:
 
@@ -54,9 +56,12 @@ are committed to the source repository.
 Set `publish=false` for the same native build and packaging checks without registry
 writes or a tag/release. Its review archive is marked unpublished and installation
 admission rejects it. Local packaging checks can resolve without native builds:
+use the Go toolchain pinned in the Release Action for the CLI build.
 
 ```bash
 python3 scripts/release.py resolve --definition "$BUNDLE_DEFINITION" --output .work/resolved
+python3 scripts/cli.py build --selection .work/resolved/candidate.json \
+  --source .work/resolved/source --output .work/resolved/cli
 python3 -m unittest discover -s tests -v
 ```
 

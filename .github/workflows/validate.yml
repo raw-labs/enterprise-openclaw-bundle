@@ -23,5 +23,11 @@ jobs:
         run: python3 scripts/release.py validate-definitions
       - name: Resolve source and dependencies for packaging tests
         run: python3 scripts/release.py resolve --output .work/resolved
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: .work/resolved/source/go.sum
+      - name: Build and test the unchanged exact-source CLI
+        run: python3 scripts/cli.py build --selection .work/resolved/candidate.json --source .work/resolved/source --output .work/resolved/cli
       - name: Check rejection paths, provenance, reproducibility and actual chart rendering
         run: python3 -m unittest discover -s tests -v

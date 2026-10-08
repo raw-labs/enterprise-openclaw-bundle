@@ -2,6 +2,7 @@
 
 import copy
 import json
+import os
 import subprocess
 import sys
 import tarfile
@@ -15,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SELECTION = ROOT / ".work/resolved/candidate.json"
 sys.path.insert(0, str(ROOT / "scripts"))
 import install as installer  # noqa: E402
+from bundle import cli_files  # noqa: E402
 from common import (  # noqa: E402
     digest,
     helm_values,
@@ -162,6 +164,28 @@ class RegistryInputs(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 identical_tag(response, expected)
+
+
+class CliInputs(unittest.TestCase):
+    def test_cli_rejects_another_source_missing_platform_and_changed_binary(self):
+        directory = ROOT / ".work/resolved/cli"
+        original = load(directory / "cli.json")
+        release = read_release(SELECTION, ROOT)
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp)
+            for name in original["binaries"]:
+                os.link(directory / name, out / name)
+            for mutate in (
+                lambda m: m.update(oceCommit="0" * 40),
+                lambda m: m["binaries"].pop("occ-darwin-amd64"),
+                lambda m: m["binaries"]["occ-linux-arm64"].update(sha256="0" * 64),
+                lambda m: m["tests"].update(skip=1),
+            ):
+                metadata = copy.deepcopy(original)
+                mutate(metadata)
+                save(out / "cli.json", metadata)
+                with self.assertRaises(ValueError):
+                    cli_files(out, release)
 
 
 class OciInputs(unittest.TestCase):
@@ -353,6 +377,43 @@ class StockArtifact(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("candidate cannot be installed", result.stderr)
+
+    def test_delivered_upstream_cli_launcher_and_inventory(self):
+        cli = load(self.artifact / "release.json")["operatorCli"]
+        self.assertEqual(
+            cli["oceCommit"], read_release(SELECTION)["sources"]["oce"]["commit"]
+        )
+        self.assertEqual(len(cli["binaries"]), 4)
+        manifest = load(self.artifact / "manifest.json")
+        for name, info in cli["binaries"].items():
+            self.assertEqual(manifest["cli/" + name], info["sha256"])
+            self.assertTrue((self.artifact / "cli" / name).stat().st_mode & 0o111)
+        result = subprocess.check_output(
+            [self.artifact / "bin/occ", "--version"], text=True
+        )
+        self.assertEqual(result.strip(), "occ " + cli["version"])
+        help_text = subprocess.check_output(
+            [self.artifact / "bin/occ", "--help"], text=True
+        )
+        self.assertIn("--service-key-file", help_text)
+        # A changed delivered executable must be rejected before it can run.
+        import platform
+
+        os_name = {"Darwin": "darwin", "Linux": "linux"}[platform.system()]
+        arch = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "amd64"}[
+            platform.machine()
+        ]
+        binary = self.artifact / "cli" / f"occ-{os_name}-{arch}"
+        original = binary.read_bytes()
+        try:
+            binary.write_bytes(original + b"changed")
+            result = subprocess.run(
+                [self.artifact / "bin/occ", "--version"], capture_output=True, text=True
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("file integrity mismatch", result.stderr)
+        finally:
+            binary.write_bytes(original)
 
     def test_profiles_render_with_delivered_dependencies_and_real_chart(self):
         release = load(self.artifact / "release.json")

@@ -437,6 +437,14 @@ def verify_handoff(archive, published=True):
             [sys.executable, artifact / "scripts/install.py", "verify"],
             stdout=subprocess.DEVNULL,
         )
+        cli = load(artifact / "release.json")["operatorCli"]
+        require(
+            subprocess.check_output(
+                [sys.executable, artifact / "bin/occ", "--version"], text=True
+            ).strip()
+            == "occ " + cli["version"],
+            "delivered CLI launcher/version mismatch",
+        )
         examples = sorted((artifact / "examples/installations").glob("*.json"))
         require(examples, "installation examples missing from handoff")
         for example in examples:
@@ -491,6 +499,11 @@ def verify_handoff(archive, published=True):
 def finish(args):
     selection = Path(args.selection).resolve()
     release = read_release(selection, ROOT)
+    from bundle import cli_files
+
+    release["operatorCli"], _ = cli_files(
+        Path(args.dependencies).parent / "cli", release
+    )
     publication = load(selection.parent / "publication.json")
     require(
         publication["status"]
@@ -579,6 +592,10 @@ def publish_release(args):
     preflight(version, sha)
     notes = out / "release-notes.txt"
     notes.write_text(
+        "Download **bundle.tar.gz** and **bundle.tar.gz.sha256** to install; "
+        "the archive includes the chart, installation helpers, presets and matched upstream occ "
+        "for macOS/Linux AMD64/ARM64. Container images are pulled separately from private GHCR. "
+        "The remaining assets are generated provenance and verification records.\n\n"
         "Native AMD64 and ARM64 shipping artifacts passed all build and confinement checks. "
         "The archive passed inventory verification, reproducibility and real chart rendering. "
         "Provider access and customer installation acceptance remain separate. "
