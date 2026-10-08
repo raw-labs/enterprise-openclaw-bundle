@@ -6,13 +6,14 @@ mirrors. Installation operators use the access handoff with the delivered instal
 Bundle versions are independent of the upstream chart version. Use immutable
 SemVer prerelease tags with numbered `alpha`, `beta` or `rc` suffixes. Alpha denotes
 early artifact preparation, beta denotes evaluation, and an RC is intended for
-final acceptance. A prerelease label does not confer qualification. Create a stable
-version only after reviewing qualification of the final artifacts. Never reuse a
-tag, replace a published asset or move published history.
+final acceptance. A prerelease label does not confer qualification. The Action
+currently publishes prereleases only; stable promotion needs explicit implementation
+and review of the final artifacts. Never reuse a tag, replace a published asset or
+move published history.
 
-Private GHCR is the distribution registry for new bundle images. Record repository
-names and final digests in the release selection. Presales needs authorized GitHub
-package access, without an AWS account. Outside Actions, private GHCR pulls require
+Private GHCR is the distribution registry for new bundle images. The Action records
+repository names and final digests in generated `release.json`. Presales needs
+authorized GitHub package access, without an AWS account. Outside Actions, private GHCR pulls require
 a classic GitHub token with `read:packages` and any required organization SSO
 authorization. CI publication uses the repository's short-lived `GITHUB_TOKEN`.
 Link packages to the private bundle repository and verify their private visibility

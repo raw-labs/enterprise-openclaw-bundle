@@ -5,21 +5,18 @@ selection. Its version is independent of the OCE chart version. Retain hash-pinn
 ingredients used by maintained definitions; add a new file when changing one.
 Published source and definitions remain available at their immutable Git tags.
 
-The definition selects the exact OCE commit, compatible OpenClaw commit and Codex
-version, both architectures, optional preset templates, bundled plugin IDs and the
-Codex installation profile. Its `build` section selects optional hash-pinned source
-patches and reviewed confinement inputs. Runtime versions and plugin IDs must match
-the selected source Dockerfiles after applying those patches. The build code adds
-mandatory license notices. Presets are included for optional import; they are not
-created in a running installation. Connections and live Agent configuration are
-outside this milestone.
+See the [bundle schema](bundle-schema.md) for supported fields, source compatibility
+checks and adding plugins. Presets are shipped for optional import. Connections
+and live Agent configuration are outside this milestone.
 
 Installation examples live in `docs/examples/installations/`. They are shipped
 with the documentation and checked by the renderer. Customer-specific settings
 belong in the customer's private deployment repository.
 
 Commit the definition and ingredients, then run **Release bundle** on main and
-select its definition path. Publication defaults to enabled. From the CLI:
+select its definition path. The Action runs on demand; pushing a commit or tag does
+not start a release. Publication defaults to enabled. Set `BUNDLE_DEFINITION` to
+the chosen `bundles/<version>/bundle.json` path, then run:
 
 ```bash
 gh workflow run release.yml --ref main -f definition="$BUNDLE_DEFINITION" -f publish=true
@@ -28,12 +25,31 @@ gh workflow run release.yml --ref main -f definition="$BUNDLE_DEFINITION" -f pub
 The single Action resolves Git sources and locked renderer dependencies, generates
 a file inventory, builds three images on native AMD64 and ARM64 Depot runners,
 runs the selected source's controller, runtime and credential isolation tests with
-confinement and no skips, and assembles their exact tested manifests. It then
-publishes private GHCR indexes, verifies a reproducible customer archive and real
-chart renders for the documentation examples, and creates the immutable tag and
-private GitHub prerelease.
-Generated definitions, digests, receipts, checksums and provenance are release assets;
-there is no manual checkpoint or acceptance JSON to prepare or commit.
+confinement and no skips, and assembles their exact tested manifests. It verifies
+the archive and real chart renders before publishing private GHCR indexes, checks
+the published handoff again, then creates the immutable tag and private prerelease.
+
+## Generated outputs
+
+Publication produces three multiarchitecture images: controller, runtime and
+repository credentials. Each has AMD64 and ARM64 manifests. The customer archive
+contains the chart, installer, templates, examples, license notices and verification
+records; images are pulled separately.
+
+The GitHub release has ten attachments:
+
+- `bundle.tar.gz` and `bundle.tar.gz.sha256`: customer handoff and checksum.
+- `bundle.json`: a copy of the chosen definition.
+- `resolved.json` and `source-files.json`: resolved ingredients and source inventory.
+- `release.json` and `publication.json`: final image selection and publication record.
+- Two `<version>-native-<architecture>-receipt.json` files: native test evidence.
+- `provenance.json`: build commit/run, definition hash and output checksums.
+
+Actions also retains four temporary artifact collections: resolved build inputs,
+native AMD64 exports, native ARM64 exports and release outputs. No generated records
+are committed to the source repository.
+
+## Checks and retries
 
 Set `publish=false` for the same native build and packaging checks without registry
 writes or a tag/release. Its review archive is marked unpublished and installation

@@ -36,8 +36,13 @@ python3 scripts/install.py render --input "$SITE/site.json" --profile "$PROFILE"
 ```
 
 For mirrors, add `--mirrors "$SITE/mirrors.json"`: map each role in `release.json`
-to an authorized destination with the same digest. Unqualified candidates cannot
-be installed.
+to an authorized destination with the same digest. The installer rejects unbuilt
+candidates and unpublished review archives. A published, native-verified release
+still needs acceptance on the customer's installation.
+
+The installer does not support external login providers, managed Codex account
+issuance or additional controller-mounted preset files. Import presets through
+the OCE API as described below.
 
 Review `preflight.json`, `selection.json`, `values.yaml`, `installation.yaml`,
 `rendered.yaml` and supplemental resources. Preserve the paired Installation
@@ -117,8 +122,8 @@ Review the generated grants, then apply:
 kubectl --kubeconfig "$KUBE" --context "$CONTEXT" apply -f "$SITE/tenant-rbac.json"
 ```
 
-Repeat into a new output after the gateway
-namespace appears and require OCE Namespace readiness. Import optional
+Repeat into a new output after the gateway namespace appears and require OCE
+Namespace readiness. Import optional
 `defaults/*-preset.json` through the authenticated Namespace preset API
 (`POST /namespaces/<id>/presets`, JSON file as body), or use seeded templates.
 Create model Secrets, grant Agent access and deploy through the Console. Review

@@ -64,8 +64,8 @@ stopping controllers and restoring service. Update the startup Secret from the
 reviewed new `installation.yaml` and keep its checksum paired with the new Helm
 values. Apply reviewed supplemental changes and use the new delivered chart.
 Recheck migration outcomes, private routing and the acceptance cases above;
-inspect actual Agent revisions and redeploy
-only the agreed Agents. Fresh-install bootstrap preparation is not an upgrade step.
+inspect actual Agent revisions and redeploy only the agreed Agents. Fresh-install
+bootstrap preparation is not an upgrade step.
 
 After failure, inspect Helm history, initialization Jobs and retained database
 state before retrying. Helm rollback does not reverse committed migrations. Use
