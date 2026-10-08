@@ -1,7 +1,8 @@
 # Scope and ownership
 
-The baseline selection in `release.json` owns its limitations and evidence.
-It is portable packaging of the internal AWS pilot, suitable for an explicitly
+Each selection in `release.json` owns its limitations and evidence. New stock
+candidates are unqualified until their final artifacts are reviewed. The recorded
+baseline is portable packaging of the internal AWS pilot, suitable for an explicitly
 accepted evaluation in another installation after access and prerequisites are
 prepared. It is not a customer-qualified product release. Pending OCE changes
 must be delivered as a new exact input and independently qualified.

@@ -1,133 +1,85 @@
-# Select, package and release
+# Select, build and release
 
-Use Python 3.12+, Git, Node 24+ and Helm 3 for packaging; Docker Buildx and the
-selected upstream dependencies are additional build/qualification requirements.
-The release JSON and its hashed source-file inventory are authoritative. Fetch
-exact source objects; a local object database is an explicit read-only acceleration,
-not a requirement or a source of working-tree content.
+Release JSON owns exact sources, digests, inventories and evidence. New stock
+candidates use our selected fork checkpoint and start without shipping images.
+The recorded pilot remains available through the legacy commands; its evidence
+never qualifies a new build. See [versions and distribution](distribution.md).
 
-```bash
-python3 scripts/bundle.py --release releases/pilot-baseline.json validate
-python3 scripts/bundle.py --release releases/pilot-baseline.json source \
-  --output .work/source
-# Optional: --from-git /absolute/path/to/selected-source-object-repository
-python3 scripts/bundle.py --release releases/pilot-baseline.json package \
-  --source .work/source --output dist/bundle.tar.gz
-python3 -m unittest discover -s tests -v
-```
+## Prepare and verify
 
-Expect a deterministic archive/checksum containing the unchanged chart, release
-selection, manifest, installation tool, upstream renderer/bootstrap helper, optional
-presets, example inputs, seccomp/provenance, procedures and notices. No images,
-source trees, private build overlay, credentials or installation state are embedded.
-The same inputs produce the same archive bytes. Artifact checks establish packaging,
-not image availability or execution.
-
-## Build a new candidate
-
-Choose a new release identity. Existing image references become inherited inputs;
-only successful pushed build outputs replace all three. No command promotes a
-candidate automatically or rewrites historical evidence.
+Use Python 3.12+, Git, Node 24.16+ and Helm 3. Select a new, agreed prerelease
+identity. Export exact Git objects, never working-tree content. An explicit
+read-only local object repository may accelerate the export.
 
 ```bash
-python3 scripts/bundle.py --release releases/pilot-baseline.json candidate \
-  --id evaluation-001 --output .work/candidate.json
-python3 scripts/bundle.py --release .work/candidate.json build \
-  --source .work/source --output .work/build
+python3 scripts/stock.py new --id <agreed-prerelease> --output .work/candidate.json
+python3 scripts/stock.py --selection .work/candidate.json source --output .work/source
+python3 scripts/stock.py --selection .work/candidate.json dependencies --output .work/renderer-dependencies
+python3 scripts/bundle.py --release .work/candidate.json package \
+  --source .work/source --dependencies .work/renderer-dependencies --output dist/bundle.tar.gz
 ```
 
-Local builds load AMD64 images and retain unqualified metadata. Full builds need
-substantial local capacity/network access; emulation is not runtime qualification.
-For private publication, authenticate Docker to the selected ECR registry and
-publish to a new output directory:
+This produces an unbuilt review bundle. It cannot install through the delivered
+tool. The deterministic archive contains the unchanged chart and upstream MIT
+notice, exact selection, hashed file manifest, renderer with its locked public
+suffix dependencies and their notices, installation helper, optional defaults and
+static procedures. Build contexts, notice-layer fragment, image exports, credentials
+and private test logs stay outside the SE archive.
 
-```bash
-python3 scripts/bundle.py --release .work/candidate.json build \
-  --source .work/source --output .work/published --push \
-  --registry-prefix '<account>.dkr.ecr.<region>.amazonaws.com/<prefix>'
-```
+Validation CI exports both the historical pilot source and the selected fork,
+checks negative inputs and inventories, reproduces archives, verifies delivered
+files and renders both profiles with the real chart. Those checks establish
+packaging compatibility, not runtime qualification.
 
-The CLI verifies AWS account, existing private repositories, immutable tags without
-exclusions, and absent release tags. It creates no cloud resources. Builder access
-must cover the three repositories; node read access is separately granted.
-Do not retry partial publication with the same identity until all tags are inspected.
+## Native shipping artifacts
 
-Controller uses selected OCE's root Dockerfile runtime target. Runtime uses its
-pinned OC recipe and bridge patches, then the tracked Codex overlay with the
-newly built base digest. Credential service reuses OCE's service target; its pilot
-image was built by the installation's equivalent supplemental Dockerfile. Runtime
-inventory helper equality was established against the selected source; builds
-use that source helper. Package lock, plugin metadata, dedicated command and
-provenance must resolve the same Codex version. Base images and downloads are
-pinned, but apt/dependency execution can change output; rebuilds are not promised
-to reproduce old image digests.
+The manually dispatched private `build.yml` workflow takes the agreed release
+identity. It uses existing Depot runner labels for native AMD64 and ARM64; it
+creates no runner, cloud or installation resources. Both jobs export all three
+roles from the selected source recipes. A tracked notice-only stage preserves
+OCE's MIT license in each final image; it changes no Codex code or identity.
+Build timestamps use the selected commit epoch. Apt and other dependency execution
+can still change image bytes; rebuilds need not reproduce old image digests.
 
-## Check and qualify
+Before installing test dependencies, the build verifies the complete source
+inventory. Native checks bind each export manifest to its loaded config ID, source
+label, architecture and license. The controller startup test, four unchanged
+runtime startup/broker/worker test files, runtime repository-volume test and
+credential isolation tests execute against the actual shipping exports. Credential
+isolation uses the actual service and a separate source-built test-only client.
+No test identity patch, skipped test, emulation or unconfined fallback is accepted.
 
-```bash
-python3 scripts/bundle.py --release releases/pilot-baseline.json check-images \
-  --output .work/baseline-image-identity.json
-python3 scripts/bundle.py --release .work/published/candidate.json qualify \
-  --source .work/source --seccomp profiles/codex-seccomp.json \
-  --output .work/qualification
-```
+The selected source prepares a temporary k3d fixture, derives its reviewed Codex
+seccomp additions from that node baseline, and uses its bounded job-owned AppArmor
+policy where Docker enables AppArmor. Owned fixture cleanup and policy removal run
+on success or failure. Temporary CI fixtures are not customer deployments. Raw TAP
+stays in ignored private files; only sanitized counts, identities, confinement
+artifacts and log checksums enter the candidate record. Customer node policy still
+requires review and installation tests.
 
-`check-images` pulls exact digests and checks architecture, source labels and runtime
-provenance/version. The pilot credential image may lack a source label; its recorded
-digest does not manufacture one. A failure is retained and blocks acceptance.
-`qualify` requires native Linux AMD64 Docker, source inventory, reviewed seccomp,
-installed dependencies and real upstream production/runtime/repository-volume tests and credential service isolation
-against the actual service digest (with locally built test-only client/fixture images).
-The tracked patch raises only the source's Codex identity expectation to the overlay
-version; this is adapted qualification, not stock upstream proof. No lower version,
-skip, unconfined run or old pilot receipt is accepted. Raw TAP stays private/ignored
-because fixtures may contain synthetic credentials. The sanitized receipt records
-exact images, sources, confinement, patch and counts. It does not establish real
-model/provider/repository workflows or qualify customer infrastructure.
+## Private candidate publication
 
-After reviewing successful evidence, the release owner creates a new `kind: release`
-selection with `qualification.status: qualified`, a relative receipt path and
-`receiptSha256`. Record `customerQualified` accurately; customer acceptance is
-separate. Validation verifies receipt identities/inputs and requires nonzero tests,
-all passing without skips. The baseline's `pilot-recorded` state is never promoted.
+Only after both native jobs succeed does a separate job receive `packages: write`.
+It checks the private bundle repository, expected package ownership/visibility,
+all native receipts and absence of every destination tag before writing. Unknown
+authentication or tag state stops publication. It assembles one OCI index per role
+from the exact two tested manifests, copies with digest preservation, and verifies
+the private published index digest. It never builds replacement shipping images.
 
-## Private automation and delivery
+The resulting candidate stays unqualified pending review. Its exact images,
+both native receipts, per-platform policy artifacts and SE bundle are retained as
+private Actions artifacts. Partial publication must be inspected before any retry;
+never overwrite a tag to repair it. The workflow does not create a GitHub Release
+or promote a stable version automatically.
 
-Validation runs without cloud credentials. The manually dispatched image workflow
-is restricted to private repository `main` and a protected `release-build` environment.
-Configure that environment with `AWS_ROLE_ARN`, `AWS_REGION`, `ECR_PREFIX` and review
-protection. Use short-lived OIDC credentials with trust restricted to this repository
-and environment; grant only identity/read and push access to the three existing
-repositories. No static AWS keys, production deployment or automatic GitHub Release
-publication is configured. Candidate metadata is retained as a private Actions
-artifact; publishing remains an explicit release-owner step.
+Review the final digests, confinement and test scope before customer handoff.
+Model/provider access and customer infrastructure acceptance are separate from
+these native export checks. Stable promotion and enabling installation of a new
+release require an explicit reviewed acceptance record and tooling that validates
+that record. The current stock tool deliberately rejects automatic promotion.
 
-For customer mirroring, an authorized delivery operator uses Skopeo with separately
-protected source/destination registry authentication:
-
-```bash
-skopeo copy --all --preserve-digests --authfile /secure/registry-auth.json \
-  docker://<source-role-reference-from-release.json> \
-  docker://<private-customer-repository>:<unique-release-id>
-skopeo inspect --raw --authfile /secure/registry-auth.json \
-  docker://<private-customer-repository>:<unique-release-id> | shasum -a 256
-```
-
-Repeat for all three roles; require manifest hashes equal selected digests and
-record destination digest references in `mirrors.json`. Verify destination ownership,
-private visibility and tag absence/immutability before copying; stop on mismatches
-or uncertain outcomes. Grant pull access to both node pools and test actual pulls.
-A digest-preserving mirror does not require new image qualification; changed bytes do.
-
-After checking repository privacy, create a private versioned GitHub Release or use
-an authorized private artifact channel to deliver the archive/checksum and optional
-mirror map. Source repository collaborators may download private GitHub Release
-assets; customers without that access receive the exported archive through the
-approved channel. Bundle membership does not grant ECR access. Do not make the
-repository, artifacts or source images public to simplify delivery.
-
-The next OCE integration input is an exact combined commit, its chosen OC pin/archive
-checksum, matching chart version, recipes/bridge patches, compatible overlay decision
-and version-aware qualification fixtures. Regenerate the source archive/file inventory
-from that exact commit, review profile/default compatibility, update pins in a new
-candidate and build/qualify all roles. Keep upstream topic PRs independent.
+Preserve published history. Before pushing source or creating a release, verify
+identity, origin, private visibility and the expected remote head. Deliver through
+private releases or approved channels. Mirror all platforms with
+`skopeo copy --all --preserve-digests`, verify destination manifests and record the
+mirror map; never put build or presales credentials in a customer installation.

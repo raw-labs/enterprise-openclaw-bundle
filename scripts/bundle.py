@@ -60,11 +60,37 @@ def verify_source(release, selection, source):
         and release["sources"]["openclaw"]["archiveSha256"] in recipe,
         "runtime Dockerfile/source selection mismatch",
     )
+    runtime = (
+        release["runtime"] if release["schemaVersion"] == 2 else release["overlay"]
+    )
     require(
-        digest((Path(source) / release["overlay"]["inventoryHelper"]).read_bytes())
-        == release["overlay"]["inventoryHelperSha256"],
+        digest((Path(source) / runtime["inventoryHelper"]).read_bytes())
+        == runtime["inventoryHelperSha256"],
         "inventory helper mismatch",
     )
+    if release["schemaVersion"] == 2:
+        require(
+            "ENV OPENAI_CODEX_VERSION=" + runtime["codexVersion"] in recipe,
+            "stock Codex/source mismatch",
+        )
+        for name, expected in runtime["bridgePatches"].items():
+            require(
+                digest(safe_path(source, name).read_bytes()) == expected
+                and expected in recipe,
+                "bridge patch mismatch",
+            )
+        lock = (Path(source) / "pnpm-lock.yaml").read_text()
+        for name, dependency in release["rendererDependencies"].items():
+            require(
+                re.search(
+                    re.escape(name + "@" + dependency["version"])
+                    + r":\n    resolution: \{integrity: "
+                    + re.escape(dependency["integrity"])
+                    + r"\}",
+                    lock,
+                ),
+                "renderer dependency differs from selected source lockfile",
+            )
 
 
 def prepare(args, release):
@@ -143,6 +169,10 @@ def package(args, release):
         stdout=subprocess.PIPE,
     )
     files = {}
+    if release["schemaVersion"] == 2:
+        from stock import renderer_files
+
+        files.update(renderer_files(release, Path(args.dependencies)))
     chart_files = {
         str(p.relative_to(chart)): (p.read_bytes(), 0o644)
         for p in sorted(chart.rglob("*"))
@@ -202,21 +232,30 @@ def package(args, release):
     for name in ["common.py", "install.py"]:
         files["scripts/" + name] = ((ROOT / "scripts" / name).read_bytes(), 0o755)
     for name in release["payloadFiles"]:
-        files[name] = ((ROOT / name).read_bytes(), 0o644)
+        payload = safe_path(ROOT, name)
+        if release["schemaVersion"] == 2 and not payload.exists():
+            payload = safe_path(Path(args.release).parent, name)
+        files[name] = (payload.read_bytes(), 0o644)
     files["INSTALL.md"] = ((ROOT / "docs/install.md").read_bytes(), 0o644)
     files["SCOPE.md"] = ((ROOT / "docs/scope.md").read_bytes(), 0o644)
     # Runtime build overlay/private build inputs are deliberately excluded.
     copy = json.loads(json.dumps(release))
     copy["chart"]["artifact"] = chart_name
     copy["chart"]["sha256"] = digest(chart_data)
-    copy["overlay"]["files"] = {
-        k: v for k, v in release["overlay"]["files"].items()
-    }  # provenance, not delivered build inputs
+    if release["schemaVersion"] == 1:
+        copy["overlay"]["files"] = {
+            k: v for k, v in release["overlay"]["files"].items()
+        }  # provenance, not delivered build inputs
     files["release.json"] = (
         (json.dumps(copy, indent=2, sort_keys=True) + "\n").encode(),
         0o644,
     )
     q = release["qualification"]
+    for receipt in q.get("nativeReceipts", {}).values():
+        files[receipt["path"]] = (
+            safe_path(Path(args.release).parent, receipt["path"]).read_bytes(),
+            0o644,
+        )
     if q["status"] == "qualified":
         files[q["receipt"]] = (
             safe_path(Path(args.release).parent, q["receipt"]).read_bytes(),
@@ -730,6 +769,7 @@ def main():
     p = sub.add_parser("package")
     p.add_argument("--source", required=True)
     p.add_argument("--output", required=True)
+    p.add_argument("--dependencies")
     p = sub.add_parser("candidate")
     p.add_argument("--id", required=True)
     p.add_argument("--output", required=True)
@@ -750,6 +790,15 @@ def main():
         source_files(release, args.release)
         print(f"{release['id']}: valid ({release['qualification']['status']})")
     else:
+        require(
+            release["schemaVersion"] == 1 or args.command in ("source", "package"),
+            "stock candidates use scripts/stock.py for native builds and checks",
+        )
+        if release["schemaVersion"] == 2 and args.command == "package":
+            require(
+                args.dependencies,
+                "stock package requires verified renderer dependency archives",
+            )
         (
             prepare
             if args.command == "source"

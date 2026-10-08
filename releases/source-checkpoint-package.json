@@ -1,0 +1,21 @@
+{
+  "profiles": {
+    "codex": {
+      "helmLint": "passed",
+      "helmTemplate": "passed",
+      "renderedSha256": "4799478674e16980b9f00bb3085400316a7f25c499844aeaacf6bbc9e36daa33",
+      "renderer": "passed"
+    },
+    "openclaw": {
+      "helmLint": "passed",
+      "helmTemplate": "passed",
+      "renderedSha256": "8169fd1783d8a428f46994be20268aa9a2d984677bd438c7acbc3aa6f3cdbddc",
+      "renderer": "passed"
+    }
+  },
+  "scope": "fixture image references and placeholder policy; chart/profile compatibility only, no shipping image or installation qualification",
+  "sourceCommit": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db",
+  "sourceFiles": 1800,
+  "sourceInventory": "passed",
+  "status": "passed-source-preparation"
+}

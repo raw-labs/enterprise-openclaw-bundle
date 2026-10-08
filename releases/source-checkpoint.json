@@ -1,0 +1,333 @@
+{
+  "build": {
+    "nodeBaseImage": "docker.io/library/node:24-bookworm@sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584",
+    "nodeRuntimeBaseImage": "docker.io/library/node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03",
+    "recipes": {
+      "controller": {
+        "dockerfile": "Dockerfile",
+        "target": "runtime"
+      },
+      "repositoryCredentials": {
+        "dockerfile": "deploy/runtime/Dockerfile",
+        "target": "repository-credentials-service"
+      },
+      "runtime": {
+        "dockerfile": "deploy/runtime/Dockerfile",
+        "target": "runtime"
+      }
+    }
+  },
+  "chart": {
+    "name": "openclaw-enterprise",
+    "path": "deploy/helm/openclaw-enterprise",
+    "sourceCommit": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db",
+    "version": "0.1.0"
+  },
+  "customerQualified": false,
+  "distribution": {
+    "customerDelivery": "digest-preserving mirrors or verified OCI exports",
+    "namespace": "raw-labs/enterprise-openclaw-bundle",
+    "productVersion": null,
+    "registry": "ghcr.io",
+    "versionPolicy": "immutable SemVer alpha.N, beta.N, rc.N prereleases; stable only after final artifact qualification and review",
+    "visibility": "private"
+  },
+  "evidenceSchemaVersion": 1,
+  "modelMetadataEvidence": {
+    "command": "codex debug models --bundled",
+    "model": {
+      "default_reasoning_level": "low",
+      "display_name": "GPT-6.1-Sol",
+      "slug": "gpt-6.1-sol",
+      "supported_in_api": true
+    },
+    "package": "@openai/codex@0.160.0-darwin-arm64",
+    "packageArchiveSha256": "fc789bcd655d903f92e1a23c8dc5315ba38f43b3586eafb7bd3b195970b57466",
+    "reasoningEfforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+      "ultra"
+    ],
+    "scope": "offline bundled catalog in macOS ARM64 npm binary; no provider invocation or Linux runtime qualification"
+  },
+  "recordType": "source-checkpoint",
+  "rendererDependencies": {
+    "tldts": {
+      "archiveSha256": "0516e7aa8d07ea537d782a5d02d7f2938a4abf987cc66ee35d8e5f2e7cd80b6c",
+      "integrity": "sha512-lCcgTAgMxQ1JKOWrVGo6E69Ukbnx4Gc1wiYLRf6J5NN4HRYJtCby1rPF8rkQ4a6qqoFBK5dvjJ1zJ0F7VfDSvw==",
+      "purpose": "renderer public suffix validation; preserve package license in customer artifact",
+      "version": "7.0.18"
+    },
+    "tldts-core": {
+      "archiveSha256": "0275d4423756b28c65474b87045426aa79c28027d1be09ee444c97ff15c66647",
+      "integrity": "sha512-nYNzS2WRf4QJmjzFFgAxLOBjyBxAGRbCy9PVBPaglcYyYajh40VBn+v5Ngr96ZMc7oM0+aCJdtQnNejvdBnXMQ==",
+      "purpose": "renderer public suffix validation; preserve package license in customer artifact",
+      "version": "7.4.12"
+    }
+  },
+  "runtime": {
+    "bridgePatches": {
+      "deploy/runtime/openclaw-codex-read-only-paths.patch": "1d8b670e7029872262375a21da7222768c2fe2390ff7a159ed1616ee9c9de1ca",
+      "deploy/runtime/openclaw-connect-ephemeral-expired-setup.patch": "c57722da9a88ec4295577ab9a9ba6e2ca37fceda11ce8b51b08ee1425e00851f"
+    },
+    "codexVersion": "0.160.0",
+    "inventoryHelper": "scripts/build-runtime-assets.mjs",
+    "inventoryHelperSha256": "076fd10d900e790cbf5c864611835f205a07cc6a01f1811cc0c0fceca9fbd3d9",
+    "overlay": null,
+    "selection": "upstream-stock"
+  },
+  "shippingImages": null,
+  "shippingQualification": "unqualified",
+  "sourceEvidence": {
+    "runs": [
+      {
+        "conclusion": "success",
+        "head_sha": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db",
+        "html_url": "https://github.com/raw-labs/openclaw-enterprise/actions/runs/37755915156",
+        "id": 37755915156,
+        "jobs": [
+          {
+            "conclusion": "success",
+            "id": 113257713106,
+            "name": "Runtime Image Fixture"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713269,
+            "name": "First Agent Smoke"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713417,
+            "name": "Console Browser 2"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713420,
+            "name": "Production Observability"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713441,
+            "name": "Static Checks"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713442,
+            "name": "Image Model Probes"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713451,
+            "name": "Image Runtime Startup 2"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713514,
+            "name": "PostgreSQL Platform"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713516,
+            "name": "Checks and Conformance 2"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713529,
+            "name": "Image Runtime Startup"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713537,
+            "name": "Logging Collector"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713539,
+            "name": "PostgreSQL Application"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713568,
+            "name": "Console Browser"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713574,
+            "name": "PostgreSQL Authentication"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713575,
+            "name": "Repository Credentials Platform"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713590,
+            "name": "Checks and Conformance 1"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713594,
+            "name": "k3d Fixture and Configuration"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713607,
+            "name": "k3d Plugin Status"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713643,
+            "name": "PostgreSQL Migrations"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713652,
+            "name": "Images and Packaging"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713655,
+            "name": "Repository Credentials"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257713677,
+            "name": "k3d State and Lifecycle"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 113257714894,
+            "name": "Affected Packages (advisory)"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257754631,
+            "name": "Suite Audit"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 113257762697,
+            "name": "Native Container Verification"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257770974,
+            "name": "CI Impact"
+          },
+          {
+            "conclusion": "success",
+            "id": 113259209492,
+            "name": "CI Required"
+          }
+        ],
+        "name": "CI",
+        "run_attempt": 2,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "head_sha": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db",
+        "html_url": "https://github.com/raw-labs/openclaw-enterprise/actions/runs/37755914637",
+        "id": 37755914637,
+        "jobs": [
+          {
+            "conclusion": "success",
+            "id": 113257554919,
+            "name": "CodeQL (javascript-typescript)"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257556146,
+            "name": "Check current CodeQL eligibility"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257556630,
+            "name": "CodeQL (actions)"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 113257556731,
+            "name": "CodeQL not enabled (no analysis performed)"
+          }
+        ],
+        "name": "CodeQL",
+        "run_attempt": 2,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "head_sha": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db",
+        "html_url": "https://github.com/raw-labs/openclaw-enterprise/actions/runs/37755965186",
+        "id": 37755965186,
+        "jobs": [
+          {
+            "conclusion": "success",
+            "counts": {
+              "cancelled": 0,
+              "fail": 0,
+              "pass": 29,
+              "skipped": 0,
+              "tests": 29
+            },
+            "id": 113257523460,
+            "name": "Prepare runtime (arm64)",
+            "rawLogSha256": "74becc470d10e5e896eec9737023c4a26c9a35731604bea5ae02cd601c4a9aff"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257523748,
+            "name": "Prepare controller (amd64)"
+          },
+          {
+            "conclusion": "success",
+            "counts": {
+              "cancelled": 0,
+              "fail": 0,
+              "pass": 29,
+              "skipped": 0,
+              "tests": 29
+            },
+            "id": 113257523844,
+            "name": "Prepare runtime (amd64)",
+            "rawLogSha256": "a0164871f062438baa4bcfd66f9ba6b683f00366935147bf33013555ed4af7ca"
+          },
+          {
+            "conclusion": "success",
+            "id": 113257525597,
+            "name": "Prepare controller (arm64)"
+          }
+        ],
+        "name": "Check Native Container Images",
+        "run_attempt": 2,
+        "status": "completed"
+      }
+    ],
+    "scope": "selected source checks and temporary test OCI exports; not shipping artifact or customer installation qualification"
+  },
+  "sources": {
+    "oce": {
+      "archiveSha256": "168faae4c362db191b688e3e1560d9e8b85d4cdefee41411d6b9ff33fadf67a0",
+      "commit": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db",
+      "commitEpoch": 1791451179,
+      "files": "source-checkpoint-files.json",
+      "filesSha256": "8e7900c12b137c458e3497f536530d497ca27910e82cc80b633af6833474932c",
+      "repository": "https://github.com/raw-labs/openclaw-enterprise.git",
+      "upstreamBase": "89da31f7268835170fe35014733d925facb004ab"
+    },
+    "openclaw": {
+      "archiveSha256": "b48a59055b2eeb39db06a7b900ade5208fa8f23c3f4f481fd5b5c455ea9436ab",
+      "commit": "11d3d04a1279781a770f6a6aa09e6322b064b80a",
+      "repository": "https://github.com/openclaw/openclaw.git"
+    }
+  },
+  "targetArchitectures": [
+    "linux/amd64",
+    "linux/arm64"
+  ]
+}

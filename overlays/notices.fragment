@@ -1,0 +1,3 @@
+
+FROM __UPSTREAM_TARGET__ AS bundle-notices
+COPY --chmod=0444 LICENSE /usr/share/licenses/openclaw-enterprise/LICENSE

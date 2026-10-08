@@ -60,6 +60,8 @@ def identities(release):
 
 
 def validate(release):
+    if release.get("schemaVersion") == 2:
+        return validate_stock(release)
     require(release["schemaVersion"] == 1, "unsupported release schema")
     require(
         bool(re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,79}", release["id"])),
@@ -165,6 +167,52 @@ def validate(release):
 def read_release(path, root=None):
     path = Path(path)
     release = validate(load(path))
+    if release["schemaVersion"] == 2:
+        if root is not None:
+            notice = release["build"]["noticeLayer"]
+            require(
+                digest(safe_path(root, notice["fragment"]).read_bytes())
+                == notice["sha256"],
+                "notice layer integrity mismatch",
+            )
+            for name, expected in release["payloadFiles"].items():
+                source = safe_path(root, name)
+                if not source.exists():
+                    source = safe_path(path.parent, name)
+                require(
+                    digest(source.read_bytes()) == expected, f"payload mismatch: {name}"
+                )
+        for arch, receipt in release["qualification"].get("nativeReceipts", {}).items():
+            proof_path = safe_path(path.parent, receipt["path"])
+            require(
+                digest(proof_path.read_bytes()) == receipt["sha256"],
+                "native receipt integrity mismatch",
+            )
+            proof = load(proof_path)
+            require(
+                proof["status"] == "passed-native-export-checks"
+                and proof["native"] is True
+                and proof["cleanup"] == "completed"
+                and proof["releaseId"] == release["id"]
+                and proof["platform"] == "linux/" + arch
+                and proof["oceCommit"] == release["sources"]["oce"]["commit"]
+                and proof["openclawCommit"] == release["sources"]["openclaw"]["commit"]
+                and proof["codexVersion"] == release["runtime"]["codexVersion"]
+                and proof["images"]
+                == {
+                    r: release["images"][r]["platforms"]["linux/" + arch] for r in ROLES
+                },
+                "native receipt identity mismatch",
+            )
+            require(set(proof["lanes"]) == set(ROLES), "all native test lanes required")
+            for counts in proof["lanes"].values():
+                require(
+                    counts["tests"] > 0
+                    and counts["tests"] == counts["pass"]
+                    and all(counts[k] == 0 for k in ("fail", "skipped", "cancelled")),
+                    "native receipt failed or skipped tests",
+                )
+        return release
     if root is not None:
         verify_files(root, release["overlay"]["files"])
         verify_files(root, release["payloadFiles"])
@@ -229,6 +277,102 @@ def read_release(path, root=None):
             and all(proof["counts"][k] == 0 for k in ("fail", "skipped", "cancelled")),
             "qualification must pass without skips",
         )
+    return release
+
+
+def validate_stock(release):
+    """New stock inputs cannot inherit pilot images or claim automatic promotion."""
+    require(
+        re.fullmatch(r"v\d+\.\d+\.\d+-(alpha|beta|rc)\.[1-9]\d*", release["id"]),
+        "stock candidate requires a numbered SemVer prerelease",
+    )
+    require(release["kind"] == "candidate", "stock promotion requires separate review")
+    require(
+        release["architectures"] == ["linux/amd64", "linux/arm64"],
+        "both native architectures are required",
+    )
+    for src in release["sources"].values():
+        require(SHA.fullmatch(src["commit"]), "source must pin a full commit")
+        require(
+            HASH.fullmatch(src["archiveSha256"]), "source archive checksum required"
+        )
+        require(
+            re.fullmatch(r"https://github.com/[\w.-]+/[\w.-]+\.git", src["repository"]),
+            "invalid source repository",
+        )
+    oce = release["sources"]["oce"]["commit"]
+    require(release["chart"]["sourceCommit"] == oce, "chart/source mismatch")
+    require(release["chart"]["name"] == "openclaw-enterprise", "unexpected chart")
+    runtime = release["runtime"]
+    require(
+        runtime["selection"] == "upstream-stock" and runtime["overlay"] is None,
+        "stock source does not accept a hidden overlay",
+    )
+    require(
+        re.fullmatch(r"\d+\.\d+\.\d+", runtime["codexVersion"]), "invalid Codex version"
+    )
+    require(HASH.fullmatch(runtime["inventoryHelperSha256"]), "helper hash required")
+    for image in ("nodeBaseImage", "nodeRuntimeBaseImage"):
+        require(IMAGE.fullmatch(release["build"][image]), "base image digest required")
+    for role, expected in {
+        "controller": {"dockerfile": "Dockerfile", "target": "runtime"},
+        "runtime": {"dockerfile": "deploy/runtime/Dockerfile", "target": "runtime"},
+        "repositoryCredentials": {
+            "dockerfile": "deploy/runtime/Dockerfile",
+            "target": "repository-credentials-service",
+        },
+    }.items():
+        require(release["build"][role] == expected, "unexpected stock build recipe")
+    require(
+        set(release["rendererDependencies"]) == {"tldts", "tldts-core"},
+        "unexpected renderer dependency set",
+    )
+    for dependency in release["rendererDependencies"].values():
+        require(
+            re.fullmatch(r"\d+\.\d+\.\d+", dependency["version"])
+            and HASH.fullmatch(dependency["archiveSha256"]),
+            "invalid renderer dependency pin",
+        )
+    require(set(release["images"]) == set(ROLES), "exactly three image roles required")
+    for role, image in release["images"].items():
+        require(image["oceCommit"] == oce, f"{role} image/source mismatch")
+        if image["reference"] is None:
+            require(not image["platforms"], "unbuilt role cannot carry platform images")
+        else:
+            require(
+                IMAGE.fullmatch(image["reference"]), "immutable index digest required"
+            )
+            require(
+                set(image["platforms"]) == set(release["architectures"]),
+                "platform set mismatch",
+            )
+            for platform in image["platforms"].values():
+                require(
+                    re.fullmatch(r"sha256:[a-f0-9]{64}", platform["digest"]),
+                    "platform digest required",
+                )
+                require(
+                    re.fullmatch(r"sha256:[a-f0-9]{64}", platform["configDigest"]),
+                    "config digest required",
+                )
+    require(
+        release["images"]["runtime"]["openclawCommit"]
+        == release["sources"]["openclaw"]["commit"]
+        and release["images"]["runtime"]["codexVersion"] == runtime["codexVersion"],
+        "runtime/source metadata mismatch",
+    )
+    require(
+        release["qualification"]["status"] == "unqualified"
+        and release["qualification"]["customerQualified"] is False,
+        "new artifacts remain unqualified pending review",
+    )
+    require(
+        release["distribution"]["registry"] == "ghcr.io"
+        and release["distribution"]["visibility"] == "private"
+        and release["distribution"]["namespace"]
+        == "raw-labs/enterprise-openclaw-bundle",
+        "unexpected distribution destination",
+    )
     return release
 
 
