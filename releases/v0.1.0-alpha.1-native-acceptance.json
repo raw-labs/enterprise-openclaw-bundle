@@ -1,0 +1,48 @@
+{
+  "codexVersion": "0.160.0",
+  "confinementProfiles": {
+    "linux/amd64": {
+      "path": "profiles/v0.1.0-alpha.1/amd64/codex-seccomp.json",
+      "sha256": "bfaca0ea1e07e26e357e0e86ab4bded566686b10f212e303855e115fa1925b4d"
+    },
+    "linux/arm64": {
+      "path": "profiles/v0.1.0-alpha.1/arm64/codex-seccomp.json",
+      "sha256": "965700eecda1dd402a2be122dbc76101689833c594b6482abe05aab789ebfa60"
+    }
+  },
+  "images": {
+    "controller": "ghcr.io/raw-labs/enterprise-openclaw-bundle/controller@sha256:b80fed6aeec1c4c284538966b041d72b81c6ce63bbc010b11b6ef7342a997c64",
+    "repositoryCredentials": "ghcr.io/raw-labs/enterprise-openclaw-bundle/repository-credentials@sha256:dfd9fdce3128f073c0d52b56922030a27c7f45da90e45f0a4bfe0d1f029021a2",
+    "runtime": "ghcr.io/raw-labs/enterprise-openclaw-bundle/runtime@sha256:d625d7ca9a64d807f337c331df7a7720b6e20b6dbc60b78023457f2673437b6f"
+  },
+  "nativeReceipts": {
+    "amd64": {
+      "path": "v0.1.0-alpha.1-native-amd64-receipt.json",
+      "sha256": "d1c6b810e091b895883b8955b964ba6824c3d572513af51116f4d3522ae9b6ef"
+    },
+    "arm64": {
+      "path": "v0.1.0-alpha.1-native-arm64-receipt.json",
+      "sha256": "17bf3fce26c1a81eab83c14cfc92ee9f59d1731cee8e993fe74af50453191bd3"
+    }
+  },
+  "oceCommit": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db",
+  "openclawCommit": "11d3d04a1279781a770f6a6aa09e6322b064b80a",
+  "releaseId": "v0.1.0-alpha.1",
+  "reviewBasis": {
+    "confinement": "Both profiles default-deny, retain clone3 ENOSYS and contain exactly the selected reviewed namespace/mount additions. Source AppArmor policy and cleanup were checked.",
+    "failures": 0,
+    "nativeBuildRun": "https://github.com/raw-labs/enterprise-openclaw-bundle/actions/runs/37767373354",
+    "ociIdentity": "Manifest/config hashes, architecture and source labels match the genuine native receipts. Native CI verified every layer before and after tests.",
+    "packaging": "Reproducible archive; delivered inventory and both real Helm profiles checked. Historical pilot fixture excluded.",
+    "skips": 0,
+    "sourceInventory": "Verified exact selected source inventory and pinned recipes; preserved upstream notices.",
+    "testsPerArchitecture": {
+      "controller": 4,
+      "repositoryCredentials": 3,
+      "runtime": 29
+    }
+  },
+  "reviewedBy": "Codex (bundle artifact review)",
+  "scope": "native shipping artifacts; provider access and customer installation acceptance remain separate",
+  "status": "reviewed-native-artifacts"
+}

@@ -1,0 +1,69 @@
+{
+  "cleanup": "completed",
+  "codexVersion": "0.160.0",
+  "confinement": {
+    "apparmor": "oce-ci-codex-sandbox",
+    "kubernetesProfile": "openclaw/codex-bwrap.json",
+    "reviewedInputs": {
+      ".github/actions/run-ci-lane/codex-sandbox.apparmor": "188c9142ca4de344a7f0e0c8252d0b9e37f233e3f12814f1a29b4f9210cec32b",
+      "scripts/lib/codex-seccomp-profile.mjs": "d0aa9a9db8e6ff8a1c2a00f8778f8c4193010888cc80e5cf0cdd3b99b9bb68a7"
+    },
+    "scope": "Selected source's reviewed additions to this native CI node baseline; customer node policy requires review.",
+    "seccompSha256": "965700eecda1dd402a2be122dbc76101689833c594b6482abe05aab789ebfa60"
+  },
+  "images": {
+    "controller": {
+      "configDigest": "sha256:e7cf864aa9254d28794b2b0ce1c9ec2e5c02ce72cf5c99ff88430f88c8057480",
+      "digest": "sha256:1643eb85011ebf7ebe9306293393a910276a10e58d7dd3675820ec4da8df3caa"
+    },
+    "repositoryCredentials": {
+      "configDigest": "sha256:c62c53b8633b080d69e3c11fb5df5231688620a12769ba3849f288525ef88bad",
+      "digest": "sha256:377230093965a54a2c89897d3fe19f38b7b05bd7be643c35b06a1f226783c590"
+    },
+    "runtime": {
+      "configDigest": "sha256:54a354bc98460514bb7caf3801f02ed79b1490e6c510600a6f113ebad536ee0c",
+      "digest": "sha256:dbad65366f2b0a1b55133484f719b967fc578fb1efbf70aa466f653c45edb1e2"
+    }
+  },
+  "lanes": {
+    "controller": {
+      "cancelled": 0,
+      "fail": 0,
+      "pass": 4,
+      "skipped": 0,
+      "tests": 4
+    },
+    "repositoryCredentials": {
+      "cancelled": 0,
+      "fail": 0,
+      "pass": 3,
+      "skipped": 0,
+      "tests": 3
+    },
+    "runtime": {
+      "cancelled": 0,
+      "fail": 0,
+      "pass": 29,
+      "skipped": 0,
+      "tests": 29
+    }
+  },
+  "logSha256": {
+    "controller.tap": "bebe7df0bb50440adbf8207381496f506a84717b643f0d554bbd78edb9b17af7",
+    "repository.tap": "6741dce61adfd0471c49a5f48119955f158e3a41c2f2ca6b57697ae669e2e160",
+    "runtime.tap": "1b20835bba814b5cc8ec264f95646d841587641266d8c23f1e0ed7f388f265b8"
+  },
+  "native": true,
+  "oceCommit": "9c9733effacad4a747a1b9cdd95e2548c3e5b0db",
+  "openclawCommit": "11d3d04a1279781a770f6a6aa09e6322b064b80a",
+  "platform": "linux/arm64",
+  "releaseId": "v0.1.0-alpha.1",
+  "scope": "native shipping export tests; no provider workflow or customer installation qualification",
+  "status": "passed-native-export-checks",
+  "workflow": {
+    "GITHUB_REPOSITORY": "raw-labs/enterprise-openclaw-bundle",
+    "GITHUB_RUN_ATTEMPT": "1",
+    "GITHUB_RUN_ID": "37767373354",
+    "GITHUB_SHA": "948c495f8d06dcaa863012fbb78e0e5d38e8be9c"
+  }
+}
