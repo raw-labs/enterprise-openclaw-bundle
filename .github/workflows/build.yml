@@ -6,6 +6,11 @@ on:
         description: New immutable SemVer alpha.N, beta.N or rc.N identity
         required: true
         type: string
+      publish:
+        description: Publish checked images to private GHCR only after explicit authorization
+        required: true
+        default: false
+        type: boolean
 permissions:
   contents: read
 concurrency:
@@ -71,6 +76,14 @@ jobs:
           fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
+          name: native-proof-${{ matrix.arch }}
+          path: |
+            .work/native/proof
+            .work/native/build-record.json
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
           name: native-${{ matrix.arch }}
           path: .work/native
           compression-level: 0
@@ -78,7 +91,7 @@ jobs:
           if-no-files-found: error
   publish:
     needs: native
-    if: github.ref == 'refs/heads/main' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event.repository.private
+    if: inputs.publish && github.ref == 'refs/heads/main' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event.repository.private
     runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 60
     permissions:

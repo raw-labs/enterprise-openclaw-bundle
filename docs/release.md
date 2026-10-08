@@ -40,6 +40,8 @@ roles from the selected source recipes. A tracked notice-only stage preserves
 OCE's MIT license in each final image; it changes no Codex code or identity.
 Build timestamps use the selected commit epoch. Apt and other dependency execution
 can still change image bytes; rebuilds need not reproduce old image digests.
+Registry publication is disabled by default. Run the build and checks first and
+obtain explicit authorization for the private GHCR destination before publication.
 
 Before installing test dependencies, the build verifies the complete source
 inventory. Native checks bind each export manifest to its loaded config ID, source
