@@ -57,10 +57,12 @@ def new(args):
         codexVersion=checkpoint["runtime"]["codexVersion"],
     )
     payload = {
-        str(p.relative_to(ROOT)): digest(p.read_bytes())
-        for directory in ("defaults",)
-        for p in sorted((ROOT / directory).rglob("*"))
-        if p.is_file()
+        name: digest((ROOT / name).read_bytes())
+        for name in (
+            "defaults/assistant-preset.json",
+            "defaults/coding-preset.json",
+            "defaults/codex-profile.json",
+        )
     }
     payload["profiles/aws-example.json"] = digest(
         (ROOT / "profiles/aws-example.json").read_bytes()

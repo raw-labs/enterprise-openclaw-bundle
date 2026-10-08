@@ -63,7 +63,6 @@
     "defaults/assistant-preset.json": "1fa871bfdcb1b9f9d06802244130425b960085c624a4c15502c4c740f2a17483",
     "defaults/codex-profile.json": "993df48904fb8a2ee68f29bec6d857af5f830ce08a91ba48fd7f4ddbc9c6964b",
     "defaults/coding-preset.json": "59a76dabcf9dd41eb96be343974ad02b1367b350912654635580944ad61b00e5",
-    "defaults/lint-values.json": "c89b4721394cd7ff3fc3f6f3470256c92b47a1a38aec987b966014ee52e022b5",
     "profiles/aws-example.json": "4ff05c26e3a6ebb89075fc9b14a9d9823fbc078e47465d1d8d1f96eb2240d94a"
   },
   "qualification": {

@@ -11,7 +11,7 @@ must be delivered as a new exact input and independently qualified.
 | --- | --- |
 | OCE integration | Exact combined OCE commit; controller/runtime recipes, OC patches, chart and compatible fixtures |
 | OpenClaw | Runtime source and extensions; included through OCE's pinned recipe |
-| This bundle | Selection, Codex overlay, build records, packaging, image qualification and private delivery |
+| This bundle | Source selection, stock build recipes, historical overlay, packaging, image qualification and private delivery |
 | Installation operator | Cluster, cloud account, DNS/TLS, database roles, node policy, registry pulls, Secrets, users, Agents, repository grants, backups and restore testing |
 | Sales engineer | Obtain authorized artifacts, prepare customer inputs, run the installation checks and record acceptance |
 
