@@ -65,7 +65,8 @@ requires review and installation tests.
 
 Only after both native jobs succeed does a separate job receive `packages: write`.
 It checks the private bundle repository, expected package ownership/visibility,
-all native receipts and absence of every destination tag before writing. Unknown
+all native receipts and every destination tag before writing. An existing tag must
+match the exact tested index; it is reused without a registry write. Unknown
 authentication or tag state stops publication. It assembles one OCI index per role
 from the exact two tested manifests, copies with digest preservation, and verifies
 the private published index digest. It never builds replacement shipping images.

@@ -26,7 +26,9 @@ from common import (  # noqa: E402
 )
 from stock import (  # noqa: E402
     assemble_index,
+    identical_tag,
     inspect_oci,
+    private_package,
     renderer_files,
     tap_counts,
     verify_receipt,
@@ -114,6 +116,45 @@ class StockInputs(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             validate(self.release)
+
+
+class RegistryInputs(unittest.TestCase):
+    def test_private_package_checks_documented_owner_and_optional_repository(self):
+        name = "enterprise-openclaw-bundle/controller"
+        package = {
+            "name": name,
+            "package_type": "container",
+            "visibility": "private",
+            "owner": {"login": "raw-labs"},
+        }
+        with patch("stock.github_json", return_value=package):
+            self.assertEqual(private_package(name), package)
+        for field, wrong in (
+            ("visibility", "public"),
+            ("name", "unrelated/controller"),
+            ("owner", {"login": "someone-else"}),
+            ("repository", {"full_name": "raw-labs/other-repository"}),
+        ):
+            changed = package | {field: wrong}
+            with patch("stock.github_json", return_value=changed):
+                with self.assertRaises(ValueError):
+                    private_package(name)
+
+    def test_retry_requires_identical_index_and_fails_on_unknown_authentication(self):
+        index = '{"schemaVersion":2,"manifests":[]}\n'
+        expected = "sha256:" + digest(index.encode())
+
+        def result(code, stdout="", stderr=""):
+            return subprocess.CompletedProcess([], code, stdout, stderr)
+
+        self.assertTrue(identical_tag(result(0, index), expected))
+        self.assertFalse(identical_tag(result(1, stderr="manifest unknown"), expected))
+        for response in (
+            result(0, "different index"),
+            result(1, stderr="unauthorized"),
+        ):
+            with self.assertRaises(ValueError):
+                identical_tag(response, expected)
 
 
 class OciInputs(unittest.TestCase):

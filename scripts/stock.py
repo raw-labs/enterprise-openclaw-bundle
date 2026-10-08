@@ -633,11 +633,37 @@ def private_package(name):
     if package is not None:
         require(
             package["visibility"] == "private"
-            and package.get("repository", {}).get("full_name")
-            == "raw-labs/enterprise-openclaw-bundle",
-            "package is public or belongs to another repository",
+            and package["name"] == name
+            and package["package_type"] == "container"
+            and package["owner"]["login"] == "raw-labs",
+            "package visibility or namespace ownership mismatch",
         )
+        # The documented Packages REST response need not contain a repository.
+        # Exact OCI source labels and trusted native receipts bind the repository.
+        linked = package.get("repository")
+        if linked is not None:
+            require(
+                linked["full_name"] == "raw-labs/enterprise-openclaw-bundle",
+                "package belongs to another repository",
+            )
     return package
+
+
+def identical_tag(result, expected):
+    if result.returncode == 0:
+        require(
+            "sha256:" + digest(result.stdout.encode()) == expected,
+            "existing tag differs from the exact tested index; refusing overwrite",
+        )
+        return True
+    require(
+        any(
+            message in result.stderr.lower()
+            for message in ("manifest unknown", "name unknown")
+        ),
+        "tag absence could not be verified",
+    )
+    return False
 
 
 def publish(args, release):
@@ -727,9 +753,17 @@ def publish(args, release):
         )
         receipts[arch] = receipt
         copies[arch] = identities
-    # Check every tag before the first write. Authentication/unknown outcomes fail closed.
+    # Prepare every index and check every tag before the first registry write.
+    # An identical existing tag is verified and reused, never overwritten.
+    out.mkdir(parents=True)
     destinations = {}
     for role in ROLES:
+        directory = out / "oci" / role
+        dg = assemble_index(
+            directory,
+            {arch: source / ("native-" + arch) / role for arch in copies},
+            release["id"],
+        )
         name = (
             release["distribution"]["namespace"].split("/", 1)[1]
             + "/"
@@ -749,39 +783,31 @@ def publish(args, release):
             capture_output=True,
             text=True,
         )
-        require(
-            result.returncode != 0
-            and any(
-                message in result.stderr.lower()
-                for message in ("manifest unknown", "name unknown")
-            ),
-            "tag exists or absence could not be verified",
-        )
-        destinations[role] = (name, ref)
-    out.mkdir(parents=True)
+        exists = identical_tag(result, dg)
+        if exists:
+            require(
+                private_package(name) is not None, "existing package is unverifiable"
+            )
+        destinations[role] = (name, ref, dg, exists)
     candidate = json.loads(json.dumps(release))
     publication = {"status": "incomplete", "releaseId": release["id"], "roles": {}}
     try:
-        for role, (name, ref) in destinations.items():
+        for role, (name, ref, dg, exists) in destinations.items():
             directory = out / "oci" / role
-            dg = assemble_index(
-                directory,
-                {arch: source / ("native-" + arch) / role for arch in copies},
-                release["id"],
-            )
-            run(
-                [
-                    "skopeo",
-                    "copy",
-                    "--all",
-                    "--preserve-digests",
-                    "--authfile",
-                    args.authfile,
-                    "oci:" + str(directory) + ":" + release["id"],
-                    "docker://" + ref,
-                ],
-                stdout=subprocess.DEVNULL,
-            )
+            if not exists:
+                run(
+                    [
+                        "skopeo",
+                        "copy",
+                        "--all",
+                        "--preserve-digests",
+                        "--authfile",
+                        args.authfile,
+                        "oci:" + str(directory) + ":" + release["id"],
+                        "docker://" + ref,
+                    ],
+                    stdout=subprocess.DEVNULL,
+                )
             actual = subprocess.check_output(
                 [
                     "skopeo",
@@ -802,6 +828,7 @@ def publish(args, release):
                 platforms={"linux/" + arch: copies[arch][role] for arch in copies},
             )
             publication["roles"][role] = candidate["images"][role]
+            save(out / "publication.json", publication)
         for arch, receipt in receipts.items():
             path = "profiles/" + release["id"] + "/" + arch + "/codex-seccomp.json"
             dest = out / path
