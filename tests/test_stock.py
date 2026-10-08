@@ -321,7 +321,7 @@ class StockArtifact(unittest.TestCase):
             )
         )
         self.assertIn("upstream/apps/controller/node_modules/tldts/LICENSE", manifest)
-        self.assertNotIn("defaults/lint-values.json", manifest)
+        self.assertNotIn("tests/fixtures/helm-lint-values.json", manifest)
         self.assertIn(
             "upstream/apps/controller/node_modules/tldts-core/LICENSE", manifest
         )

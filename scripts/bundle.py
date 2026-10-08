@@ -111,8 +111,22 @@ def package(args, release):
     dest = Path(args.output).resolve()
     require(not dest.exists(), "artifact output already exists")
     chart = source / release["chart"]["path"]
+    lint_values = ROOT / "tests/fixtures/helm-lint-values.json"
+    # Unbuilt packaging tests use the fixture; real releases lint their selected image.
+    controller = (
+        release["images"]["controller"]["reference"]
+        or load(lint_values)["images"]["controller"]
+    )
     run(
-        ["helm", "lint", chart, "-f", ROOT / "defaults/lint-values.json"],
+        [
+            "helm",
+            "lint",
+            chart,
+            "-f",
+            lint_values,
+            "--set-string",
+            "images.controller=" + controller,
+        ],
         stdout=subprocess.PIPE,
     )
     files = {}
