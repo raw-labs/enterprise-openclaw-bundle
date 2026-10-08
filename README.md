@@ -1,4 +1,4 @@
-# RAW Labs enterprise OpenClaw bundle
+# RAW Labs Enterprise OpenClaw bundle
 
 Private bundle definitions and release factory. Select a definition; the release
 Action builds, tests, packages and publishes its artifacts.
