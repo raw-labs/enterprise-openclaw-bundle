@@ -52,7 +52,14 @@ def exercise(args):
         work = Path(temporary)
 
         def run(
-            command, *, cwd=None, input=None, env=None, timeout=600, log_output=True
+            command,
+            *,
+            cwd=None,
+            input=None,
+            env=None,
+            timeout=600,
+            log_output=True,
+            diagnostics=False,
         ):
             result = subprocess.run(
                 [str(a) for a in command],
@@ -65,6 +72,8 @@ def exercise(args):
             if log_output:
                 logs.write(result.stdout + result.stderr)
                 logs.flush()
+            if result.returncode and diagnostics:
+                print(result.stderr.decode(errors="replace"), file=sys.stderr)
             require(
                 result.returncode == 0,
                 f"command failed ({result.returncode}): {shlex.join(str(a) for a in command)}; private log: {log_path}",
@@ -156,8 +165,9 @@ def exercise(args):
                         "docker",
                         "exec",
                         name,
-                        "k3s",
                         "ctr",
+                        "--address",
+                        "/run/k3s/containerd/containerd.sock",
                         "-n",
                         "k8s.io",
                         "images",
@@ -165,7 +175,8 @@ def exercise(args):
                         "--all-platforms",
                         "--no-unpack",
                         "/tmp/controller.tar",
-                    ]
+                    ],
+                    diagnostics=True,
                 )
                 actual = json.loads(
                     run(
@@ -173,11 +184,13 @@ def exercise(args):
                             "docker",
                             "exec",
                             name,
-                            "k3s",
                             "crictl",
+                            "--runtime-endpoint",
+                            "unix:///run/k3s/containerd/containerd.sock",
                             "inspecti",
                             controller,
-                        ]
+                        ],
+                        diagnostics=True,
                     )
                 )
                 require(
@@ -504,6 +517,7 @@ def exercise(args):
                 ],
                 cwd=upstream,
                 timeout=660,
+                diagnostics=True,
             )
             steps.append(
                 "packaged chart migration, bootstrap, API and worker readiness"
@@ -628,6 +642,53 @@ def exercise(args):
             finally:
                 forward.terminate()
                 forward.wait(timeout=15)
+        except Exception:
+            if kubeconfig.exists():
+                diagnostic = subprocess.run(
+                    [
+                        "kubectl",
+                        "--kubeconfig",
+                        str(kubeconfig),
+                        "--context",
+                        context,
+                        "get",
+                        "pods",
+                        "--all-namespaces",
+                        "-o",
+                        "json",
+                    ],
+                    capture_output=True,
+                    timeout=30,
+                )
+                if diagnostic.returncode == 0:
+                    for pod in json.loads(diagnostic.stdout)["items"]:
+                        status = pod.get("status", {})
+                        print(
+                            json.dumps(
+                                {
+                                    "pod": pod["metadata"]["name"],
+                                    "namespace": pod["metadata"]["namespace"],
+                                    "phase": status.get("phase"),
+                                    "containers": [
+                                        {
+                                            "name": c["name"],
+                                            "ready": c.get("ready"),
+                                            "reason": next(
+                                                (
+                                                    v.get("reason")
+                                                    for v in c.get("state", {}).values()
+                                                ),
+                                                None,
+                                            ),
+                                        }
+                                        for c in status.get("initContainerStatuses", [])
+                                        + status.get("containerStatuses", [])
+                                    ],
+                                }
+                            ),
+                            file=sys.stderr,
+                        )
+            raise
         finally:
             run(["k3d", "cluster", "delete", cluster])
             clusters = json.loads(run(["k3d", "cluster", "list", "-o", "json"]))
