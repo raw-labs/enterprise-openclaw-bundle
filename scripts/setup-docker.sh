@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Disposable native release runners only; never an installation-host setup tool.
+set -euo pipefail
+test "${GITHUB_ACTIONS:-}" = true
+test "$(id -u)" = 1000
+test "$(. /etc/os-release; echo "$ID/$VERSION_CODENAME")" = ubuntu/noble
+
+sudo apt-get -o Acquire::Retries=3 update
+sudo apt-get install --no-install-recommends -y ca-certificates curl gnupg
+if ! grep -Rqs 'download.docker.com/linux/ubuntu' /etc/apt/sources.list.d; then
+  sudo install -d -m 0755 /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg |
+    sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/bundle-docker.gpg
+  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/bundle-docker.gpg] https://download.docker.com/linux/ubuntu noble stable\n' "$(dpkg --print-architecture)" |
+    sudo tee /etc/apt/sources.list.d/bundle-docker.list >/dev/null
+fi
+sudo apt-get -o Acquire::Retries=3 update
+docker_version=$(apt-cache madison docker-ce | awk '$3 ~ /^5:29\.5\.3-/ {print $3; exit}')
+test -n "$docker_version"
+sudo apt-get install --no-install-recommends -y --allow-downgrades \
+  docker-ce="$docker_version" docker-ce-cli="$docker_version" containerd.io
+sudo python3 - <<'PY'
+import json
+from pathlib import Path
+path = Path('/etc/docker/daemon.json')
+config = json.loads(path.read_text()) if path.exists() else {}
+config.setdefault('features', {})['containerd-snapshotter'] = True
+path.write_text(json.dumps(config) + '\n')
+PY
+sudo systemctl restart docker
+python3 scripts/stock.py docker-preflight

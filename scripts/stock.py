@@ -157,6 +157,107 @@ def native_arch(arch):
     )
 
 
+def validate_docker(version, drivers, inspect_help, save_help):
+    for side in ("Client", "Server"):
+        api = version[side]["ApiVersion"]
+        require(
+            re.fullmatch(r"\d+\.\d+", api) and tuple(map(int, api.split("."))) >= (1, 49),
+            "OCE's image probe requires Docker CLI and Engine API 1.49+ (28.1+)",
+        )
+    require(
+        ["driver-type", "io.containerd.snapshotter.v1"] in drivers,
+        "OCE's image probe requires Docker's containerd image store",
+    )
+    require(
+        "--platform" in inspect_help and "--platform" in save_help,
+        "OCE's image probe requires platform-specific image inspect and save",
+    )
+    return {
+        side.lower(): {key: version[side][key] for key in ("Version", "ApiVersion")}
+        for side in ("Client", "Server")
+    } | {"imageStore": "io.containerd.snapshotter.v1"}
+
+
+def docker_preflight():
+    def output(args):
+        return subprocess.check_output(["docker", *args], text=True)
+
+    return validate_docker(
+        json.loads(output(["version", "--format", "{{json .}}"])),
+        json.loads(output(["info", "--format", "{{json .DriverStatus}}"])),
+        output(["image", "inspect", "--help"]),
+        output(["image", "save", "--help"]),
+    )
+
+
+def staged_tag(role, version, arch):
+    return f"localhost/bundle-{ROLE_NAMES.get(role, role)}:{version}-{arch}"
+
+
+def native_index(descriptor, arch):
+    manifest = {key: descriptor[key] for key in ("mediaType", "digest", "size")}
+    manifest["platform"] = {"os": "linux", "architecture": arch}
+    index = {
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.index.v1+json",
+        "manifests": [manifest],
+    }
+    return (json.dumps(index, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def stage_archive(directory, arch, tag, output):
+    """Preserve the native manifest under an OCI index, without a registry upload."""
+    descriptor = load(directory / "index.json")["manifests"][0]
+    data = native_index(descriptor, arch)
+    root_digest = "sha256:" + digest(data)
+    root = {
+        "schemaVersion": 2,
+        "manifests": [{
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "digest": root_digest,
+            "size": len(data),
+            "annotations": {"org.opencontainers.image.ref.name": tag},
+        }],
+    }
+    with tarfile.open(output, "w") as archive:
+        for name, content in (
+            ("index.json", json.dumps(root).encode()),
+            ("blobs/sha256/" + root_digest.split(":")[1], data),
+            ("oci-layout", b'{"imageLayoutVersion":"1.0.0"}\n'),
+        ):
+            entry = tarfile.TarInfo(name)
+            entry.size = len(content)
+            archive.addfile(entry, io.BytesIO(content))
+        for blob in sorted((directory / "blobs/sha256").iterdir()):
+            require(blob.is_file() and not blob.is_symlink(), "invalid OCI blob file")
+            archive.add(blob, arcname="blobs/sha256/" + blob.name)
+    return tag.split(":", 1)[0] + "@" + root_digest
+
+
+def verify_upgrade_probe(proof, release, arch, identities):
+    platform = "linux/" + arch
+    require(
+        proof["version"] == 1 and proof["daemonPlatform"] == platform,
+        "upgrade probe platform mismatch",
+    )
+    for key, role in (("controller", "controller"), ("broker", "repositoryCredentials")):
+        identity = proof[key]
+        require(
+            identity["platform"] == platform
+            and identity["manifestDigest"] == identities[role]["digest"]
+            and identity["configDigest"] == identities[role]["configDigest"]
+            and bool(DIGEST.fullmatch(identity["rootDigest"]))
+            and identity["image"] == staged_tag(role, release["id"], arch).split(":", 1)[0]
+            + "@" + identity["rootDigest"],
+            "upgrade probe image mismatch",
+        )
+    require(
+        proof["reports"]["recover"]["outcome"] == "missing"
+        and proof["reports"]["reserve"]["outcome"] == "unavailable",
+        "upgrade probe protocol mismatch",
+    )
+
+
 def inspect_oci(directory, platform, source_sha):
     root = load(directory / "index.json")
     require(len(root["manifests"]) == 1, "expected exactly one native export")
@@ -350,6 +451,8 @@ def tests(command, source, env, log):
 
 def check(args, release):
     native_arch(args.arch)
+    require(os.getuid() == 1000, "OCE's native image probe requires UID 1000")
+    toolchain = docker_preflight()
     out = Path(args.build).resolve()
     source = Path(args.source).resolve()
     verify_files(source, source_files(release, args.selection))
@@ -367,6 +470,7 @@ def check(args, release):
     require(not logs.exists(), "private log output exists")
     logs.mkdir(parents=True, mode=0o700)
     images = {}
+    staged = {}
     tags = []
     receipt = {
         "status": "failed",
@@ -389,6 +493,7 @@ def check(args, release):
         "selectionSha256": digest(Path(args.selection).read_bytes()),
         "definitionSha256": release["definitionSha256"],
         "lanes": {},
+        "docker": toolchain,
         "scope": "native shipping export tests; no provider workflow or customer installation qualification",
     }
     env = dict(os.environ)
@@ -396,26 +501,32 @@ def check(args, release):
         for role in ROLES:
             identity = inspect_oci(out / role, record["platform"], record["oceCommit"])
             require(identity == record["images"][role], "built OCI identity changed")
-            tag = f"localhost/bundle-{ROLE_NAMES.get(role, role)}:{release['id']}-{args.arch}"
+            tag = staged_tag(role, release["id"], args.arch)
             existing = subprocess.run(
                 ["docker", "image", "inspect", tag],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
             require(existing.returncode != 0, "local export tag already exists")
-            run(
-                ["skopeo", "copy", "oci:" + str(out / role), "docker-daemon:" + tag],
-                stdout=subprocess.DEVNULL,
-            )
+            # Claim cleanup before import: Docker can load the tag before exiting with an error.
+            tags.append(tag)
+            with tempfile.TemporaryDirectory() as temporary:
+                archive = Path(temporary) / "image.tar"
+                staged[role] = stage_archive(out / role, args.arch, tag, archive)
+                run(["docker", "image", "load", "--input", archive], stdout=subprocess.DEVNULL)
             info = json.loads(
                 subprocess.check_output(["docker", "image", "inspect", tag])
             )[0]
+            selected = json.loads(subprocess.check_output(
+                ["docker", "image", "inspect", "--platform", record["platform"], tag]
+            ))[0]
             require(
-                info["Id"] == identity["configDigest"],
-                "loaded config differs from tested export",
+                info["Descriptor"]["digest"] == staged[role].rsplit("@", 1)[1]
+                and selected["Descriptor"]["digest"] == identity["digest"]
+                and selected["Os"] + "/" + selected["Architecture"] == record["platform"],
+                "loaded image differs from tested export",
             )
             images[role] = info["Id"]
-            tags.append(tag)
             notice = subprocess.check_output(
                 [
                     "docker",
@@ -441,6 +552,20 @@ def check(args, release):
                 digest(notice) == source_files(release, args.selection)["LICENSE"],
                 "shipping upstream notice mismatch",
             )
+        log = logs / "upgrade-probe.json"
+        with log.open("w") as file:
+            os.chmod(log, 0o600)
+            result = subprocess.run(
+                ["node", source / "scripts/upgrade-repository-image-probe.mjs",
+                 staged["controller"], staged["repositoryCredentials"], record["platform"]],
+                cwd=source, env=env, stdout=file, stderr=subprocess.STDOUT, timeout=360,
+            )
+        require(result.returncode == 0, f"OCE's image probe failed; private diagnostics: {log}")
+        proof = load(log)
+        verify_upgrade_probe(proof, release, args.arch, record["images"])
+        receipt["upgradeProbe"] = {key: proof[key] for key in (
+            "version", "daemonPlatform", "controller", "broker", "reports"
+        )}
         node = ["node", "--test", "--test-concurrency=1", "--test-reporter=tap"]
         receipt["lanes"]["controller"] = tests(
             [*node, "tests/integration/production-image-startup.test.mjs", ROOT / "tests/native_presets.mjs"],
@@ -532,7 +657,7 @@ def check(args, release):
             run(["docker", "image", "rm", tag], stdout=subprocess.DEVNULL)
         receipt["cleanup"] = "completed"
         receipt["logSha256"] = {
-            p.name: digest(p.read_bytes()) for p in logs.glob("*.tap")
+            p.name: digest(p.read_bytes()) for p in logs.iterdir() if p.is_file()
         }
         save(report / "native-receipt.json", receipt)
     print("Native export checks passed without skips")
@@ -552,6 +677,13 @@ def verify_receipt(receipt, release, arch, identities):
         "native receipt identity mismatch",
     )
     require(set(receipt["lanes"]) == set(ROLES), "all native lanes required")
+    require("upgradeProbe" in receipt, "OCE's native image probe proof is required")
+    verify_upgrade_probe(receipt["upgradeProbe"], release, arch, identities)
+    docker = receipt["docker"]
+    validate_docker(
+        {side: docker[side.lower()] for side in ("Client", "Server")},
+        [["driver-type", docker["imageStore"]]], "--platform", "--platform",
+    )
     for counts in receipt["lanes"].values():
         require(
             counts["tests"] > 0
@@ -866,6 +998,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--selection")
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("docker-preflight")
     p = sub.add_parser("dependencies")
     p.add_argument("--output", required=True)
     p = sub.add_parser("build")
@@ -885,6 +1018,9 @@ def main():
         if command == "publish":
             p.add_argument("--authfile", required=True)
     args = parser.parse_args()
+    if args.command == "docker-preflight":
+        print(json.dumps(docker_preflight(), sort_keys=True))
+        return
     require(args.selection, "--selection is required")
     release = read_release(args.selection, ROOT)
     require(release["schemaVersion"] == 2, "stock tooling requires stock candidate")

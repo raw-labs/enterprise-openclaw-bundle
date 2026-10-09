@@ -37,9 +37,12 @@ from stock import (  # noqa: E402
     inspect_oci,
     private_package,
     renderer_files,
+    stage_archive,
+    staged_tag,
     tap_counts,
     tests as native_tests,
     verify_receipt,
+    validate_docker,
 )
 
 
@@ -90,6 +93,23 @@ class StockInputs(unittest.TestCase):
             )
             with self.assertRaises(ValueError):
                 tap_counts(text)
+
+    def test_upgrade_docker_rejects_old_api_classic_store_and_missing_flags(self):
+        version = {side: {"Version": "29.5.3", "ApiVersion": "1.54"} for side in ("Client", "Server")}
+        drivers = [["driver-type", "io.containerd.snapshotter.v1"]]
+        validate_docker(version, drivers, "--platform", "--platform")
+        for side in ("Client", "Server"):
+            old = copy.deepcopy(version)
+            old[side]["ApiVersion"] = "1.48"
+            with self.assertRaises(ValueError):
+                validate_docker(old, drivers, "--platform", "--platform")
+        for store, inspect_help, save_help in (
+            ([], "--platform", "--platform"),
+            (drivers, "", "--platform"),
+            (drivers, "--platform", ""),
+        ):
+            with self.assertRaises(ValueError):
+                validate_docker(version, store, inspect_help, save_help)
 
     def test_native_failure_diagnostics_do_not_expose_other_test_output(self):
         text = """TAP version 13
@@ -297,6 +317,28 @@ class OciInputs(unittest.TestCase):
             ],
         )
 
+    def test_staging_preserves_exact_manifest_and_original_export(self):
+        for arch in ("amd64", "arm64"):
+            source = self.oci(arch)
+            before = {str(p.relative_to(source)): p.read_bytes() for p in source.rglob("*") if p.is_file()}
+            archive = self.root / (arch + ".tar")
+            tag = staged_tag("controller", self.release["id"], arch)
+            reference = stage_archive(source, arch, tag, archive)
+            with tarfile.open(archive) as tar:
+                root = json.load(tar.extractfile("index.json"))
+                descriptor = root["manifests"][0]
+                index_bytes = tar.extractfile("blobs/sha256/" + descriptor["digest"].split(":")[1]).read()
+                self.assertEqual("sha256:" + digest(index_bytes), descriptor["digest"])
+                self.assertEqual(reference, tag.split(":", 1)[0] + "@" + descriptor["digest"])
+                self.assertEqual(descriptor["annotations"]["org.opencontainers.image.ref.name"], tag)
+                selected = json.loads(index_bytes)["manifests"][0]
+                self.assertEqual(selected["platform"], {"os": "linux", "architecture": arch})
+                self.assertEqual(selected["digest"], load(source / "index.json")["manifests"][0]["digest"])
+                for name, contents in before.items():
+                    if name.startswith("blobs/"):
+                        self.assertEqual(tar.extractfile(name).read(), contents)
+            self.assertEqual(before, {str(p.relative_to(source)): p.read_bytes() for p in source.rglob("*") if p.is_file()})
+
     def test_receipt_cannot_follow_a_changed_image(self):
         identities = {
             r: {"digest": "sha256:" + "1" * 64, "configDigest": "sha256:" + "2" * 64}
@@ -316,12 +358,40 @@ class OciInputs(unittest.TestCase):
                 r: {"tests": 1, "pass": 1, "fail": 0, "skipped": 0, "cancelled": 0}
                 for r in identities
             },
+            "docker": {
+                "client": {"Version": "29.5.3", "ApiVersion": "1.54"},
+                "server": {"Version": "29.5.3", "ApiVersion": "1.54"},
+                "imageStore": "io.containerd.snapshotter.v1",
+            },
+            "upgradeProbe": {
+                "version": 1,
+                "daemonPlatform": "linux/amd64",
+                "reports": {"recover": {"outcome": "missing"}, "reserve": {"outcome": "unavailable"}},
+            },
         }
+        for key, role in (("controller", "controller"), ("broker", "repositoryCredentials")):
+            proof["upgradeProbe"][key] = {
+                "platform": "linux/amd64", "rootDigest": "sha256:" + "4" * 64,
+                "manifestDigest": identities[role]["digest"], "configDigest": identities[role]["configDigest"],
+                "image": staged_tag(role, self.release["id"], "amd64").split(":", 1)[0] + "@sha256:" + "4" * 64,
+            }
         verify_receipt(proof, self.release, "amd64", identities)
         changed = copy.deepcopy(identities)
         changed["runtime"]["digest"] = "sha256:" + "3" * 64
         with self.assertRaises(ValueError):
             verify_receipt(proof, self.release, "amd64", changed)
+        for mutate in (
+            lambda p: p.pop("upgradeProbe"),
+            lambda p: p["upgradeProbe"].update(daemonPlatform="linux/arm64"),
+            lambda p: p["upgradeProbe"]["controller"].update(manifestDigest="sha256:" + "9" * 64),
+            lambda p: p["upgradeProbe"]["broker"].update(configDigest="sha256:" + "9" * 64),
+            lambda p: p["upgradeProbe"]["broker"].update(image="foreign/controller@sha256:" + "4" * 64),
+            lambda p: p["upgradeProbe"]["reports"]["recover"].update(outcome="unknown"),
+        ):
+            rejected = copy.deepcopy(proof)
+            mutate(rejected)
+            with self.assertRaises(ValueError):
+                verify_receipt(rejected, self.release, "amd64", identities)
 
 
 class StockArtifact(unittest.TestCase):

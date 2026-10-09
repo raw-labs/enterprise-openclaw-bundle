@@ -6,6 +6,14 @@ Native artifact checks and fresh-install tests do not prove an upgrade between
 two bundle versions. Check the selected OCE's supported starting state before
 scheduling the update.
 
+Run OCE's image probe on native Linux AMD64 or ARM64 as UID 1000, with
+Python 3, Node.js and OpenSSL available. Docker CLI and Engine must be 28.1 or
+newer (API 1.49+) with the
+[containerd image store](https://docs.docker.com/engine/storage/containerd/) enabled.
+The probe uses platform-specific `docker image inspect` and `docker image save`;
+updating only the CLI or enabling only the image store is insufficient. This is
+an upgrade-host requirement, not a Kubernetes node Docker requirement.
+
 ## Prepare the candidate
 
 Extract the new bundle alongside the retained old bundle. Keep live Helm values,

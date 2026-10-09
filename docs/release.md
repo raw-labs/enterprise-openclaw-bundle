@@ -26,9 +26,12 @@ The single Action resolves Git sources and locked renderer dependencies, generat
 a file inventory, builds unchanged `occ` from that same source for macOS/Linux
 AMD64/ARM64 and runs its CLI tests. Native AMD64 and ARM64 Depot runners check the
 Linux executables and build three images, then run the selected source's controller,
-runtime and credential isolation tests with
-confinement and no skips, and assembles their exact tested manifests. It verifies
-the archive and real chart renders before publishing private GHCR indexes, checks
+runtime and credential isolation tests with confinement and no skips. It also runs
+OCE's image-identity and controller/broker compatibility probe on both native
+targets using locally staged OCI indexes containing the exact built manifests.
+The native receipts bind that proof to the exports; this does not test a retained
+installation's database or Agent upgrade. The Action assembles the tested manifests
+and verifies the archive and real chart renders before publishing private GHCR indexes, checks
 the published handoff again, installs the extracted package on disposable k3d
 with PostgreSQL TLS and checks authenticated `occ` access, then creates the
 immutable tag and private prerelease. Raw installation logs remain private.
