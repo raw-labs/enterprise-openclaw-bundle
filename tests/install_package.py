@@ -722,6 +722,29 @@ net.createServer(client => {
 
                     namespace = occ("namespace", "create", "Bundle preset check")
                     namespace_id = namespace["id"]
+                    # Follow OCE's production-agents procedure: its worker can
+                    # create the Namespace but needs tenant-local RoleBindings.
+                    deadline = time.monotonic() + 60
+                    while True:
+                        tenants = json.loads(kubectl("get", "namespaces", "-l", f"openclaw.dev/namespace={namespace_id}", "-o", "json"))["items"]
+                        if tenants:
+                            require(len(tenants) == 1, "test Namespace backing resource is ambiguous")
+                            tenant = tenants[0]["metadata"]["name"]
+                            break
+                        require(time.monotonic() < deadline, "test backing Namespace was not created")
+                        time.sleep(1)
+                    for name, role, account in (
+                        ("worker", "worker", "worker"),
+                        ("api-secrets", "api", "api"),
+                        ("api-configuration", "configuration", "api"),
+                    ):
+                        apply({
+                            "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding",
+                            "metadata": {"name": "openclaw-enterprise-" + name, "namespace": tenant},
+                            "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": cp["releaseName"] + "-openclaw-tenant-" + role},
+                            "subjects": [{"kind": "ServiceAccount", "name": "openclaw-enterprise-" + account, "namespace": cp["namespace"]}],
+                        })
+                    steps.append("documented tenant-local RoleBindings on the owned test Namespace")
                     deadline = time.monotonic() + 180
                     while occ("namespace", "get", namespace_id)["status"] != "ready":
                         require(time.monotonic() < deadline, "preset test Namespace did not become ready")
