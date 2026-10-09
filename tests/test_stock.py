@@ -458,15 +458,22 @@ class StockArtifact(unittest.TestCase):
         ]
         binary = self.artifact / "lib/occ" / f"occ-{os_name}-{arch}"
         original = binary.read_bytes()
+        saved = binary.with_suffix(".original")
+        mode = binary.stat().st_mode
+        # Replace the inode: Linux can briefly retain a completed executable's
+        # write lock after waitpid returns.
+        binary.rename(saved)
         try:
             binary.write_bytes(original + b"changed")
+            binary.chmod(mode)
             result = subprocess.run(
                 [self.artifact / "bin/occ", "--version"], capture_output=True, text=True
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("file integrity mismatch", result.stderr)
         finally:
-            binary.write_bytes(original)
+            binary.unlink(missing_ok=True)
+            saved.rename(binary)
 
     def test_profiles_render_with_delivered_dependencies_and_real_chart(self):
         release = load(self.artifact / "metadata/release.json")
