@@ -8,6 +8,7 @@ import json
 import os
 import platform
 import secrets
+import shlex
 import subprocess
 import sys
 import tarfile
@@ -37,6 +38,7 @@ ROUTING = (
 def exercise(args):
     archive = Path(args.archive).resolve()
     layout = Path(args.controller).resolve()
+    require((layout / "index.json").is_file(), "controller OCI layout is missing")
     cluster = "bundle-install-" + secrets.token_hex(6)
     arch = {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[platform.machine()]
     log_path = Path(args.logs).resolve()
@@ -64,7 +66,8 @@ def exercise(args):
                 logs.write(result.stdout + result.stderr)
                 logs.flush()
             require(
-                result.returncode == 0, f"{command[0]} failed; private log: {log_path}"
+                result.returncode == 0,
+                f"command failed ({result.returncode}): {shlex.join(str(a) for a in command)}; private log: {log_path}",
             )
             return result.stdout
 
