@@ -99,5 +99,5 @@ Human sign-in and Agent setup use OCE's APIs and Console.
 Packaged `occ` supports remote administration;
 `occ dev` requires an OCE source checkout.
 
-Follow [OPERATE.md](OPERATE.md) for acceptance and upgrades. Each installation
+Follow [OPERATE.md](OPERATE.md) for acceptance and [UPDATE.md](UPDATE.md) for later updates. Each installation
 uses its own OCE inputs; the same immutable bundle can serve multiple clusters.

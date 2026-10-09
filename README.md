@@ -4,6 +4,7 @@ Private OCE curation and release factory.
 
 - [Install a release](https://github.com/raw-labs/enterprise-openclaw-bundle/releases): download the archive and checksum, then start with its `INSTALL.md`.
 - [Installation procedure](docs/install.md): installers.
+- [Update procedure](docs/update.md): existing installations.
 - [Operations procedure](docs/operate.md): installation owners.
 - [Download, access and mirrors](docs/distribution.md): release retrieval and private distribution.
 

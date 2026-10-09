@@ -432,6 +432,7 @@ class StockArtifact(unittest.TestCase):
             {
                 "AGENTS.md",
                 "INSTALL.md",
+                "UPDATE.md",
                 "OPERATE.md",
                 "bin",
                 "defaults",
@@ -442,7 +443,7 @@ class StockArtifact(unittest.TestCase):
                 "oce",
             },
         )
-        for name in ("AGENTS.md", "INSTALL.md", "OPERATE.md"):
+        for name in ("AGENTS.md", "INSTALL.md", "UPDATE.md", "OPERATE.md"):
             document = self.artifact / name
             for target in re.findall(r"\]\(([^)]+)\)", document.read_text()):
                 if "://" not in target and not target.startswith("#"):

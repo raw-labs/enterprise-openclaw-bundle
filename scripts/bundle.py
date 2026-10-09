@@ -286,6 +286,7 @@ def package(args, release):
         payload = release_file(args.release, ROOT, name)
         files[name] = (payload.read_bytes(), 0o644)
     files["INSTALL.md"] = ((ROOT / "docs/install.md").read_bytes(), 0o644)
+    files["UPDATE.md"] = ((ROOT / "docs/update.md").read_bytes(), 0o644)
     files["OPERATE.md"] = ((ROOT / "docs/operate.md").read_bytes(), 0o644)
     files["AGENTS.md"] = ((ROOT / "delivery/AGENTS.md").read_bytes(), 0o644)
     # Runtime build inputs are deliberately excluded.

@@ -1,14 +1,12 @@
 This is RAW's curated installation kit for OpenClaw Enterprise (OCE).
-It contains a matching chart, operator CLI, installation helpers,
-selected presets and documentation. Container images are pulled separately
-using the digests recorded in `metadata/release.json`.
+It pairs OCE's chart and tools with selected presets and native plugins.
+Container images are downloaded separately by digest.
 
-Start with [INSTALL.md](INSTALL.md) for installation and
-[OPERATE.md](OPERATE.md) for maintenance. Commands are in `bin/`;
-packaged OCE tools and documentation are in `oce/`.
-OCE defines product behavior and operational procedures.
-Selected RAW presets are seeded by OCE; native plugins are packaged in the runtime
-and configured through OCE. Preset files in the kit are for inspection.
-The installation owner provides infrastructure and site-specific settings.
-Keep site settings, generated configuration and credentials outside
-this package directory.
+- [INSTALL.md](INSTALL.md): install into prepared Kubernetes infrastructure.
+- [UPDATE.md](UPDATE.md): update an existing installation using OCE's procedure.
+- [OPERATE.md](OPERATE.md): acceptance, diagnostics, presets and plugin configuration.
+- [metadata/release.json](metadata/release.json): exact sources, images, ingredients and native artifact checks.
+- [metadata/manifest.json](metadata/manifest.json): packaged file checksums; check with `bin/prepare verify`.
+- `bin/prepare`: verify this kit and render/check OCE inputs. `bin/occ`: matched upstream operator CLI.
+- `oce/`: packaged OCE chart, helpers and product documentation. OCE owns operational behavior.
+- Keep infrastructure, site settings, generated files and credentials outside this package. Its owner controls deployment and live changes.

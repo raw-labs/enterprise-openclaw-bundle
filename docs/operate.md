@@ -40,22 +40,6 @@ kubectl/Helm commands for cluster health; retain diagnostic logs privately.
 
 ## Upgrade and recover
 
-Use the candidate bundle's packaged
-[production image upgrade procedure](oce/docs/guides/deploy/production-upgrade.md)
-and [recovery procedure](oce/docs/guides/deploy/production-upgrade-recovery.md).
-The helper and its sibling probes, chart and Collector configuration are included.
-Read its supported changes and prerequisites before running it.
-
-The verified candidate's `oce/` replaces the source checkout in that guide;
-skip its Git checkout and CLI build steps. Put the candidate bundle's `bin/` on
-PATH to use the matching `occ`. Substitute your actual namespace, Helm release
-and protected directories for upstream examples. Optional source-level Name
-diagnostics in the recovery guide require an OCE checkout; the packaged upgrade
-helper already validates the Installation name during preflight.
-
-Use the new bundle's selected image digests and OCE source revision from
-`metadata/release.json`. Retain protected baseline values and Installation files;
-render candidate inputs into a separate directory when settings must change.
-Follow upstream's backup, Installation binding, maintenance, migration and
-recovery steps. Fresh-install volume preparation is not an upgrade step.
-Helm rollback does not reverse database migrations.
+Start with [UPDATE.md](UPDATE.md). For an interrupted update, retain its evidence
+and maintenance restrictions and follow OCE's
+[recovery procedure](oce/docs/guides/deploy/production-upgrade-recovery.md).

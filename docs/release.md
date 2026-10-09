@@ -51,7 +51,7 @@ The GitHub release has eleven attachments:
 - `installation-receipt.json`: extracted-package installation and authenticated CLI check on disposable k3d infrastructure.
 - `provenance.json`: build commit/run, definition hash and output checksums.
 
-The archive starts with `INSTALL.md`, `OPERATE.md` and a short operator-facing
+The archive starts with `INSTALL.md`, `UPDATE.md`, `OPERATE.md` and a short operator-facing
 `AGENTS.md`. Its commands are `bin/occ` and `bin/prepare`; packaged OCE files are
 under `oce/`, with supporting code under `lib/` and release metadata under
 `metadata/`. Native receipts remain separate release assets.
