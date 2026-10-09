@@ -84,10 +84,17 @@ test("Connections loads in the native Gateway and retains its database across Ku
     },
   };
   const native = (...args) => kube("exec", "gateway", "-c", "gateway", "--", "node", "/app/openclaw.mjs", ...args);
-  const call = (method, params = {}) => JSON.parse(native("gateway", "call", method, "--url", "ws://127.0.0.1:18789", "--token", token, "--params", JSON.stringify(params), "--json"));
+  const call = (method, params = {}) => {
+    try {
+      return JSON.parse(native("gateway", "call", method, "--url", "ws://127.0.0.1:18789", "--token", token, "--params", JSON.stringify(params), "--json"));
+    } catch (error) {
+      throw new Error([error.message, error.stdout, error.stderr].filter(Boolean).join("\n"), {cause: error});
+    }
+  };
   const start = () => {put(pod); kube("wait", "--for=condition=Ready", "pod/gateway", "--timeout=180s");};
   const stop = () => kube("delete", "pod/gateway", "--wait=true", "--timeout=180s");
   let created = false;
+  let phase = "create disposable cluster";
   try {
     run("docker", ["tag", image, tag]);
     run("k3d", ["cluster", "create", cluster, "--servers", "1", "--agents", "0", "--no-lb", "--image",
@@ -101,10 +108,13 @@ test("Connections loads in the native Gateway and retains its database across Ku
       accessModes: ["ReadWriteOnce"], storageClassName: "local-path", resources: {requests: {storage: "100Mi"}},
     }});
     const saveConfig = () => put({apiVersion: "v1", kind: "ConfigMap", metadata: {name: "gateway", namespace: "bundle-connections"}, data: {"openclaw.json": JSON.stringify(config)}});
+    phase = "start Gateway with native plugin configuration";
     saveConfig(); start();
+    phase = "inspect native plugin";
     const inspected = native("plugins", "inspect", "openclaw-connections", "--runtime", "--json");
     for (const tool of ["connections_search", "connections_describe", "connections_call"]) assert.ok(inspected.includes(tool));
     assert.ok(!inspected.includes("synthetic-never-sent-project-key"));
+    phase = "administrator management and UI catalog";
     const before = call("connections.status");
     assert.equal(before.configured, true); assert.ok(before.userId);
     const connection = call("connections.create", {connectorId: "github", name: "Bundle persistence check", grant: {mode: "selected", agentIds: []}});
@@ -113,6 +123,7 @@ test("Connections loads in the native Gateway and retains its database across Ku
     assert.ok(asset);
     const plugin = plugins.find(p => p.id === "openclaw-connections");
     const manifest = JSON.parse(await readFile(resolve("deploy/bundle/plugins/openclaw-connections/openclaw.plugin.json"), "utf8"));
+    phase = "UI asset, read-only authority and unconnected tools";
     kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
       import assert from 'node:assert/strict';
       import { createHash } from 'node:crypto';
@@ -137,20 +148,25 @@ test("Connections loads in the native Gateway and retains its database across Ku
       assert.equal(search.status, 200); assert.match(body, /no_usable_connections/);
       assert.ok(!body.includes('synthetic-never-sent-project-key'));
     `);
+    phase = "private volume permissions and Pod replacement";
     const permission = kube("exec", "gateway", "-c", "gateway", "--", "node", "-e", "const s=require('node:fs').statSync('/home/node/.openclaw/connections');if((s.mode&511)!==448||s.uid!==1000)process.exit(1)");
     assert.equal(permission.trim(), "");
     stop(); start();
     assert.equal(call("connections.status").userId, before.userId);
     const restored = call("connections.list").items.find(p => p.id === connection.id);
     assert.ok(restored); assert.equal(restored.name, "Bundle persistence check"); assert.deepEqual(restored.grant, {mode: "selected", agentIds: []});
+    phase = "explicitly disabled plugin";
     config.plugins.entries["openclaw-connections"].enabled = false;
     stop(); saveConfig(); start();
     assert.throws(() => call("connections.status"), /unknown method|not found|not registered/i);
   } catch (error) {
+    let logs = "";
     if (created) {
-      try {process.stderr.write(kube("logs", "gateway", "-c", "gateway", "--tail=70"));} catch {}
+      try {logs = kube("logs", "gateway", "-c", "gateway", "--tail=70");} catch {}
     }
-    throw error;
+    const detail = `${String(error.message)}\n${logs}`
+      .replaceAll(token, "[synthetic token]").replaceAll("synthetic-never-sent-project-key", "[synthetic key]");
+    throw new Error(`Synthetic Connections check failed at ${phase}: ${detail}`, {cause: error});
   } finally {
     // Remove only the cluster and local tag created with this random test identity.
     if (created) run("k3d", ["cluster", "delete", cluster]);

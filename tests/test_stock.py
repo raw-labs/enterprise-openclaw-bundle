@@ -1,6 +1,8 @@
 """Packaging and negative input checks; synthetic OCI fixtures never qualify runtime."""
 
 import copy
+import contextlib
+import io
 import json
 import os
 import re
@@ -35,6 +37,7 @@ from stock import (  # noqa: E402
     private_package,
     renderer_files,
     tap_counts,
+    tests as native_tests,
     verify_receipt,
 )
 
@@ -86,6 +89,30 @@ class StockInputs(unittest.TestCase):
             )
             with self.assertRaises(ValueError):
                 tap_counts(text)
+
+    def test_native_failure_diagnostics_do_not_expose_other_test_output(self):
+        text = """TAP version 13
+# Subtest: selected RAW presets are image-resident and accepted by OCE's real loader
+not ok 1 - selected RAW presets are image-resident and accepted by OCE's real loader
+  ---
+  error: 'synthetic preset failure'
+  ...
+# private output from the next source test
+# Subtest: upstream test
+not ok 2 - upstream test
+  ---
+  error: 'private source diagnostics'
+  ...
+"""
+        with tempfile.TemporaryDirectory() as temp:
+            captured = io.StringIO()
+            log = Path(temp) / "test.tap"
+            with contextlib.redirect_stderr(captured), self.assertRaises(ValueError):
+                native_tests([sys.executable, "-c", f"import sys; print({text!r}); sys.exit(1)"], ROOT, os.environ, log)
+            self.assertIn("synthetic preset failure", captured.getvalue())
+            self.assertNotIn("private output", captured.getvalue())
+            self.assertNotIn("private source diagnostics", captured.getvalue())
+            self.assertIn("private source diagnostics", log.read_text())
 
     def test_native_promotion_requires_built_images_and_both_receipts(self):
         self.release["kind"] = "release"

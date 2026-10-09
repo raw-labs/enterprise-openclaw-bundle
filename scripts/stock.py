@@ -49,7 +49,7 @@ USER node
 INGREDIENT_LAYER = b"""
 FROM __UPSTREAM_TARGET__ AS bundle-ingredients
 USER root
-COPY --chown=node:node deploy/bundle/plugins/ /app/node_modules/openclaw/dist/extensions/
+COPY --from=bundle-plugins --chown=node:node / /app/node_modules/openclaw/dist/extensions/
 COPY scripts/build-runtime-assets.mjs /tmp/bundle-inventory.mjs
 COPY deploy/bundle/runtime.mjs /tmp/bundle-runtime.mjs
 COPY deploy/bundle/plugins.json /tmp/bundle-plugins.json
@@ -283,6 +283,7 @@ def build(args, release):
             ingredients = b""
             if role == "runtime" and release.get("pluginPackages"):
                 require(digest(INGREDIENT_LAYER) == release["build"]["ingredientLayerSha256"], "ingredient build code changed")
+                cmd.extend(["--build-context", f"bundle-plugins={Path(args.source).resolve() / 'deploy/bundle/plugins'}"])
                 ingredients = INGREDIENT_LAYER.replace(b"__UPSTREAM_TARGET__", upstream_target.encode())
                 upstream_target = "bundle-ingredients"
             dockerfile.write_bytes(
@@ -330,8 +331,21 @@ def tests(command, source, env, log):
             stdout=file,
             stderr=subprocess.STDOUT,
         )
+    output = log.read_text()
+    if result.returncode:
+        # Only these factory tests use fresh state and fixed, synthetic credentials.
+        # Other source-test diagnostics remain in the private log.
+        public_tests = {
+            "selected RAW presets are image-resident and accepted by OCE's real loader",
+            "packaged native extensions and their inventory match the selected release",
+            "Connections loads in the native Gateway and retains its database across Kubernetes Pod replacement",
+        }
+        for block in re.split(r"(?m)(?=^# Subtest: )", output):
+            failure = re.match(r"^# Subtest: ([^\n]+)\nnot ok [^\n]+\n  ---\n.*?\n  \.\.\.(?:\n|$)", block, re.DOTALL)
+            if failure and failure[1] in public_tests:
+                print(failure[0][:16384], file=sys.stderr)
     require(result.returncode == 0, f"native lane failed; private diagnostics: {log}")
-    return tap_counts(log.read_text())
+    return tap_counts(output)
 
 
 def check(args, release):
