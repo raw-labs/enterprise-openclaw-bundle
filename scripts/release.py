@@ -4,6 +4,7 @@
 import argparse
 import base64
 import hashlib
+import importlib.util
 import io
 import os
 import re
@@ -211,6 +212,11 @@ def resolve(args):
         filesSha256=digest((out / "source-files.json").read_bytes()),
     )
     dockerfile = (source / "deploy/runtime/Dockerfile").read_text()
+    require(
+        "--profile-file"
+        in (source / "scripts/render-installation-profile.mjs").read_text(),
+        "selected renderer requires explicit profile-file support; select a compatible source or pinned patch",
+    )
 
     def one(pattern, text=dockerfile):
         matches = re.findall(pattern, text, re.MULTILINE)
@@ -434,7 +440,7 @@ def verify_handoff(archive, published=True):
         require(len(dirs) == 1 and dirs[0].is_dir(), "invalid handoff root")
         artifact = dirs[0]
         run(
-            [sys.executable, artifact / "scripts/install.py", "verify"],
+            [sys.executable, artifact / "tools/prepare.py", "verify"],
             stdout=subprocess.DEVNULL,
         )
         cli = load(artifact / "release.json")["operatorCli"]
@@ -455,7 +461,7 @@ def verify_handoff(archive, published=True):
                         run(
                             [
                                 sys.executable,
-                                artifact / "scripts/install.py",
+                                artifact / "tools/prepare.py",
                                 "render",
                                 "--input",
                                 example,
@@ -470,16 +476,14 @@ def verify_handoff(archive, published=True):
                         )
                     else:
                         # A dry-run exercises the exact renderer without granting installation admission.
-                        import install
-
-                        original_root, original_gate = (
-                            install.ROOT,
-                            install.install_gate,
+                        spec = importlib.util.spec_from_file_location(
+                            "delivered_prepare", artifact / "tools/prepare.py"
                         )
+                        prepare = importlib.util.module_from_spec(spec)
+                        sys.path.insert(0, str(artifact / "tools"))
                         try:
-                            install.ROOT = artifact
-                            install.install_gate = lambda release: None
-                            install.render(
+                            spec.loader.exec_module(prepare)
+                            prepare.render(
                                 SimpleNamespace(
                                     input=example,
                                     profile=profile,
@@ -487,13 +491,33 @@ def verify_handoff(archive, published=True):
                                     output=dest,
                                     mirrors=None,
                                 ),
-                                read_release(artifact / "release.json"),
+                                load(artifact / "release.json"),
+                                admit=False,
                             )
                         finally:
-                            install.ROOT, install.install_gate = (
-                                original_root,
-                                original_gate,
-                            )
+                            sys.path.pop(0)
+                    next_steps = load(dest / "preflight.json")["nextSteps"]
+                    require(
+                        any(
+                            "deploy/helm/openclaw-enterprise" in step
+                            for step in next_steps
+                        ),
+                        "upstream chart instruction changed; review package paths",
+                    )
+                    require(
+                        (
+                            artifact
+                            / "upstream/deploy/helm/openclaw-enterprise/Chart.yaml"
+                        ).is_file(),
+                        "generated chart instruction references an absent chart",
+                    )
+        for helper in ("prepare-bootstrap-volume", "upgrade-production-images"):
+            run(
+                ["bash", artifact / "upstream/scripts" / helper, "--help"],
+                cwd=artifact / "upstream",
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
 
 def finish(args):
@@ -573,10 +597,49 @@ def finish(args):
     )
 
 
+def verify_installation(args):
+    out = Path(args.output).resolve()
+    provenance = load(out / "provenance.json")
+    archive = out / "bundle.tar.gz"
+    require(
+        digest(archive.read_bytes()) == provenance["artifactSha256"],
+        "handoff changed before installation check",
+    )
+    receipt = out / "installation-receipt.json"
+    run(
+        [
+            sys.executable,
+            ROOT / "tests/install_package.py",
+            "--archive",
+            archive,
+            "--controller",
+            args.controller,
+            "--output",
+            receipt,
+            "--logs",
+            args.logs,
+        ]
+    )
+    proof = load(receipt)
+    require(
+        proof["status"] == "passed-package-installation"
+        and proof["cleanup"] == "completed"
+        and proof["artifactSha256"] == provenance["artifactSha256"]
+        and proof["releaseId"] == provenance["version"],
+        "package installation receipt mismatch",
+    )
+    provenance["files"][receipt.name] = digest(receipt.read_bytes())
+    save(out / "provenance.json", provenance)
+
+
 def publish_release(args):
     out = Path(args.output).resolve()
     provenance = load(out / "provenance.json")
     require(provenance["published"] is True, "cannot publish a dry-run handoff")
+    require(
+        "installation-receipt.json" in provenance["files"],
+        "package installation check required before publication",
+    )
     version = provenance["version"]
     sha = os.environ.get("GITHUB_SHA", "")
     require(
@@ -593,11 +656,13 @@ def publish_release(args):
     notes = out / "release-notes.txt"
     notes.write_text(
         "Download **bundle.tar.gz** and **bundle.tar.gz.sha256** to install; "
-        "the archive includes the chart, installation helpers, presets and matched upstream occ "
+        "extract it and start with **INSTALL.md**. The archive includes the OCE chart, "
+        "input preparation tool, upstream installation/upgrade helpers, presets and matched occ "
         "for macOS/Linux AMD64/ARM64. Container images are pulled separately from private GHCR. "
         "The remaining assets are generated provenance and verification records.\n\n"
         "Native AMD64 and ARM64 shipping artifacts passed all build and confinement checks. "
         "The archive passed inventory verification, reproducibility and real chart rendering. "
+        "A disposable k3d installation passed migration/bootstrap and an authenticated packaged occ request. "
         "Provider access and customer installation acceptance remain separate. "
         "Exact ingredients and evidence are in the attached bundle definition and provenance.\n"
     )
@@ -683,6 +748,10 @@ def main():
     p.add_argument("--output", required=True)
     p = sub.add_parser("publish")
     p.add_argument("--output", required=True)
+    p = sub.add_parser("verify-installation")
+    p.add_argument("--output", required=True)
+    p.add_argument("--controller", required=True)
+    p.add_argument("--logs", required=True)
     args = parser.parse_args()
     if args.command == "validate-definitions":
         validate_definitions()
@@ -692,9 +761,12 @@ def main():
     else:
         if args.command == "resolve" and not args.definition:
             args.definition = latest_definition()
-        {"resolve": resolve, "finish": finish, "publish": publish_release}[
-            args.command
-        ](args)
+        {
+            "resolve": resolve,
+            "finish": finish,
+            "publish": publish_release,
+            "verify-installation": verify_installation,
+        }[args.command](args)
 
 
 if __name__ == "__main__":

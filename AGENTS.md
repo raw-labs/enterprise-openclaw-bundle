@@ -6,7 +6,9 @@ live Agents, or add OpenClaw Connections in this milestone.
 
 `bundles/<version>/bundle.json` owns human-authored ingredient selection,
 optional source patches and reviewed confinement inputs. `defaults/` owns selectable
-templates. `scripts/` owns build, verification and delivery mechanics.
+templates. `scripts/` owns factory mechanics; `delivery/` owns the small payload
+for package verification and OCE input preparation. Product operations belong to
+OCE; infrastructure and installation settings belong to installation owners.
 The release Action generates inventories, native receipts, image indexes, archives
 and provenance only as CI artifacts and GitHub release assets. `docs/` owns short
 static procedures and installation examples. README is navigation only.

@@ -1,0 +1,70 @@
+--- a/scripts/render-installation-profile.mjs
++++ b/scripts/render-installation-profile.mjs
+@@ -22,7 +22,7 @@
+ 
+ function usage() {
+   return `Usage: node scripts/render-installation-profile.mjs --profile openclaw|codex \\
+-  --input <site-inputs.json> --out-dir <rendered-directory>
++  --input <site-inputs.json> --out-dir <rendered-directory> [--profile-file <profile.json>]
+ 
+ The renderer writes values.yaml, installation.yaml, and preflight.json. Missing
+ or invalid required inputs write preflight.json and exit nonzero.
+@@ -42,6 +42,8 @@
+     };
+     if (arg === "--profile") {
+       parsed.profile = next();
++    } else if (arg === "--profile-file") {
++      parsed.profileFile = next();
+     } else if (arg === "--input") {
+       parsed.input = next();
+     } else if (arg === "--out-dir") {
+@@ -89,10 +91,10 @@
+   }
+ }
+ 
+-async function readProfile(name) {
++async function readProfile(name, profileFile) {
+   const diagnostics = { errors: [] };
+   const profile = record(
+-    await readJson(resolve(profilesDir, `${name}.json`), `profile ${name}`),
++    await readJson(profileFile ? resolve(profileFile) : resolve(profilesDir, `${name}.json`), `profile ${name}`),
+     `profile ${name}`,
+     diagnostics,
+   );
+@@ -1409,13 +1411,22 @@
+   if (profile.name === "codex") {
+     diagnostics.prerequisites.push(
+       "Configured Codex seccomp profile installed and verified on every node selected by runtime.nodeSelector.",
+-      "Hosted discovery and codex_pat runtime tokens stored later as Namespace Secrets or entered in the Console; the renderer does not create or verify those credentials.",
+-    );
+-    if (Object.keys(managedServiceAccounts).length === 0) {
+-      diagnostics.warnings.push(
+-        "Managed ChatGPT service-account issuance is not configured; Codex Agents must use an existing codex_pat token until backend provisioning is supplied and verified.",
++    );
++    if (profile.installation.drivers.plugin.configuration.catalogSource === "hosted") {
++      diagnostics.prerequisites.push(
++        "Hosted discovery and codex_pat runtime tokens stored later as Namespace Secrets or entered in the Console; the renderer does not create or verify those credentials.",
+       );
++      if (Object.keys(managedServiceAccounts).length === 0) {
++        diagnostics.warnings.push(
++          "Managed ChatGPT service-account issuance is not configured; Codex Agents must use an existing codex_pat token until backend provisioning is supplied and verified.",
++        );
++      }
+     } else {
++      diagnostics.prerequisites.push(
++        "Model credentials supplied as Namespace Secrets and granted to the Agents that use them; the renderer does not create or verify those credentials.",
++      );
++    }
++    if (Object.keys(managedServiceAccounts).length > 0) {
+       diagnostics.prerequisites.push(
+         "ChatGPT service-account app connections configured outside OCE before Agents select a managed ServiceAccount as their codex_pat source.",
+       );
+@@ -1485,7 +1496,7 @@
+ await Promise.all(Object.values(output).map((path) => rm(path, { force: true })));
+ const diagnostics = { errors: [], warnings: [], prerequisites: [], nextSteps: [] };
+ const [profile, rawInput] = await Promise.all([
+-  readProfile(args.profile),
++  readProfile(args.profile, args.profileFile),
+   readJson(resolve(args.input), "input"),
+ ]);
+ const parsed = buildInput(rawInput, diagnostics);

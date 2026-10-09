@@ -1,0 +1,664 @@
+#!/usr/bin/env python3
+"""Exercise the extracted package on an owned, disposable k3d cluster."""
+
+import argparse
+import importlib.util
+import io
+import json
+import os
+import platform
+import secrets
+import subprocess
+import sys
+import tarfile
+import tempfile
+import time
+import urllib.request
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "delivery"))
+from integrity import digest, helm_values, load, require, save  # noqa: E402
+
+# Infrastructure pins from the selected OCE CI fixtures; these are test prerequisites.
+K3S = "docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc"
+POSTGRES = "docker.io/library/postgres:18.6@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae"
+ROUTING = (
+    (
+        "https://github.com/envoyproxy/gateway/releases/download/v1.6.7/install.yaml",
+        "9a250c698d78b92c670d9d2bd6bd54615f1dee41ddd520ece9704edf63088df8",
+    ),
+    (
+        "https://github.com/cert-manager/cert-manager/releases/download/v1.18.4/cert-manager.yaml",
+        "aff085b4f0126f67372e3a02cb18feb70eed37dbd4de01973a159e6c13482f83",
+    ),
+)
+
+
+def exercise(args):
+    archive = Path(args.archive).resolve()
+    layout = Path(args.controller).resolve()
+    cluster = "bundle-install-" + secrets.token_hex(6)
+    arch = {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[platform.machine()]
+    log_path = Path(args.logs).resolve()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    os.umask(0o077)
+    steps = []
+    with (
+        tempfile.TemporaryDirectory(prefix=cluster + "-") as temporary,
+        log_path.open("wb") as logs,
+    ):
+        work = Path(temporary)
+
+        def run(
+            command, *, cwd=None, input=None, env=None, timeout=600, log_output=True
+        ):
+            result = subprocess.run(
+                [str(a) for a in command],
+                cwd=cwd,
+                input=input,
+                env=env,
+                capture_output=True,
+                timeout=timeout,
+            )
+            if log_output:
+                logs.write(result.stdout + result.stderr)
+                logs.flush()
+            require(
+                result.returncode == 0, f"{command[0]} failed; private log: {log_path}"
+            )
+            return result.stdout
+
+        with tarfile.open(archive) as tar:
+            require(
+                all(
+                    m.isfile()
+                    and not Path(m.name).is_absolute()
+                    and ".." not in Path(m.name).parts
+                    for m in tar.getmembers()
+                ),
+                "invalid package member",
+            )
+            tar.extractall(work, filter="data")
+        artifact = next(p for p in work.iterdir() if p.is_dir())
+        release = load(artifact / "release.json")
+        require(
+            release["qualification"]["status"] == "native-verified",
+            "native artifact checks required",
+        )
+        run([sys.executable, artifact / "tools/prepare.py", "verify"])
+        controller = release["images"]["controller"]["reference"]
+        index = load(layout / "index.json")
+        require(
+            len(index["manifests"]) == 1
+            and index["manifests"][0]["digest"] == controller.split("@")[1],
+            "installation test/controller index mismatch",
+        )
+        index["manifests"][0]["annotations"] = {
+            "org.opencontainers.image.ref.name": controller
+        }
+        image_archive = work / "controller.tar"
+        with tarfile.open(image_archive, "w") as tar:
+            for path in sorted(layout.rglob("*")):
+                if path.is_file() and path.name != "index.json":
+                    tar.add(path, arcname=str(path.relative_to(layout)))
+            data = json.dumps(index).encode()
+            info = tarfile.TarInfo("index.json")
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+        kubeconfig = work / "kubeconfig"
+        context = "k3d-" + cluster
+        try:
+            run(
+                [
+                    "k3d",
+                    "cluster",
+                    "create",
+                    cluster,
+                    "--image",
+                    K3S,
+                    "--agents",
+                    "1",
+                    "--k3s-arg",
+                    "--disable=traefik@server:*",
+                    "--k3s-arg",
+                    "--disable=servicelb@server:*",
+                    "--kubeconfig-update-default=false",
+                    "--kubeconfig-switch-context=false",
+                ]
+            )
+            kubeconfig.write_bytes(
+                run(["k3d", "kubeconfig", "get", cluster], log_output=False)
+            )
+            kube = ["kubectl", "--kubeconfig", kubeconfig, "--context", context]
+
+            def kubectl(*arguments, input=None, log_output=True):
+                return run([*kube, *arguments], input=input, log_output=log_output)
+
+            def apply(obj):
+                kubectl("apply", "-f", "-", input=json.dumps(obj).encode())
+
+            def resource(kind, name, namespace="openclaw-system"):
+                return json.loads(
+                    kubectl("-n", namespace, "get", kind, name, "-o", "json")
+                )
+
+            nodes = json.loads(kubectl("get", "nodes", "-o", "json"))["items"]
+            for node in nodes:
+                name = node["metadata"]["name"]
+                role = "control" if "server" in name else "agents"
+                kubectl("label", "node", name, "oce-role=" + role)
+                run(["docker", "cp", image_archive, name + ":/tmp/controller.tar"])
+                run(
+                    [
+                        "docker",
+                        "exec",
+                        name,
+                        "k3s",
+                        "ctr",
+                        "-n",
+                        "k8s.io",
+                        "images",
+                        "import",
+                        "--all-platforms",
+                        "--no-unpack",
+                        "/tmp/controller.tar",
+                    ]
+                )
+                actual = json.loads(
+                    run(
+                        [
+                            "docker",
+                            "exec",
+                            name,
+                            "k3s",
+                            "crictl",
+                            "inspecti",
+                            controller,
+                        ]
+                    )
+                )
+                require(
+                    controller in actual["status"]["repoDigests"],
+                    "node image digest mismatch",
+                )
+            for number, (url, checksum) in enumerate(ROUTING):
+                with urllib.request.urlopen(url, timeout=120) as response:
+                    data = response.read()
+                require(digest(data) == checksum, "routing prerequisite hash mismatch")
+                path = work / f"routing-{number}.yaml"
+                path.write_bytes(data)
+                kubectl("apply", "--server-side", "-f", path)
+            for ns, name in (
+                ("envoy-gateway-system", "envoy-gateway"),
+                ("cert-manager", "cert-manager"),
+                ("cert-manager", "cert-manager-webhook"),
+            ):
+                kubectl(
+                    "-n",
+                    ns,
+                    "rollout",
+                    "status",
+                    "deployment/" + name,
+                    "--timeout=300s",
+                )
+            apply(
+                {
+                    "apiVersion": "gateway.networking.k8s.io/v1",
+                    "kind": "GatewayClass",
+                    "metadata": {"name": "eg"},
+                    "spec": {
+                        "controllerName": "gateway.envoyproxy.io/gatewayclass-controller"
+                    },
+                }
+            )
+            kubectl("create", "namespace", "openclaw-system")
+            database_host = "postgres.openclaw-system.svc.cluster.local"
+            run(
+                [
+                    "openssl",
+                    "req",
+                    "-x509",
+                    "-newkey",
+                    "rsa:2048",
+                    "-nodes",
+                    "-days",
+                    "1",
+                    "-subj",
+                    "/CN=" + database_host,
+                    "-addext",
+                    "subjectAltName=DNS:" + database_host,
+                    "-keyout",
+                    work / "server.key",
+                    "-out",
+                    work / "server.crt",
+                ]
+            )
+            app_password, migration_password = (
+                secrets.token_hex(24),
+                secrets.token_hex(24),
+            )
+
+            def secret(name, values):
+                apply(
+                    {
+                        "apiVersion": "v1",
+                        "kind": "Secret",
+                        "metadata": {"name": name, "namespace": "openclaw-system"},
+                        "stringData": values,
+                    }
+                )
+
+            secret(
+                "postgres-tls",
+                {
+                    "server.key": (work / "server.key").read_text(),
+                    "server.crt": (work / "server.crt").read_text(),
+                },
+            )
+            sql = (
+                f"CREATE ROLE occ_migrator LOGIN PASSWORD '{migration_password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;\n"
+                f"CREATE ROLE occ_app LOGIN PASSWORD '{app_password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;\n"
+                "GRANT CREATE ON DATABASE openclaw_enterprise TO occ_migrator;\n"
+                "CREATE SCHEMA occ AUTHORIZATION occ_migrator;\nCREATE SCHEMA drizzle AUTHORIZATION occ_migrator;\n"
+                "REVOKE CREATE ON SCHEMA public FROM PUBLIC;\n"
+            )
+            secret(
+                "postgres-init", {"init.sql": sql, "password": secrets.token_hex(24)}
+            )
+            apply(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Pod",
+                    "metadata": {
+                        "name": "postgres",
+                        "namespace": "openclaw-system",
+                        "labels": {"app": "postgres"},
+                    },
+                    "spec": {
+                        "nodeSelector": {"oce-role": "control"},
+                        "containers": [
+                            {
+                                "name": "postgres",
+                                "image": POSTGRES,
+                                "command": [
+                                    "bash",
+                                    "-ec",
+                                    "cp /tls/server.* /tmp/; chown 999:999 /tmp/server.*; chmod 600 /tmp/server.key; exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/tmp/server.crt -c ssl_key_file=/tmp/server.key",
+                                ],
+                                "env": [
+                                    {
+                                        "name": "POSTGRES_DB",
+                                        "value": "openclaw_enterprise",
+                                    },
+                                    {
+                                        "name": "POSTGRES_PASSWORD",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "name": "postgres-init",
+                                                "key": "password",
+                                            }
+                                        },
+                                    },
+                                ],
+                                "volumeMounts": [
+                                    {
+                                        "name": "tls",
+                                        "mountPath": "/tls",
+                                        "readOnly": True,
+                                    },
+                                    {
+                                        "name": "init",
+                                        "mountPath": "/docker-entrypoint-initdb.d",
+                                        "readOnly": True,
+                                    },
+                                ],
+                                "readinessProbe": {
+                                    "exec": {
+                                        "command": ["pg_isready", "-U", "postgres"]
+                                    },
+                                    "periodSeconds": 2,
+                                },
+                            }
+                        ],
+                        "volumes": [
+                            {"name": "tls", "secret": {"secretName": "postgres-tls"}},
+                            {
+                                "name": "init",
+                                "secret": {
+                                    "secretName": "postgres-init",
+                                    "items": [{"key": "init.sql", "path": "init.sql"}],
+                                },
+                            },
+                        ],
+                    },
+                }
+            )
+            apply(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Service",
+                    "metadata": {"name": "postgres", "namespace": "openclaw-system"},
+                    "spec": {
+                        "selector": {"app": "postgres"},
+                        "ports": [{"port": 5432}],
+                    },
+                }
+            )
+            kubectl(
+                "-n",
+                "openclaw-system",
+                "wait",
+                "--for=condition=Ready",
+                "pod/postgres",
+                "--timeout=180s",
+            )
+            endpoint = resource("endpoints", "kubernetes", "default")["subsets"][0]
+            site = load(artifact / "examples/installations/site.json")
+            cp = site["controlPlane"]
+            cp["databaseCidrs"] = [
+                resource("pod", "postgres")["status"]["podIP"] + "/32"
+            ]
+            cp["clusterCidrs"] = [
+                address["ip"] + "/32" for address in endpoint["addresses"]
+            ]
+            cp["databaseCa"] = {
+                "secretName": "occ-database-ca",
+                "key": "ca.pem",
+                "mountPath": "/etc/openclaw/database-ca",
+            }
+            cp["pluginStatusProxySourceCidrs"] = [
+                node["status"]["addresses"][0]["address"] + "/32" for node in nodes
+            ]
+            site["runtime"]["gatewayStorageClassName"] = "local-path"
+            path = work / "site.json"
+            save(path, site)
+            rendered = work / "rendered"
+            if release["distribution"]["published"]:
+                run(
+                    [
+                        sys.executable,
+                        artifact / "tools/prepare.py",
+                        "render",
+                        "--input",
+                        path,
+                        "--profile",
+                        "codex",
+                        "--architecture",
+                        "linux/" + arch,
+                        "--output",
+                        rendered,
+                    ]
+                )
+            else:
+                spec = importlib.util.spec_from_file_location(
+                    "package_prepare", artifact / "tools/prepare.py"
+                )
+                prepare = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(prepare)
+                prepare.render(
+                    argparse.Namespace(
+                        input=path,
+                        profile="codex",
+                        architecture="linux/" + arch,
+                        output=rendered,
+                        mirrors=None,
+                    ),
+                    release,
+                    admit=False,
+                )
+            run(
+                [
+                    sys.executable,
+                    artifact / "tools/prepare.py",
+                    "check",
+                    "--directory",
+                    rendered,
+                ]
+            )
+            steps.append("extracted package verification and release-bound rendering")
+            values = helm_values(rendered / "values.yaml")
+            # k3d exposes its API endpoint on 6443; cluster.port is an upstream chart option.
+            # The Installation bytes and their paired checksum remain unchanged.
+            values["cluster"]["port"] = endpoint["ports"][0]["port"]
+            save(rendered / "values.yaml", values)
+            run(
+                [
+                    sys.executable,
+                    artifact / "tools/prepare.py",
+                    "check",
+                    "--directory",
+                    rendered,
+                ]
+            )
+            upstream = artifact / "upstream"
+            claim = helm_values(
+                upstream / "deploy/examples/production/bootstrap-pvc.yaml"
+            )
+            claim["metadata"]["namespace"] = cp["namespace"]
+            claim["metadata"]["name"] = cp["bootstrapPasswordClaimName"]
+            claim["spec"]["storageClassName"] = "local-path"
+            apply(claim)
+            secret(
+                values["installation"]["secretName"],
+                {
+                    values["installation"]["key"]: (
+                        rendered / "installation.yaml"
+                    ).read_text()
+                },
+            )
+            ca_path = "/etc/openclaw/database-ca/ca.pem"
+            suffix = f"@{database_host}:5432/openclaw_enterprise?sslmode=verify-full&sslrootcert={ca_path}"
+            secret(
+                "occ-database",
+                {
+                    "application-url": "postgresql://occ_app:" + app_password + suffix,
+                    "migration-url": "postgresql://occ_migrator:"
+                    + migration_password
+                    + suffix,
+                },
+            )
+            secret("occ-database-ca", {"ca.pem": (work / "server.crt").read_text()})
+            secret("occ-auth", {"secret": secrets.token_hex(32)})
+            secret(cp["gatewayApiKeySecretName"], {"occ": secrets.token_hex(32)})
+            run(
+                [
+                    "bash",
+                    "scripts/prepare-bootstrap-volume",
+                    "--kubeconfig",
+                    kubeconfig,
+                    "--context",
+                    context,
+                    "--namespace",
+                    cp["namespace"],
+                    "--claim",
+                    cp["bootstrapPasswordClaimName"],
+                    "--image",
+                    controller,
+                    "--node-selector",
+                    "oce-role=control",
+                ],
+                cwd=upstream,
+            )
+            steps.append("upstream bootstrap volume preparation")
+            run(
+                [
+                    "helm",
+                    "upgrade",
+                    "--install",
+                    cp["releaseName"],
+                    "deploy/helm/openclaw-enterprise",
+                    "--kubeconfig",
+                    kubeconfig,
+                    "--kube-context",
+                    context,
+                    "--namespace",
+                    cp["namespace"],
+                    "-f",
+                    rendered / "values.yaml",
+                    "--wait",
+                    "--timeout",
+                    "10m",
+                ],
+                cwd=upstream,
+                timeout=660,
+            )
+            steps.append(
+                "packaged chart migration, bootstrap, API and worker readiness"
+            )
+            # Test storage access belongs to the fixture, not the delivered product.
+            reader = {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {"name": "bootstrap-reader", "namespace": cp["namespace"]},
+                "spec": {
+                    "nodeSelector": {"oce-role": "control"},
+                    "restartPolicy": "Never",
+                    "automountServiceAccountToken": False,
+                    "securityContext": {
+                        "runAsUser": 1000,
+                        "runAsGroup": 1000,
+                        "fsGroup": 1000,
+                        "runAsNonRoot": True,
+                        "seccompProfile": {"type": "RuntimeDefault"},
+                    },
+                    "containers": [
+                        {
+                            "name": "reader",
+                            "image": controller,
+                            "command": ["node", "-e", "setInterval(()=>{},1000)"],
+                            "securityContext": {
+                                "allowPrivilegeEscalation": False,
+                                "readOnlyRootFilesystem": True,
+                                "capabilities": {"drop": ["ALL"]},
+                            },
+                            "volumeMounts": [
+                                {
+                                    "name": "bootstrap",
+                                    "mountPath": "/bootstrap",
+                                    "readOnly": True,
+                                }
+                            ],
+                        }
+                    ],
+                    "volumes": [
+                        {
+                            "name": "bootstrap",
+                            "persistentVolumeClaim": {
+                                "claimName": cp["bootstrapPasswordClaimName"],
+                                "readOnly": True,
+                            },
+                        }
+                    ],
+                },
+            }
+            apply(reader)
+            kubectl(
+                "-n",
+                cp["namespace"],
+                "wait",
+                "--for=condition=Ready",
+                "pod/bootstrap-reader",
+                "--timeout=120s",
+            )
+            key = kubectl(
+                "-n",
+                cp["namespace"],
+                "exec",
+                "bootstrap-reader",
+                "--",
+                "cat",
+                "/bootstrap/initial-admin-service-key.json",
+                log_output=False,
+            )
+            key_path = work / "service-key.json"
+            key_path.write_bytes(key)
+            forward = subprocess.Popen(
+                [
+                    str(x)
+                    for x in [
+                        *kube,
+                        "-n",
+                        cp["namespace"],
+                        "port-forward",
+                        "service/openclaw-enterprise-api",
+                        "18080:8080",
+                    ]
+                ],
+                stdout=logs,
+                stderr=logs,
+            )
+            try:
+                deadline = time.monotonic() + 30
+                while True:
+                    try:
+                        with urllib.request.urlopen(
+                            "http://127.0.0.1:18080/healthz", timeout=2
+                        ) as response:
+                            require(response.status == 200, "API health failed")
+                        break
+                    except OSError:
+                        require(
+                            forward.poll() is None and time.monotonic() < deadline,
+                            "API port forward failed",
+                        )
+                        time.sleep(1)
+                response = json.loads(
+                    run(
+                        [
+                            artifact / "bin/occ",
+                            "--url",
+                            "http://127.0.0.1:18080",
+                            "--service-key-file",
+                            key_path,
+                            "installation",
+                            "get",
+                            "--output",
+                            "json",
+                        ]
+                    )
+                )
+                require(
+                    response["id"] == json.loads(key)["meta"]["installationId"],
+                    "authenticated Installation identity mismatch",
+                )
+                steps.append("packaged occ authenticated Installation request")
+            finally:
+                forward.terminate()
+                forward.wait(timeout=15)
+        finally:
+            run(["k3d", "cluster", "delete", cluster])
+            clusters = json.loads(run(["k3d", "cluster", "list", "-o", "json"]))
+            require(
+                not any(c["name"] == cluster for c in clusters),
+                "owned cluster cleanup incomplete",
+            )
+    save(
+        args.output,
+        {
+            "status": "passed-package-installation",
+            "artifactSha256": digest(archive.read_bytes()),
+            "releaseId": release["id"],
+            "controller": controller,
+            "architecture": "linux/" + arch,
+            "referenceEnvironment": "disposable k3d with PostgreSQL TLS, restricted database roles, cert-manager and Envoy Gateway",
+            "checks": steps,
+            "cleanup": "completed",
+            "customerQualified": False,
+            "scope": "package installation and bootstrap; no provider, ingress, Agent turn or customer acceptance",
+        },
+    )
+    print(
+        "Extracted package installation and authenticated occ check passed; owned cluster removed"
+    )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--archive", required=True)
+    parser.add_argument("--controller", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--logs", required=True)
+    try:
+        exercise(parser.parse_args())
+    except (ValueError, KeyError, OSError, subprocess.TimeoutExpired) as error:
+        sys.exit(f"package installation check: {error}")

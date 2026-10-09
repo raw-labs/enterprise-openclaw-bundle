@@ -167,7 +167,7 @@ def package(args, release):
         stdout=subprocess.PIPE,
     )
     cli, files = cli_files(Path(args.dependencies).parent / "cli", release)
-    files["bin/occ"] = ((ROOT / "bin/occ").read_bytes(), 0o755)
+    files["bin/occ"] = ((ROOT / "delivery/occ").read_bytes(), 0o755)
     if release["schemaVersion"] == 2:
         from stock import renderer_files
 
@@ -178,61 +178,100 @@ def package(args, release):
         if p.is_file()
     }
     chart_files["LICENSE"] = ((source / "LICENSE").read_bytes(), 0o644)
-    chart_data = deterministic_tar(chart_files, release["chart"]["name"] + "/")
-    chart_name = (
-        "chart/" + release["chart"]["name"] + "-" + release["chart"]["version"] + ".tgz"
-    )
-    files[chart_name] = (chart_data, 0o644)
+    # Keep OCE's paths: its renderer, origin helper and upgrade tool use this chart.
+    chart_name = "upstream/" + release["chart"]["path"]
+    for name, content in chart_files.items():
+        files[chart_name + "/" + name] = content
     shipped = [
         "scripts/render-installation-profile.mjs",
+        "scripts/render-repository-credentials-origin.mjs",
         "scripts/prepare-bootstrap-volume",
         "deploy/profiles/openclaw.json",
         "deploy/profiles/codex.json",
+        "docs/guides/deploy/installation-profiles.md",
+        "docs/guides/deploy/production-installation.md",
+        "docs/guides/deploy/production-agents.md",
+        "docs/guides/deploy/production-upgrade.md",
+        "docs/guides/deploy/production-upgrade-recovery.md",
+        "docs/guides/deploy/upgrade-baseline.md",
+        "docs/guides/deploy/upgrade-checklist.md",
+        "docs/flows/coordinated-production-upgrade.md",
         "docs/guides/repository-credentials/installation.md",
     ]
+    shipped.extend(
+        str(p.relative_to(source))
+        for p in sorted((source / "scripts").glob("upgrade-*"))
+        if p.is_file()
+    )
+    for directory in ("deploy/examples/production", "deploy/logging"):
+        shipped.extend(
+            str(p.relative_to(source))
+            for p in sorted((source / directory).rglob("*"))
+            if p.is_file()
+        )
+    # Include referenced product documentation so customer access does not depend on GitHub.
+    pending = [name for name in shipped if name.endswith(".md")]
+    while pending:
+        name = pending.pop()
+        for target in re.findall(r"\]\(([^)]+)\)", (source / name).read_text()):
+            if "://" in target or target.startswith("#"):
+                continue
+            relative = posixpath.normpath(
+                posixpath.join(posixpath.dirname(name), target.split("#")[0])
+            )
+            if (
+                relative.startswith("docs/")
+                and relative.endswith(".md")
+                and relative not in shipped
+                and (source / relative).is_file()
+            ):
+                shipped.append(relative)
+                pending.append(relative)
     for name in shipped:
         data = (source / name).read_bytes()
+        files["upstream/" + name] = (
+            data,
+            0o755 if name.startswith("scripts/") else 0o644,
+        )
+    # Local links use the delivered kit; additional reference links pin the source.
+    source_url = (
+        release["sources"]["oce"]["repository"].removesuffix(".git")
+        + "/blob/"
+        + release["sources"]["oce"]["commit"]
+        + "/"
+    )
+    for name in shipped:
         if name.endswith(".md"):
-            # Keep upstream prose and commands, resolve relative references to the exact source.
-            base = (
-                release["sources"]["oce"]["repository"].removesuffix(".git")
-                + "/blob/"
-                + release["sources"]["oce"]["commit"]
-                + "/"
-            )
 
-            def absolute_link(match, base=base, name=name):
+            def link(match, name=name):
                 target = match.group(1)
                 if "://" in target or target.startswith("#"):
                     return match.group(0)
+                path = posixpath.normpath(
+                    posixpath.join(posixpath.dirname(name), target.split("#")[0])
+                )
                 return (
-                    "]("
-                    + base
+                    match.group(0)
+                    if "upstream/" + path in files
+                    else "]("
+                    + source_url
                     + posixpath.normpath(
                         posixpath.join(posixpath.dirname(name), target)
                     )
                     + ")"
                 )
 
-            data = re.sub(r"\]\(([^)]+)\)", absolute_link, data.decode()).encode()
-        files["upstream/" + name] = (
-            data,
-            0o755 if name.startswith("scripts/") else 0o644,
-        )
-    # Explicit profile configuration overlay; renderer and chart remain unchanged.
-    if "defaults/codex-profile.json" in release["payloadFiles"]:
-        files["upstream/deploy/profiles/codex.json"] = (
-            release_file(
-                args.release, ROOT, "defaults/codex-profile.json"
-            ).read_bytes(),
-            0o644,
-        )
+            data, mode = files["upstream/" + name]
+            files["upstream/" + name] = (
+                re.sub(r"\]\(([^)]+)\)", link, data.decode()).encode(),
+                mode,
+            )
     files["notices/OCE-LICENSE"] = ((source / "LICENSE").read_bytes(), 0o644)
     for name in ["THIRD_PARTY_NOTICES.md"]:
         if (source / name).exists():
             files["notices/OCE-" + name] = ((source / name).read_bytes(), 0o644)
-    for name in ["common.py", "install.py"]:
-        files["scripts/" + name] = ((ROOT / "scripts" / name).read_bytes(), 0o755)
+    for name in ("integrity.py", "prepare.py"):
+        files["tools/" + name] = ((ROOT / "delivery" / name).read_bytes(), 0o644)
     for name in release["payloadFiles"]:
         payload = release_file(args.release, ROOT, name)
         files[name] = (payload.read_bytes(), 0o644)
@@ -242,7 +281,19 @@ def package(args, release):
     copy = json.loads(json.dumps(release))
     copy["operatorCli"] = cli
     copy["chart"]["artifact"] = chart_name
-    copy["chart"]["sha256"] = digest(chart_data)
+    copy["profiles"] = {
+        "openclaw": "upstream/deploy/profiles/openclaw.json",
+        "codex": "defaults/codex-profile.json",
+    }
+    copy["upstreamGuides"] = {
+        name: release["sources"]["oce"]["repository"].removesuffix(".git")
+        + "/blob/"
+        + release["sources"]["oce"]["commit"]
+        + "/"
+        + name
+        for name in shipped
+        if name.endswith(".md")
+    }
     files["release.json"] = (
         (json.dumps(copy, indent=2, sort_keys=True) + "\n").encode(),
         0o644,

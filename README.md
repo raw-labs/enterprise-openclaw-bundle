@@ -1,7 +1,11 @@
 # RAW Labs Enterprise OpenClaw bundle
 
-Private bundle definitions and release factory. Select a definition; the release
-Action builds, tests, packages and publishes its artifacts.
+Private OCE curation and release factory.
+
+- [Install a release](https://github.com/raw-labs/enterprise-openclaw-bundle/releases): download the archive and checksum, then start with its `INSTALL.md`.
+- [Installation procedure](docs/install.md): installers.
+- [Operations procedure](docs/operate.md): installation owners.
+- [Distribution procedure](docs/distribution.md): private access and mirrors.
 
 - [Bundle definitions](bundles/): versioned ingredients.
 - [Bundle schema](docs/bundle-schema.md): supported fields and how to extend them.
@@ -10,6 +14,3 @@ Action builds, tests, packages and publishes its artifacts.
 - [Validation Action](.github/workflows/validate.yml): definition and packaging checks.
 - [GitHub releases](https://github.com/raw-labs/enterprise-openclaw-bundle/releases): generated delivery artifacts and provenance.
 - [Release procedure](docs/release.md): maintainers.
-- [Installation procedure](docs/install.md): installers and sales engineers.
-- [Operations procedure](docs/operate.md): operators.
-- [Distribution procedure](docs/distribution.md): registry access and mirrors.

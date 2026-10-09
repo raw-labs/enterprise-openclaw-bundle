@@ -1,164 +1,111 @@
-# Install a delivered bundle
+# Install a bundle
 
-For sales engineers and installation operators performing a fresh installation.
-Run commands from the extracted bundle root. Keep cluster configuration and
-credentials in the operator's private installation directory.
-
-## Obtain artifacts and prepare the cluster
-
-Download only `bundle.tar.gz` and `bundle.tar.gz.sha256` for installation; the other
-release assets are provenance and test evidence. With GitHub CLI authenticated,
-set `VERSION` to the selected release and `DOWNLOAD` to an empty download directory:
+For operators installing OCE into prepared Kubernetes infrastructure.
+Commands and relative links below apply to the extracted package.
+Download `bundle.tar.gz` and `bundle.tar.gz.sha256` from the selected private
+GitHub release. The remaining assets are build provenance and test evidence.
+With GitHub CLI authenticated and an empty download directory:
 
 ```bash
+: "${VERSION:?Set VERSION to the selected bundle tag}"
+: "${DOWNLOAD:?Set DOWNLOAD to an absolute empty download directory}"
 gh release download "$VERSION" --repo raw-labs/enterprise-openclaw-bundle \
   --pattern 'bundle.tar.gz*' --dir "$DOWNLOAD"
 ```
 
-In that directory, run `sha256sum -c bundle.tar.gz.sha256` (macOS:
-`shasum -a 256 -c bundle.tar.gz.sha256`), then `tar -xzf bundle.tar.gz`.
-Enter the extracted version directory and run
-`python3 scripts/install.py verify`. Read `release.json` for the
-selected images, architectures and acceptance scope. Image access is separate:
-authorize node pulls or arrange a digest-preserving customer mirror. Installation
-uses the delivered chart and images; it does not require building from source.
+In that directory, verify with `sha256sum -c bundle.tar.gz.sha256` (macOS:
+`shasum -a 256 -c bundle.tar.gz.sha256`), extract with `tar -xzf bundle.tar.gz`,
+and enter the extracted version directory.
 
-Use Bash, Python 3.12+, Node 24+, Helm 3 and kubectl compatible with the cluster.
-Prepare a dedicated kubeconfig/context, PostgreSQL with separate restricted
-application/migration roles and TLS CA, DNS/TLS, RWO storage, disjoint control/Agent
-node pools, enforced NetworkPolicies, cert-manager, Gateway API and Envoy.
-Cloud prerequisites and node confinement are the installation operator's responsibility.
+## Prerequisites
 
-The archive includes unchanged upstream `occ` for macOS/Linux AMD64/ARM64:
+Use Python 3.12+, Node 24+, Bash, Helm 3 and kubectl compatible with the cluster.
+OCE's production procedures also use jq, Mike Farah yq v4 and openssl;
+its image-upgrade compatibility probe requires Docker on a Linux workstation.
+Database baseline and recovery procedures require psql.
 
-```bash
-export PATH="$PWD/bin:$PATH"
-occ --version
-occ --help
-```
+Prepare Kubernetes, PostgreSQL roles and CA trust, DNS/TLS, storage, disjoint
+control/runtime node pools, enforced NetworkPolicies, cert-manager and Envoy
+Gateway as specified by the packaged OCE production guide. Infrastructure,
+ingress access and credentials belong to the installation owner.
 
-The launcher selects the native executable and checks its delivered checksum.
-Use `--url`, `--service-key-file` and `--namespace` to select the controller,
-protected service API key file and OCE Namespace. Command help describes the
-upstream operations. Human accounts and browser sign-in remain OCE procedures.
+Authorize private image pulls or arrange a digest-preserving registry mirror.
+Images are pulled separately; this archive is not an offline image package.
 
-## Render installation inputs
+## Prepare OCE inputs
 
-Copy `examples/installations/aws.json` into the private installation directory as
-`site.json`. Replace its example addresses, domains, email, selectors and storage
-settings. Review the cluster requirements against the chosen source revision in
-`release.json`; the example does not establish support for another environment.
-
-Set `SITE`, `KUBE`, `CONTEXT` and `SECURE` to the installation directory, kubeconfig,
-reviewed context and protected credential directory. Set `PROFILE` to `codex` or
-`openclaw` and `ARCHITECTURE` to the native target listed in `release.json`.
+Run from the extracted bundle root. Keep site settings, generated files and
+credentials in a protected directory outside the package.
 
 ```bash
 umask 077
-python3 scripts/install.py render --input "$SITE/site.json" --profile "$PROFILE" \
-  --architecture "$ARCHITECTURE" --output "$SITE/rendered"
+: "${SITE:?Set SITE to an absolute installation directory}"
+mkdir -m 700 "$SITE"
+: "${KUBECONFIG_FILE:?Set KUBECONFIG_FILE to an absolute protected kubeconfig}"
+: "${CONTEXT:?Set CONTEXT to the reviewed Kubernetes context}"
+export KUBECONFIG_FILE CONTEXT
+chmod 600 "$KUBECONFIG_FILE"
+python3 tools/prepare.py verify
+export PATH="$PWD/bin:$PATH"
+occ --version
+cp examples/installations/site.json "$SITE/site.json"
 ```
 
-For mirrors, add `--mirrors "$SITE/mirrors.json"`: map each role in `release.json`
-to an authorized destination with the same digest. The installer rejects unbuilt
-candidates and unpublished review archives. A published, native-verified release
-still needs acceptance on the customer's installation.
-
-The installer does not support external login providers, managed Codex account
-issuance or additional controller-mounted preset files. Import presets through
-the OCE API as described below.
-
-Review `preflight.json`, `selection.json`, `values.yaml`, `installation.yaml`,
-`rendered.yaml` and supplemental resources. Preserve the paired Installation
-checksum. Provision the selected Codex seccomp file on each dedicated harness
-node at the path rendered in `installation.yaml`; test it on the actual node
-configuration. Review API/DNS/webhook access for prerequisite controllers and the
-actual ingress peers, including ALB subnet inputs where applicable. Keep the
-Envoy admin listener private.
-
-Set `NAMESPACE`, `RELEASE`, `BOOTSTRAP_CLAIM`, `CONTROLLER` and `CONTROL_SELECTOR`
-from `selection.json`'s namespace, releaseName, bootstrapClaim, controller image
-and controllerNodeSelector. Use each selector as a separate `--node-selector`
-argument when more than one is present.
-
-## Provision protected inputs
-
-Retain the database URLs, public database CA, auth key and gateway key under
-`SECURE`, with directory mode 0700 and file mode 0600. Database URLs must verify
-TLS and use the CA path rendered for the controller. Generate cryptographically
-random auth/gateway keys once and preserve them on upgrades.
-
-Read Secret names and keys from the delivered chart defaults
-(`helm show values chart/*.tgz`) together with generated `values.yaml`. Create
-these inputs in `NAMESPACE` before Helm runs:
-
-| Input | Configuration that selects its Secret and keys |
-| --- | --- |
-| Generated `installation.yaml` | `installation.secretName`, `installation.key` |
-| Application and migration database URLs | `database.secretName`, `database.appUrlKey`, `database.migrationUrlKey` |
-| Public database CA | `database.caSecretName`, `database.caKey` |
-| Auth key | `auth.secretName`, `auth.secretKey` |
-| Gateway key | `gatewayRouting.apiKeySecretName`; the upstream routing procedure uses key `occ` |
-
-Create the namespace, then create each Secret from the protected files with
-`kubectl create secret generic --from-file`. For example, set `SECRET_NAME`,
-`SECRET_KEY` and `INPUT_FILE` from the reviewed configuration and table:
+Edit `site.json` using OCE's [installation input format](upstream/docs/guides/deploy/installation-profiles.md).
+Select `openclaw` or `codex` and the target `linux/amd64` or `linux/arm64`:
 
 ```bash
-kubectl --kubeconfig "$KUBE" --context "$CONTEXT" create namespace "$NAMESPACE"
-kubectl --kubeconfig "$KUBE" --context "$CONTEXT" -n "$NAMESPACE" create secret \
-  generic "$SECRET_NAME" --from-file="$SECRET_KEY=$INPUT_FILE"
+PROFILE=codex
+ARCHITECTURE=linux/amd64
+python3 tools/prepare.py render --input "$SITE/site.json" --profile "$PROFILE" \
+  --architecture "$ARCHITECTURE" --output "$SITE/rendered"
+python3 tools/prepare.py check --directory "$SITE/rendered"
 ```
 
-Use both database URL files in the same database Secret. Never put Secret values
-in command arguments, rendered configuration or Git. Inspect existing inputs on
-a failed creation; preserve identities and credentials rather than replacing them.
+For a mirror, add `--mirrors "$SITE/mirrors.json"` to `render`. Map
+`controller`, `runtime` and `repositoryCredentials` to destinations retaining
+the release's exact digests. The tool rejects conflicting images and confinement.
+
+Review `preflight.json`, `values.yaml`, `installation.yaml` and `rendered.yaml`.
+The tool only prepares files. It does not create Kubernetes resources or credentials.
+For Codex, provision the packaged architecture-specific seccomp file at the
+node path selected in `installation.yaml`. The selected Codex profile uses RAW's
+curated catalog; original upstream profiles remain under `upstream/deploy/profiles/`.
 
 ## Install and bootstrap
 
-```bash
-kubectl --kubeconfig "$KUBE" --context "$CONTEXT" apply --dry-run=server \
-  -f "$SITE/rendered/rendered.yaml" -f "$SITE/rendered/supplemental.json"
-kubectl --kubeconfig "$KUBE" --context "$CONTEXT" apply \
-  -f "$SITE/rendered/supplemental.json" -f "$SITE/rendered/bootstrap-pvc.json"
-bash upstream/scripts/prepare-bootstrap-volume --kubeconfig "$KUBE" --context "$CONTEXT" \
-  --namespace "$NAMESPACE" --claim "$BOOTSTRAP_CLAIM" \
-  --image "$CONTROLLER" --node-selector "$CONTROL_SELECTOR"
-helm upgrade --install "$RELEASE" chart/*.tgz --kubeconfig "$KUBE" --kube-context "$CONTEXT" \
-  --namespace "$NAMESPACE" -f "$SITE/rendered/values.yaml" --wait --timeout 15m
-python3 scripts/install.py bootstrap-read --directory "$SITE/rendered" \
-  --kubeconfig "$KUBE" --context "$CONTEXT" --output "$SECURE/bootstrap"
-```
-
-The volume helper requires a fresh root and retains a failed Pod for diagnosis.
-Helm owns migration/bootstrap ordering. Sign in using the privately retained
-bootstrap password, read the OCE Namespace ID and set `TENANT_ID` to that value.
+Change to `upstream/` and follow the packaged
+[production installation procedure](upstream/docs/guides/deploy/production-installation.md#shared-bootstrap-pvc-and-configuration-checks)
+from **Shared bootstrap PVC and configuration checks** onward. Use absolute paths:
 
 ```bash
-python3 scripts/install.py tenant-resources --tenant-id "$TENANT_ID" \
-  --namespace "$NAMESPACE" --release-name "$RELEASE" --kubeconfig "$KUBE" \
-  --context "$CONTEXT" --output "$SITE/tenant-rbac.json"
+export OCC_INPUT_DIRECTORY="$SITE/rendered"
+cd upstream
 ```
 
-Review the generated grants, then apply:
+The prepared files replace that guide's build and profile-rendering steps.
+Its chart path, bootstrap PVC example and `scripts/prepare-bootstrap-volume`
+are included. Follow its protected Secret creation, volume preparation, Helm
+installation and authenticated `occ installation get` check. Keep the paired
+Installation checksum; change site inputs and rerender instead of editing the pair.
+For documented chart options outside the profile input format, such as
+`cluster.port`, update `values.yaml` and rerun `check`. Preserve the selected
+images, profile, confinement and paired Installation checksum.
 
-```bash
-kubectl --kubeconfig "$KUBE" --context "$CONTEXT" apply -f "$SITE/tenant-rbac.json"
-```
+The upstream runbook uses example names `oce`, `openclaw-system` and
+`/secure/occ`. Substitute the release/namespace from your site inputs and your
+protected credential directory. Create that directory with mode 0700 before
+writing credentials. Edit the bootstrap PVC example to use the selected claim,
+namespace and an available protected storage class; bootstrap and runtime
+storage classes may differ.
 
-Repeat into a new output after the gateway namespace appears and require OCE
-Namespace readiness. Import optional
-`defaults/*-preset.json` through the authenticated Namespace preset API
-(`POST /namespaces/<id>/presets`, JSON file as body), or use seeded templates.
-Create model Secrets, grant Agent access and deploy through the Console. Review
-template settings and add the deployed Agent's HTTPS origin before native UI use.
-Optional public TCP egress requires `--public-egress --agent-id <id>` and review
-of the generated policy for that Agent.
+OCE owns authentication, tenant permissions and Agent setup. Continue with
+[production Agents](upstream/docs/guides/deploy/production-agents.md) and, when enabled,
+[repository access](upstream/docs/guides/repository-credentials/installation.md).
+Use the selected release images instead of upstream image-build steps.
+Human sign-in and presets use OCE's APIs and Console; optional RAW preset files
+are in `defaults/`. Packaged `occ` supports remote administration;
+`occ dev` requires an OCE source checkout.
 
-For optional Git repository access, configure the customer GitHub App, broker
-registry and TLS using `upstream/docs/guides/repository-credentials/installation.md`.
-Use the release's shipping image digests and delivered chart in place of that
-upstream guide's build steps. Review its exact-source links and arrange access
-before enabling this capability; referenced tools are not all included in the bundle.
-
-Record acceptance using the checks in the delivered `OPERATE.md` before handoff.
+Follow [OPERATE.md](OPERATE.md) for acceptance and upgrades. Each installation
+uses its own OCE inputs; the same immutable bundle can serve multiple clusters.

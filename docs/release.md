@@ -10,8 +10,7 @@ checks and adding plugins. Presets are shipped for optional import. Connections
 and live Agent configuration are outside this milestone.
 
 Installation examples live in `docs/examples/installations/`. They are shipped
-with the documentation and checked by the renderer. Customer-specific settings
-belong in the customer's private deployment repository.
+with the documentation and checked by the renderer. Customer settings belong in the installation owner's protected workspace.
 
 Commit the definition and ingredients, then run **Release bundle** on main and
 select its definition path. The Action runs on demand; pushing a commit or tag does
@@ -29,22 +28,25 @@ Linux executables and build three images, then run the selected source's control
 runtime and credential isolation tests with
 confinement and no skips, and assembles their exact tested manifests. It verifies
 the archive and real chart renders before publishing private GHCR indexes, checks
-the published handoff again, then creates the immutable tag and private prerelease.
+the published handoff again, installs the extracted package on disposable k3d
+with PostgreSQL TLS and checks authenticated `occ` access, then creates the
+immutable tag and private prerelease. Raw installation logs remain private.
 
 ## Generated outputs
 
 Publication produces three multiarchitecture images: controller, runtime and
 repository credentials. Each has AMD64 and ARM64 manifests. The customer archive
-contains the chart, matched `occ` binaries, installer, templates, examples, license
-notices and verification records; images are pulled separately.
+contains the chart, matched `occ` binaries, input preparation tool, upstream
+installation/upgrade helpers, templates, examples, notices and verification records; images are pulled separately.
 
-The GitHub release has ten attachments:
+The GitHub release has eleven attachments:
 
 - `bundle.tar.gz` and `bundle.tar.gz.sha256`: customer handoff and checksum.
 - `bundle.json`: a copy of the chosen definition.
 - `resolved.json` and `source-files.json`: resolved ingredients and source inventory.
 - `release.json` and `publication.json`: final image selection and publication record.
 - Two `<version>-native-<architecture>-receipt.json` files: native test evidence.
+- `installation-receipt.json`: extracted-package installation and authenticated CLI check on disposable k3d infrastructure.
 - `provenance.json`: build commit/run, definition hash and output checksums.
 
 Actions also retains four temporary artifact collections: resolved build inputs,

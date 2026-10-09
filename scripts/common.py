@@ -1,4 +1,4 @@
-"""Release invariants shared by build and customer artifact tools (stdlib only)."""
+"""Factory release invariants; this module is not delivered to installers."""
 
 import hashlib
 import json

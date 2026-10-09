@@ -15,7 +15,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 SELECTION = ROOT / ".work/resolved/candidate.json"
 sys.path.insert(0, str(ROOT / "scripts"))
-import install as installer  # noqa: E402
+sys.path.insert(0, str(ROOT / "delivery"))
+import prepare as installer  # noqa: E402
 from bundle import cli_files  # noqa: E402
 from common import (  # noqa: E402
     digest,
@@ -349,24 +350,32 @@ class StockArtifact(unittest.TestCase):
         self.assertIn(
             "upstream/apps/controller/node_modules/tldts-core/LICENSE", manifest
         )
-        with tarfile.open(
+        chart = (
             self.artifact / load(self.artifact / "release.json")["chart"]["artifact"]
-        ) as chart:
-            self.assertIn("openclaw-enterprise/LICENSE", chart.getnames())
+        )
+        self.assertTrue((chart / "LICENSE").is_file())
+        self.assertFalse((self.artifact / "scripts").exists())
+        self.assertNotIn("tools/common.py", manifest)
+        self.assertEqual(
+            (self.artifact / "upstream/deploy/profiles/codex.json").read_bytes(),
+            (self.source / "deploy/profiles/codex.json").read_bytes(),
+        )
 
     def test_delivery_tool_verifies_and_blocks_unqualified_installation(self):
         subprocess.run(
-            [sys.executable, str(self.artifact / "scripts/install.py"), "verify"],
+            [sys.executable, str(self.artifact / "tools/prepare.py"), "verify"],
             check=True,
             stdout=subprocess.DEVNULL,
         )
         result = subprocess.run(
             [
                 sys.executable,
-                str(self.artifact / "scripts/install.py"),
+                str(self.artifact / "tools/prepare.py"),
                 "render",
                 "--input",
-                str(self.artifact / "examples/installations/aws.json"),
+                str(self.artifact / "examples/installations/site.json"),
+                "--architecture",
+                "linux/amd64",
                 "--profile",
                 "codex",
                 "--output",
@@ -417,11 +426,9 @@ class StockArtifact(unittest.TestCase):
 
     def test_profiles_render_with_delivered_dependencies_and_real_chart(self):
         release = load(self.artifact / "release.json")
-        chart = self.out / "chart"
-        with tarfile.open(self.artifact / release["chart"]["artifact"]) as tar:
-            tar.extractall(chart, filter="data")
+        chart = self.artifact / release["chart"]["artifact"]
         for profile in ("openclaw", "codex"):
-            site = load(self.artifact / "examples/installations/aws.json")
+            site = load(self.artifact / "examples/installations/site.json")
             site["controlPlane"]["controllerImage"] = (
                 "fixture.invalid/controller@sha256:" + "0" * 64
             )
@@ -454,7 +461,7 @@ class StockArtifact(unittest.TestCase):
                     "helm",
                     "template",
                     "oce",
-                    str(chart / release["chart"]["name"]),
+                    str(chart),
                     "-f",
                     str(output / "values.yaml"),
                 ]
@@ -469,6 +476,98 @@ class StockArtifact(unittest.TestCase):
             (out / "tldts-7.0.18.tgz").write_bytes(b"corrupt")
             with self.assertRaises(ValueError):
                 renderer_files(release, out)
+
+    def test_preparation_exposes_no_operational_commands(self):
+        help_text = subprocess.check_output(
+            [sys.executable, self.artifact / "tools/prepare.py", "--help"], text=True
+        )
+        self.assertIn("{verify,render,check}", help_text)
+        for removed in ("tenant-resources", "bootstrap-read", "public-egress"):
+            result = subprocess.run(
+                [sys.executable, self.artifact / "tools/prepare.py", removed],
+                capture_output=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+
+    def test_profile_selection_preserves_stock_source_and_correct_advice(self):
+        site = load(self.artifact / "examples/installations/site.json")
+        site["controlPlane"]["controllerImage"] = (
+            "fixture.invalid/controller@sha256:" + "0" * 64
+        )
+        site["runtime"]["image"] = "fixture.invalid/runtime@sha256:" + "0" * 64
+        site["runtime"]["codexSeccompProfile"] = "openclaw/test-only.json"
+        site["codex"] = {"modelDiscoveryCidrs": []}
+        path = self.out / "explicit-profile-input.json"
+        save(path, site)
+        for label, profile in (
+            ("stock", "upstream/deploy/profiles/codex.json"),
+            ("curated", "defaults/codex-profile.json"),
+        ):
+            output = self.out / ("profile-file-" + label)
+            subprocess.run(
+                [
+                    "node",
+                    self.artifact / "upstream/scripts/render-installation-profile.mjs",
+                    "--profile",
+                    "codex",
+                    "--profile-file",
+                    self.artifact / profile,
+                    "--input",
+                    path,
+                    "--out-dir",
+                    output,
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            configuration = helm_values(output / "installation.yaml")
+            self.assertEqual(
+                configuration["drivers"]["plugin"],
+                load(self.artifact / profile)["installation"]["drivers"]["plugin"],
+            )
+            preflight = load(output / "preflight.json")
+            self.assertEqual(
+                any("Hosted discovery" in item for item in preflight["prerequisites"]),
+                label == "stock",
+            )
+            self.assertTrue(
+                (
+                    self.artifact
+                    / "upstream/deploy/helm/openclaw-enterprise/Chart.yaml"
+                ).is_file()
+            )
+
+    def test_assembly_does_not_restrict_upstream_external_login(self):
+        release = load(self.artifact / "release.json")
+        for role, image in release["images"].items():
+            image["reference"] = "fixture.invalid/" + role + "@sha256:" + "0" * 64
+        site = load(self.artifact / "examples/installations/site.json")
+        cp = site["controlPlane"]
+        cp.pop("agentNativeAdminDomain")
+        cp.pop("sharedCookieDomain")
+        cp["recoveryUserId"] = "verified-admin"
+        cp["oidc"] = {
+            "issuer": "https://idp.example.invalid",
+            "authorizationUrl": "https://idp.example.invalid/authorize",
+            "tokenUrl": "https://idp.example.invalid/token",
+            "jwksUrl": "https://idp.example.invalid/keys",
+        }
+        path = self.out / "oidc-input.json"
+        save(path, site)
+        output = self.out / "oidc-rendered"
+        with patch.object(installer, "ROOT", self.artifact):
+            installer.render(
+                SimpleNamespace(
+                    input=path,
+                    profile="openclaw",
+                    architecture="linux/amd64",
+                    output=output,
+                    mirrors=None,
+                ),
+                release,
+                admit=False,
+            )
+        self.assertTrue(helm_values(output / "values.yaml")["auth"]["oidc"]["enabled"])
 
     def test_mirrors_preserve_every_shipping_digest(self):
         release = load(self.artifact / "release.json")
@@ -497,7 +596,7 @@ class StockArtifact(unittest.TestCase):
         try:
             path.write_bytes(original + b" ")
             result = subprocess.run(
-                [sys.executable, str(self.artifact / "scripts/install.py"), "verify"],
+                [sys.executable, str(self.artifact / "tools/prepare.py"), "verify"],
                 capture_output=True,
                 text=True,
             )
@@ -517,18 +616,17 @@ class StockArtifact(unittest.TestCase):
         }
         with (
             patch.object(installer, "ROOT", self.artifact),
-            patch.object(installer, "install_gate"),
         ):
             for arch in ("amd64", "arm64"):
                 output = self.out / ("arch-contract-" + arch)
                 args = SimpleNamespace(
-                    input=self.artifact / "examples/installations/aws.json",
+                    input=self.artifact / "examples/installations/site.json",
                     profile="codex",
                     output=output,
                     mirrors=None,
                     architecture="linux/" + arch,
                 )
-                installer.render(args, release)
+                installer.render(args, release, admit=False)
                 installation = helm_values(output / "installation.yaml")
                 runtime = installation["drivers"]["compute"]["configuration"]["runtime"]
                 self.assertEqual(runtime["nodeSelector"]["kubernetes.io/arch"], arch)
@@ -541,5 +639,5 @@ class StockArtifact(unittest.TestCase):
                 )
             args.architecture = None
             args.output = self.out / "missing-arch-contract"
-            with self.assertRaisesRegex(ValueError, "select the reviewed runtime"):
-                installer.render(args, release)
+            with self.assertRaisesRegex(ValueError, "select a released"):
+                installer.render(args, release, admit=False)

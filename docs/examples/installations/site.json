@@ -43,13 +43,6 @@
       "secretName": "occ-database-ca",
       "key": "ca.pem",
       "mountPath": "/etc/openclaw/database-ca"
-    },
-    "trustedProxy": {
-      "preset": "aws",
-      "cidrs": [
-        "10.44.0.0/24",
-        "10.44.1.0/24"
-      ]
     }
   },
   "runtime": {

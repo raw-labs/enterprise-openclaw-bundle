@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "scripts"))
-from common import load, require, verify_files  # noqa: E402
+sys.path.insert(0, str(root / "tools"))
+from integrity import load, require, verify_files  # noqa: E402
 
 os_name = {"Darwin": "darwin", "Linux": "linux"}.get(platform.system())
 arch = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "amd64"}.get(platform.machine())

@@ -154,6 +154,10 @@ jobs:
         run: python3 scripts/stock.py --selection .work/resolved/candidate.json assemble --inputs .work/inputs --output .work/assembled
       - name: Verify reproducibility and real chart rendering before publication
         run: python3 scripts/release.py finish --selection .work/assembled/candidate.json --source .work/resolved/source --dependencies .work/resolved/dependencies --output .work/checked-handoff
+      - name: Prepare disposable installation test prerequisites
+        run: bash .work/resolved/source/scripts/ci/setup-tools.sh k3d
+      - name: Test the extracted package before registry publication
+        run: python3 scripts/release.py verify-installation --output .work/checked-handoff --controller .work/assembled/controller --logs .work/private-installation-review.log
       - name: Publish exact checked image indexes
         if: inputs.publish
         env:
@@ -176,6 +180,9 @@ jobs:
           else
             mv .work/checked-handoff dist
           fi
+      - name: Test the extracted package on disposable reference infrastructure
+        if: inputs.publish
+        run: python3 scripts/release.py verify-installation --output dist --controller .work/assembled/controller --logs .work/private-installation.log
       - name: Create immutable tag and private prerelease with generated evidence
         if: inputs.publish
         env:

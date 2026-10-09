@@ -20,7 +20,7 @@ are rejected.
 | `architectures` | Exactly `["linux/amd64", "linux/arm64"]`; both native builds and checks are required. |
 | `plugins` | Nonempty ordered list of unique bundled OpenClaw plugin IDs, using lowercase letters, digits and hyphens, starting with a letter. Must match both the Dockerfile's build selection and retained extensions, including order. |
 | `presets` | List of file references to optional OCE preset templates. May be empty. Each filename must end in `-preset.json` and be unique. Live Agent plugin settings must be empty. |
-| `codexProfile` | File reference to the Codex installation profile, using OCE's profile format. It replaces the delivered renderer's Codex profile. |
+| `codexProfile` | File reference to the selected Codex installation profile, using OCE's profile format. The preparation tool passes it explicitly to the renderer; original upstream profiles remain available. |
 | `build.patches` | Ordered list of file references to Git patches. May be empty. Applied to the exported OCE source before compatibility checks, inventory and builds. Must preserve the upstream license. |
 | `build.confinement` | SHA-256 hashes of the selected source's `scripts/lib/codex-seccomp-profile.mjs` and `.github/actions/run-ci-lane/codex-sandbox.apparmor`. Checked after patches; changed policies require review and new hashes. |
 
