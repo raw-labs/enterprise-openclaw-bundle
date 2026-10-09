@@ -37,7 +37,8 @@ immutable tag and private prerelease. Raw installation logs remain private.
 Publication produces three multiarchitecture images: controller, runtime and
 repository credentials. Each has AMD64 and ARM64 manifests. The customer archive
 contains the chart, matched `occ` binaries, input preparation tool, upstream
-installation/upgrade helpers, templates, examples, notices and verification records; images are pulled separately.
+installation/upgrade helpers, templates, examples, notices and release metadata;
+images are pulled separately.
 
 The GitHub release has eleven attachments:
 
@@ -48,6 +49,11 @@ The GitHub release has eleven attachments:
 - Two `<version>-native-<architecture>-receipt.json` files: native test evidence.
 - `installation-receipt.json`: extracted-package installation and authenticated CLI check on disposable k3d infrastructure.
 - `provenance.json`: build commit/run, definition hash and output checksums.
+
+The archive starts with `INSTALL.md`, `OPERATE.md` and a short operator-facing
+`AGENTS.md`. Its commands are `bin/occ` and `bin/prepare`; packaged OCE files are
+under `oce/`, with supporting code under `lib/` and release metadata under
+`metadata/`. Native receipts remain separate release assets.
 
 Actions also retains four temporary artifact collections: resolved build inputs,
 native AMD64 exports, native ARM64 exports and release outputs. No generated records

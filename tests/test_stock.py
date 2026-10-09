@@ -3,6 +3,7 @@
 import copy
 import json
 import os
+import re
 import subprocess
 import sys
 import tarfile
@@ -336,7 +337,7 @@ class StockArtifact(unittest.TestCase):
         self.assertEqual(
             (self.out / "one.tgz").read_bytes(), (self.out / "two.tgz").read_bytes()
         )
-        manifest = load(self.artifact / "manifest.json")
+        manifest = load(self.artifact / "metadata/manifest.json")
         for path, sha in manifest.items():
             self.assertEqual(digest((self.artifact / path).read_bytes()), sha)
         self.assertFalse(
@@ -345,44 +346,43 @@ class StockArtifact(unittest.TestCase):
                 for p in manifest
             )
         )
-        self.assertIn("upstream/apps/controller/node_modules/tldts/LICENSE", manifest)
+        self.assertIn("oce/apps/controller/node_modules/tldts/LICENSE", manifest)
         self.assertNotIn("tests/fixtures/helm-lint-values.json", manifest)
-        self.assertIn(
-            "upstream/apps/controller/node_modules/tldts-core/LICENSE", manifest
-        )
+        self.assertIn("oce/apps/controller/node_modules/tldts-core/LICENSE", manifest)
         chart = (
-            self.artifact / load(self.artifact / "release.json")["chart"]["artifact"]
+            self.artifact
+            / load(self.artifact / "metadata/release.json")["chart"]["artifact"]
         )
         self.assertTrue((chart / "LICENSE").is_file())
         self.assertFalse((self.artifact / "scripts").exists())
-        self.assertNotIn("tools/common.py", manifest)
+        self.assertNotIn("lib/common.py", manifest)
         self.assertFalse(
             any(
                 p.startswith(
                     (
-                        "upstream/docs/contributing/",
-                        "upstream/docs/testing/",
-                        "upstream/docs/design/",
+                        "oce/docs/contributing/",
+                        "oce/docs/testing/",
+                        "oce/docs/design/",
                     )
                 )
                 for p in manifest
             )
         )
         self.assertEqual(
-            (self.artifact / "upstream/deploy/profiles/codex.json").read_bytes(),
+            (self.artifact / "oce/deploy/profiles/codex.json").read_bytes(),
             (self.source / "deploy/profiles/codex.json").read_bytes(),
         )
 
     def test_delivery_tool_verifies_and_blocks_unqualified_installation(self):
         subprocess.run(
-            [sys.executable, str(self.artifact / "tools/prepare.py"), "verify"],
+            [sys.executable, str(self.artifact / "bin/prepare"), "verify"],
             check=True,
             stdout=subprocess.DEVNULL,
         )
         result = subprocess.run(
             [
                 sys.executable,
-                str(self.artifact / "tools/prepare.py"),
+                str(self.artifact / "bin/prepare"),
                 "render",
                 "--input",
                 str(self.artifact / "examples/installations/site.json"),
@@ -399,16 +399,48 @@ class StockArtifact(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("candidate cannot be installed", result.stderr)
 
+    def test_installer_layout_links_and_commands(self):
+        self.assertEqual(
+            {p.name for p in self.artifact.iterdir()},
+            {
+                "AGENTS.md",
+                "INSTALL.md",
+                "OPERATE.md",
+                "bin",
+                "defaults",
+                "examples",
+                "lib",
+                "metadata",
+                "notices",
+                "oce",
+            },
+        )
+        for name in ("AGENTS.md", "INSTALL.md", "OPERATE.md"):
+            document = self.artifact / name
+            for target in re.findall(r"\]\(([^)]+)\)", document.read_text()):
+                if "://" not in target and not target.startswith("#"):
+                    self.assertTrue(
+                        (document.parent / target.split("#")[0]).is_file(),
+                        f"broken package document link: {name}: {target}",
+                    )
+        subprocess.run(
+            [self.artifact / "bin/prepare", "verify"],
+            cwd=self.out,
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        self.assertFalse(list(self.artifact.rglob("__pycache__")))
+
     def test_delivered_upstream_cli_launcher_and_inventory(self):
-        cli = load(self.artifact / "release.json")["operatorCli"]
+        cli = load(self.artifact / "metadata/release.json")["operatorCli"]
         self.assertEqual(
             cli["oceCommit"], read_release(SELECTION)["sources"]["oce"]["commit"]
         )
         self.assertEqual(len(cli["binaries"]), 4)
-        manifest = load(self.artifact / "manifest.json")
+        manifest = load(self.artifact / "metadata/manifest.json")
         for name, info in cli["binaries"].items():
-            self.assertEqual(manifest["cli/" + name], info["sha256"])
-            self.assertTrue((self.artifact / "cli" / name).stat().st_mode & 0o111)
+            self.assertEqual(manifest["lib/occ/" + name], info["sha256"])
+            self.assertTrue((self.artifact / "lib/occ" / name).stat().st_mode & 0o111)
         result = subprocess.check_output(
             [self.artifact / "bin/occ", "--version"], text=True
         )
@@ -424,7 +456,7 @@ class StockArtifact(unittest.TestCase):
         arch = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "amd64"}[
             platform.machine()
         ]
-        binary = self.artifact / "cli" / f"occ-{os_name}-{arch}"
+        binary = self.artifact / "lib/occ" / f"occ-{os_name}-{arch}"
         original = binary.read_bytes()
         try:
             binary.write_bytes(original + b"changed")
@@ -437,7 +469,7 @@ class StockArtifact(unittest.TestCase):
             binary.write_bytes(original)
 
     def test_profiles_render_with_delivered_dependencies_and_real_chart(self):
-        release = load(self.artifact / "release.json")
+        release = load(self.artifact / "metadata/release.json")
         chart = self.artifact / release["chart"]["artifact"]
         for profile in ("openclaw", "codex"):
             site = load(self.artifact / "examples/installations/site.json")
@@ -454,10 +486,7 @@ class StockArtifact(unittest.TestCase):
             subprocess.run(
                 [
                     "node",
-                    str(
-                        self.artifact
-                        / "upstream/scripts/render-installation-profile.mjs"
-                    ),
+                    str(self.artifact / "oce/scripts/render-installation-profile.mjs"),
                     "--profile",
                     profile,
                     "--input",
@@ -482,7 +511,7 @@ class StockArtifact(unittest.TestCase):
             self.assertIn(b"kind: NetworkPolicy", rendered)
 
     def test_corrupt_dependency_rejected(self):
-        release = load(self.artifact / "release.json")
+        release = load(self.artifact / "metadata/release.json")
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory)
             (out / "tldts-7.0.18.tgz").write_bytes(b"corrupt")
@@ -491,12 +520,12 @@ class StockArtifact(unittest.TestCase):
 
     def test_preparation_exposes_no_operational_commands(self):
         help_text = subprocess.check_output(
-            [sys.executable, self.artifact / "tools/prepare.py", "--help"], text=True
+            [sys.executable, self.artifact / "bin/prepare", "--help"], text=True
         )
         self.assertIn("{verify,render,check}", help_text)
         for removed in ("tenant-resources", "bootstrap-read", "public-egress"):
             result = subprocess.run(
-                [sys.executable, self.artifact / "tools/prepare.py", removed],
+                [sys.executable, self.artifact / "bin/prepare", removed],
                 capture_output=True,
             )
             self.assertNotEqual(result.returncode, 0)
@@ -512,14 +541,14 @@ class StockArtifact(unittest.TestCase):
         path = self.out / "explicit-profile-input.json"
         save(path, site)
         for label, profile in (
-            ("stock", "upstream/deploy/profiles/codex.json"),
+            ("stock", "oce/deploy/profiles/codex.json"),
             ("curated", "defaults/codex-profile.json"),
         ):
             output = self.out / ("profile-file-" + label)
             subprocess.run(
                 [
                     "node",
-                    self.artifact / "upstream/scripts/render-installation-profile.mjs",
+                    self.artifact / "oce/scripts/render-installation-profile.mjs",
                     "--profile",
                     "codex",
                     "--profile-file",
@@ -544,13 +573,12 @@ class StockArtifact(unittest.TestCase):
             )
             self.assertTrue(
                 (
-                    self.artifact
-                    / "upstream/deploy/helm/openclaw-enterprise/Chart.yaml"
+                    self.artifact / "oce/deploy/helm/openclaw-enterprise/Chart.yaml"
                 ).is_file()
             )
 
     def test_assembly_does_not_restrict_upstream_external_login(self):
-        release = load(self.artifact / "release.json")
+        release = load(self.artifact / "metadata/release.json")
         for role, image in release["images"].items():
             image["reference"] = "fixture.invalid/" + role + "@sha256:" + "0" * 64
         site = load(self.artifact / "examples/installations/site.json")
@@ -582,7 +610,7 @@ class StockArtifact(unittest.TestCase):
         self.assertTrue(helm_values(output / "values.yaml")["auth"]["oidc"]["enabled"])
 
     def test_mirrors_preserve_every_shipping_digest(self):
-        release = load(self.artifact / "release.json")
+        release = load(self.artifact / "metadata/release.json")
         for role, image in release["images"].items():
             image["reference"] = "fixture.invalid/" + role + "@sha256:" + "1" * 64
         with tempfile.TemporaryDirectory() as temp:
@@ -608,7 +636,7 @@ class StockArtifact(unittest.TestCase):
         try:
             path.write_bytes(original + b" ")
             result = subprocess.run(
-                [sys.executable, str(self.artifact / "tools/prepare.py"), "verify"],
+                [sys.executable, str(self.artifact / "bin/prepare"), "verify"],
                 capture_output=True,
                 text=True,
             )
@@ -619,7 +647,7 @@ class StockArtifact(unittest.TestCase):
 
     def test_architecture_selects_agent_policy_and_preserves_gateway_pool(self):
         # Bypass admission only in this renderer contract test. No qualification is recorded.
-        release = load(self.artifact / "release.json")
+        release = load(self.artifact / "metadata/release.json")
         for role, image in release["images"].items():
             image["reference"] = "fixture.invalid/" + role + "@sha256:" + "0" * 64
         release["seccomp"]["profiles"] = {

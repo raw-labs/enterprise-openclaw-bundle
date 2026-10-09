@@ -5,16 +5,17 @@ import sys
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "tools"))
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(root / "lib"))
 from integrity import load, require, verify_files  # noqa: E402
 
 os_name = {"Darwin": "darwin", "Linux": "linux"}.get(platform.system())
 arch = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "amd64"}.get(platform.machine())
 if not os_name or not arch:
     sys.exit("occ: supported operator platforms are macOS/Linux AMD64/ARM64")
-binary = root / "cli" / f"occ-{os_name}-{arch}"
+binary = root / "lib/occ" / f"occ-{os_name}-{arch}"
 try:
-    manifest = load(root / "manifest.json")
+    manifest = load(root / "metadata/manifest.json")
     name = str(binary.relative_to(root))
     require(name in manifest, "CLI missing from delivered inventory")
     verify_files(root, {name: manifest[name]})

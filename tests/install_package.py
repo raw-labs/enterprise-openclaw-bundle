@@ -92,12 +92,12 @@ def exercise(args):
             )
             tar.extractall(work, filter="data")
         artifact = next(p for p in work.iterdir() if p.is_dir())
-        release = load(artifact / "release.json")
+        release = load(artifact / "metadata/release.json")
         require(
             release["qualification"]["status"] == "native-verified",
             "native artifact checks required",
         )
-        run([sys.executable, artifact / "tools/prepare.py", "verify"])
+        run([artifact / "bin/prepare", "verify"])
         controller = release["images"]["controller"]["reference"]
         index = load(layout / "index.json")
         require(
@@ -400,8 +400,7 @@ def exercise(args):
             if release["distribution"]["published"]:
                 run(
                     [
-                        sys.executable,
-                        artifact / "tools/prepare.py",
+                        artifact / "bin/prepare",
                         "render",
                         "--input",
                         path,
@@ -415,7 +414,7 @@ def exercise(args):
                 )
             else:
                 spec = importlib.util.spec_from_file_location(
-                    "package_prepare", artifact / "tools/prepare.py"
+                    "package_prepare", artifact / "lib/prepare.py"
                 )
                 prepare = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(prepare)
@@ -432,8 +431,7 @@ def exercise(args):
                 )
             run(
                 [
-                    sys.executable,
-                    artifact / "tools/prepare.py",
+                    artifact / "bin/prepare",
                     "check",
                     "--directory",
                     rendered,
@@ -447,14 +445,13 @@ def exercise(args):
             save(rendered / "values.yaml", values)
             run(
                 [
-                    sys.executable,
-                    artifact / "tools/prepare.py",
+                    artifact / "bin/prepare",
                     "check",
                     "--directory",
                     rendered,
                 ]
             )
-            upstream = artifact / "upstream"
+            upstream = artifact / "oce"
             claim = helm_values(
                 upstream / "deploy/examples/production/bootstrap-pvc.yaml"
             )

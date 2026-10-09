@@ -22,8 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def artifact():
-    verify_files(ROOT, load(ROOT / "manifest.json"))
-    return load(ROOT / "release.json")
+    verify_files(ROOT, load(ROOT / "metadata/manifest.json"))
+    return load(ROOT / "metadata/release.json")
 
 
 def selected_images(release, mapping):
@@ -105,7 +105,7 @@ def render(args, release, admit=True):
         subprocess.run(
             [
                 "node",
-                ROOT / "upstream/scripts/render-installation-profile.mjs",
+                ROOT / "oce/scripts/render-installation-profile.mjs",
                 "--profile",
                 args.profile,
                 "--profile-file",

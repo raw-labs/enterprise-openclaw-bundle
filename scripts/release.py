@@ -439,14 +439,31 @@ def verify_handoff(archive, published=True):
         dirs = list(root.iterdir())
         require(len(dirs) == 1 and dirs[0].is_dir(), "invalid handoff root")
         artifact = dirs[0]
+        require(
+            {p.name for p in artifact.iterdir()}
+            == {
+                "AGENTS.md",
+                "INSTALL.md",
+                "OPERATE.md",
+                "bin",
+                "defaults",
+                "examples",
+                "lib",
+                "metadata",
+                "notices",
+                "oce",
+                "security",
+            },
+            "unexpected installer package layout",
+        )
         run(
-            [sys.executable, artifact / "tools/prepare.py", "verify"],
+            [artifact / "bin/prepare", "verify"],
             stdout=subprocess.DEVNULL,
         )
-        cli = load(artifact / "release.json")["operatorCli"]
+        cli = load(artifact / "metadata/release.json")["operatorCli"]
         require(
             subprocess.check_output(
-                [sys.executable, artifact / "bin/occ", "--version"], text=True
+                [artifact / "bin/occ", "--version"], text=True
             ).strip()
             == "occ " + cli["version"],
             "delivered CLI launcher/version mismatch",
@@ -460,8 +477,7 @@ def verify_handoff(archive, published=True):
                     if published:
                         run(
                             [
-                                sys.executable,
-                                artifact / "tools/prepare.py",
+                                artifact / "bin/prepare",
                                 "render",
                                 "--input",
                                 example,
@@ -477,10 +493,10 @@ def verify_handoff(archive, published=True):
                     else:
                         # A dry-run exercises the exact renderer without granting installation admission.
                         spec = importlib.util.spec_from_file_location(
-                            "delivered_prepare", artifact / "tools/prepare.py"
+                            "delivered_prepare", artifact / "lib/prepare.py"
                         )
                         prepare = importlib.util.module_from_spec(spec)
-                        sys.path.insert(0, str(artifact / "tools"))
+                        sys.path.insert(0, str(artifact / "lib"))
                         try:
                             spec.loader.exec_module(prepare)
                             prepare.render(
@@ -491,7 +507,7 @@ def verify_handoff(archive, published=True):
                                     output=dest,
                                     mirrors=None,
                                 ),
-                                load(artifact / "release.json"),
+                                load(artifact / "metadata/release.json"),
                                 admit=False,
                             )
                         finally:
@@ -506,15 +522,14 @@ def verify_handoff(archive, published=True):
                     )
                     require(
                         (
-                            artifact
-                            / "upstream/deploy/helm/openclaw-enterprise/Chart.yaml"
+                            artifact / "oce/deploy/helm/openclaw-enterprise/Chart.yaml"
                         ).is_file(),
                         "generated chart instruction references an absent chart",
                     )
         for helper in ("prepare-bootstrap-volume", "upgrade-production-images"):
             run(
-                ["bash", artifact / "upstream/scripts" / helper, "--help"],
-                cwd=artifact / "upstream",
+                ["bash", artifact / "oce/scripts" / helper, "--help"],
+                cwd=artifact / "oce",
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )

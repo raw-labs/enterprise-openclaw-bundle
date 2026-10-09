@@ -102,7 +102,7 @@ def dependencies(args, release):
 def renderer_files(release, directory):
     files = {}
     for name, package, data in dependency_bytes(release, directory):
-        prefix = "upstream/apps/controller/node_modules/" + name + "/"
+        prefix = "oce/apps/controller/node_modules/" + name + "/"
         with tarfile.open(fileobj=io.BytesIO(data)) as tar:
             require(
                 all(m.isfile() or m.isdir() for m in tar.getmembers()),
@@ -786,7 +786,7 @@ def publish(args, release):
             publication["roles"][role] = candidate["images"][role]
             save(out / "publication.json", publication)
         for arch, receipt in receipts.items():
-            path = "profiles/" + release["id"] + "/" + arch + "/codex-seccomp.json"
+            path = "security/seccomp/" + arch + "/codex-seccomp.json"
             dest = out / path
             dest.parent.mkdir(parents=True)
             shutil.copyfile(

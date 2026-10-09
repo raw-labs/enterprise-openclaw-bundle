@@ -1,7 +1,7 @@
 # Operate an installation
 
 For installation owners. OCE owns operational behavior; the bundle supplies
-matching artifacts and exact-source tools. Run OCE procedures from `upstream/`.
+matching artifacts and exact-source tools. Run OCE procedures from `oce/`.
 
 ## Accept and retain
 
@@ -17,20 +17,20 @@ checks do not establish acceptance of a customer's environment.
 
 ## Diagnose
 
-From the bundle root, run `python3 tools/prepare.py verify` and
-`python3 tools/prepare.py check --directory "$SITE/rendered"`.
+From the bundle root, run `bin/prepare verify` and
+`bin/prepare check --directory "$SITE/rendered"`.
 These check local files and chart rendering. Use OCE's procedures and ordinary
 kubectl/Helm commands for cluster health; retain diagnostic logs privately.
 
 ## Upgrade and recover
 
 Use the candidate bundle's packaged
-[production image upgrade procedure](upstream/docs/guides/deploy/production-upgrade.md)
-and [recovery procedure](upstream/docs/guides/deploy/production-upgrade-recovery.md).
+[production image upgrade procedure](oce/docs/guides/deploy/production-upgrade.md)
+and [recovery procedure](oce/docs/guides/deploy/production-upgrade-recovery.md).
 The helper and its sibling probes, chart and Collector configuration are included.
 Read its supported changes and prerequisites before running it.
 
-The verified candidate's `upstream/` replaces the source checkout in that guide;
+The verified candidate's `oce/` replaces the source checkout in that guide;
 skip its Git checkout and CLI build steps. Put the candidate bundle's `bin/` on
 PATH to use the matching `occ`. Substitute your actual namespace, Helm release
 and protected directories for upstream examples. Optional source-level Name
@@ -38,7 +38,7 @@ diagnostics in the recovery guide require an OCE checkout; the packaged upgrade
 helper already validates the Installation name during preflight.
 
 Use the new bundle's selected image digests and OCE source revision from
-`release.json`. Retain protected baseline values and Installation files;
+`metadata/release.json`. Retain protected baseline values and Installation files;
 render candidate inputs into a separate directory when settings must change.
 Follow upstream's backup, Installation binding, maintenance, migration and
 recovery steps. Fresh-install volume preparation is not an upgrade step.

@@ -1,21 +1,9 @@
 # Install a bundle
 
 For operators installing OCE into prepared Kubernetes infrastructure.
-Commands and relative links below apply to the extracted package.
-Download `bundle.tar.gz` and `bundle.tar.gz.sha256` from the selected private
-GitHub release. The remaining assets are build provenance and test evidence.
-With GitHub CLI authenticated and an empty download directory:
-
-```bash
-: "${VERSION:?Set VERSION to the selected bundle tag}"
-: "${DOWNLOAD:?Set DOWNLOAD to an absolute empty download directory}"
-gh release download "$VERSION" --repo raw-labs/enterprise-openclaw-bundle \
-  --pattern 'bundle.tar.gz*' --dir "$DOWNLOAD"
-```
-
-In that directory, verify with `sha256sum -c bundle.tar.gz.sha256` (macOS:
-`shasum -a 256 -c bundle.tar.gz.sha256`), extract with `tar -xzf bundle.tar.gz`,
-and enter the extracted version directory.
+Start in the extracted package root. Commands and relative links below apply
+to that directory. The preparation tool reads the bundle version and image
+digests from `metadata/release.json`.
 
 ## Prerequisites
 
@@ -45,21 +33,21 @@ mkdir -m 700 "$SITE"
 : "${CONTEXT:?Set CONTEXT to the reviewed Kubernetes context}"
 export KUBECONFIG_FILE CONTEXT
 chmod 600 "$KUBECONFIG_FILE"
-python3 tools/prepare.py verify
+bin/prepare verify
 export PATH="$PWD/bin:$PATH"
 occ --version
 cp examples/installations/site.json "$SITE/site.json"
 ```
 
-Edit `site.json` using OCE's [installation input format](upstream/docs/guides/deploy/installation-profiles.md).
+Edit `site.json` using OCE's [installation input format](oce/docs/guides/deploy/installation-profiles.md).
 Select `openclaw` or `codex` and the target `linux/amd64` or `linux/arm64`:
 
 ```bash
 PROFILE=codex
 ARCHITECTURE=linux/amd64
-python3 tools/prepare.py render --input "$SITE/site.json" --profile "$PROFILE" \
+bin/prepare render --input "$SITE/site.json" --profile "$PROFILE" \
   --architecture "$ARCHITECTURE" --output "$SITE/rendered"
-python3 tools/prepare.py check --directory "$SITE/rendered"
+bin/prepare check --directory "$SITE/rendered"
 ```
 
 For a mirror, add `--mirrors "$SITE/mirrors.json"` to `render`. Map
@@ -70,17 +58,18 @@ Review `preflight.json`, `values.yaml`, `installation.yaml` and `rendered.yaml`.
 The tool only prepares files. It does not create Kubernetes resources or credentials.
 For Codex, provision the packaged architecture-specific seccomp file at the
 node path selected in `installation.yaml`. The selected Codex profile uses RAW's
-curated catalog; original upstream profiles remain under `upstream/deploy/profiles/`.
+curated catalog; original OCE profiles are under `oce/deploy/profiles/`.
+The delivered seccomp policies are under `security/seccomp/`.
 
 ## Install and bootstrap
 
-Change to `upstream/` and follow the packaged
-[production installation procedure](upstream/docs/guides/deploy/production-installation.md#shared-bootstrap-pvc-and-configuration-checks)
+Change to `oce/` and follow the packaged
+[production installation procedure](oce/docs/guides/deploy/production-installation.md#shared-bootstrap-pvc-and-configuration-checks)
 from **Shared bootstrap PVC and configuration checks** onward. Use absolute paths:
 
 ```bash
 export OCC_INPUT_DIRECTORY="$SITE/rendered"
-cd upstream
+cd oce
 ```
 
 The prepared files replace that guide's build and profile-rendering steps.
@@ -100,8 +89,8 @@ namespace and an available protected storage class; bootstrap and runtime
 storage classes may differ.
 
 OCE owns authentication, tenant permissions and Agent setup. Continue with
-[production Agents](upstream/docs/guides/deploy/production-agents.md) and, when enabled,
-[repository access](upstream/docs/guides/repository-credentials/installation.md).
+[production Agents](oce/docs/guides/deploy/production-agents.md) and, when enabled,
+[repository access](oce/docs/guides/repository-credentials/installation.md).
 Use the selected release images instead of upstream image-build steps.
 Human sign-in and presets use OCE's APIs and Console; optional RAW preset files
 are in `defaults/`. Packaged `occ` supports remote administration;

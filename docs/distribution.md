@@ -3,6 +3,21 @@
 For release maintainers and sales engineers arranging artifact access or customer
 mirrors. Installation operators use the access handoff with the delivered install guide.
 
+Download `bundle.tar.gz` and `bundle.tar.gz.sha256` from the selected private
+GitHub release. With GitHub CLI authenticated and an empty download directory:
+
+```bash
+: "${VERSION:?Set VERSION to the selected bundle tag}"
+: "${DOWNLOAD:?Set DOWNLOAD to an absolute empty download directory}"
+gh release download "$VERSION" --repo raw-labs/enterprise-openclaw-bundle \
+  --pattern 'bundle.tar.gz*' --dir "$DOWNLOAD"
+```
+
+In that directory, verify with `sha256sum -c bundle.tar.gz.sha256` (macOS:
+`shasum -a 256 -c bundle.tar.gz.sha256`), extract with `tar -xzf bundle.tar.gz`,
+and enter the extracted version directory. Start with its `INSTALL.md`.
+Other release assets provide provenance and test evidence.
+
 Bundle versions are independent of the upstream chart version. Use immutable
 SemVer prerelease tags with numbered `alpha`, `beta` or `rc` suffixes. Alpha denotes
 early artifact preparation, beta denotes evaluation, and an RC is intended for
@@ -12,7 +27,8 @@ and review of the final artifacts. Never reuse a tag, replace a published asset 
 move published history.
 
 Private GHCR is the distribution registry for new bundle images. The Action records
-repository names and final digests in generated `release.json`. Presales needs
+repository names and final digests in the release asset `release.json` and the
+archive's `metadata/release.json`. Presales needs
 authorized GitHub package access, without an AWS account. Outside Actions, private GHCR pulls require
 a classic GitHub token with `read:packages` and any required organization SSO
 authorization. CI publication uses the repository's short-lived `GITHUB_TOKEN`.

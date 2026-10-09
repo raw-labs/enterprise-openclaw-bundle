@@ -138,7 +138,7 @@ def cli_files(directory, release):
             and digest(binary.read_bytes()) == info["sha256"],
             "CLI binary changed after verification",
         )
-        files["cli/" + name] = (binary.read_bytes(), 0o755)
+        files["lib/occ/" + name] = (binary.read_bytes(), 0o755)
     return cli, files
 
 
@@ -168,6 +168,7 @@ def package(args, release):
     )
     cli, files = cli_files(Path(args.dependencies).parent / "cli", release)
     files["bin/occ"] = ((ROOT / "delivery/occ").read_bytes(), 0o755)
+    files["bin/prepare"] = ((ROOT / "delivery/prepare").read_bytes(), 0o755)
     if release["schemaVersion"] == 2:
         from stock import renderer_files
 
@@ -179,7 +180,7 @@ def package(args, release):
     }
     chart_files["LICENSE"] = ((source / "LICENSE").read_bytes(), 0o644)
     # Keep OCE's paths: its renderer, origin helper and upgrade tool use this chart.
-    chart_name = "upstream/" + release["chart"]["path"]
+    chart_name = "oce/" + release["chart"]["path"]
     for name, content in chart_files.items():
         files[chart_name + "/" + name] = content
     shipped = [
@@ -230,7 +231,7 @@ def package(args, release):
                 pending.append(relative)
     for name in shipped:
         data = (source / name).read_bytes()
-        files["upstream/" + name] = (
+        files["oce/" + name] = (
             data,
             0o755 if name.startswith("scripts/") else 0o644,
         )
@@ -253,7 +254,7 @@ def package(args, release):
                 )
                 return (
                     match.group(0)
-                    if "upstream/" + path in files
+                    if "oce/" + path in files
                     else "]("
                     + source_url
                     + posixpath.normpath(
@@ -262,8 +263,8 @@ def package(args, release):
                     + ")"
                 )
 
-            data, mode = files["upstream/" + name]
-            files["upstream/" + name] = (
+            data, mode = files["oce/" + name]
+            files["oce/" + name] = (
                 re.sub(r"\]\(([^)]+)\)", link, data.decode()).encode(),
                 mode,
             )
@@ -272,18 +273,19 @@ def package(args, release):
         if (source / name).exists():
             files["notices/OCE-" + name] = ((source / name).read_bytes(), 0o644)
     for name in ("integrity.py", "prepare.py"):
-        files["tools/" + name] = ((ROOT / "delivery" / name).read_bytes(), 0o644)
+        files["lib/" + name] = ((ROOT / "delivery" / name).read_bytes(), 0o644)
     for name in release["payloadFiles"]:
         payload = release_file(args.release, ROOT, name)
         files[name] = (payload.read_bytes(), 0o644)
     files["INSTALL.md"] = ((ROOT / "docs/install.md").read_bytes(), 0o644)
     files["OPERATE.md"] = ((ROOT / "docs/operate.md").read_bytes(), 0o644)
+    files["AGENTS.md"] = ((ROOT / "delivery/AGENTS.md").read_bytes(), 0o644)
     # Runtime build overlay/private build inputs are deliberately excluded.
     copy = json.loads(json.dumps(release))
     copy["operatorCli"] = cli
     copy["chart"]["artifact"] = chart_name
     copy["profiles"] = {
-        "openclaw": "upstream/deploy/profiles/openclaw.json",
+        "openclaw": "oce/deploy/profiles/openclaw.json",
         "codex": "defaults/codex-profile.json",
     }
     copy["upstreamGuides"] = {
@@ -295,18 +297,23 @@ def package(args, release):
         for name in shipped
         if name.endswith(".md")
     }
-    files["release.json"] = (
+    q = release["qualification"]
+    copy["qualification"]["nativeReceipts"] = {
+        arch: {
+            "url": "https://github.com/raw-labs/enterprise-openclaw-bundle/releases/download/"
+            + release["id"]
+            + "/"
+            + receipt["path"],
+            "sha256": receipt["sha256"],
+        }
+        for arch, receipt in q.get("nativeReceipts", {}).items()
+    }
+    files["metadata/release.json"] = (
         (json.dumps(copy, indent=2, sort_keys=True) + "\n").encode(),
         0o644,
     )
-    q = release["qualification"]
-    for receipt in q.get("nativeReceipts", {}).values():
-        files[receipt["path"]] = (
-            safe_path(Path(args.release).parent, receipt["path"]).read_bytes(),
-            0o644,
-        )
     manifest = {name: digest(data) for name, (data, _) in files.items()}
-    files["manifest.json"] = (
+    files["metadata/manifest.json"] = (
         (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(),
         0o644,
     )
