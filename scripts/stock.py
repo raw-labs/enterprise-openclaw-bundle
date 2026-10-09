@@ -46,6 +46,19 @@ RUN chmod 0755 /usr/share/licenses /usr/share/licenses/openclaw-enterprise \\
 USER node
 """
 
+INGREDIENT_LAYER = b"""
+FROM __UPSTREAM_TARGET__ AS bundle-ingredients
+USER root
+COPY --chown=node:node deploy/bundle/plugins/ /app/node_modules/openclaw/dist/extensions/
+COPY scripts/build-runtime-assets.mjs /tmp/bundle-inventory.mjs
+COPY deploy/bundle/runtime.mjs /tmp/bundle-runtime.mjs
+COPY deploy/bundle/plugins.json /tmp/bundle-plugins.json
+RUN node /tmp/bundle-inventory.mjs inventory /app/node_modules/openclaw /opt/oce/runtime \\
+    && node /tmp/bundle-runtime.mjs \\
+    && rm /tmp/bundle-inventory.mjs /tmp/bundle-runtime.mjs /tmp/bundle-plugins.json
+USER node
+"""
+
 
 def snapshot_inputs(release, selection, directory):
     files = {
@@ -263,12 +276,19 @@ def build(args, release):
             digest(fragment) == release["build"]["noticeLayerSha256"],
             "license build code changed",
         )
-        # Preserve the selected recipe and append only the required upstream notice.
+        # Append recorded native ingredients and required notices to the selected recipe.
         with tempfile.TemporaryDirectory() as temporary:
             dockerfile = Path(temporary) / "Dockerfile"
+            upstream_target = recipe["target"]
+            ingredients = b""
+            if role == "runtime" and release.get("pluginPackages"):
+                require(digest(INGREDIENT_LAYER) == release["build"]["ingredientLayerSha256"], "ingredient build code changed")
+                ingredients = INGREDIENT_LAYER.replace(b"__UPSTREAM_TARGET__", upstream_target.encode())
+                upstream_target = "bundle-ingredients"
             dockerfile.write_bytes(
                 (Path(args.source) / recipe["dockerfile"]).read_bytes()
-                + fragment.replace(b"__UPSTREAM_TARGET__", recipe["target"].encode())
+                + ingredients
+                + fragment.replace(b"__UPSTREAM_TARGET__", upstream_target.encode())
             )
             cmd[cmd.index("-f") + 1] = dockerfile
             cmd[cmd.index("--target") + 1] = "bundle-notices"
@@ -409,9 +429,9 @@ def check(args, release):
             )
         node = ["node", "--test", "--test-concurrency=1", "--test-reporter=tap"]
         receipt["lanes"]["controller"] = tests(
-            [*node, "tests/integration/production-image-startup.test.mjs"],
+            [*node, "tests/integration/production-image-startup.test.mjs", ROOT / "tests/native_presets.mjs"],
             source,
-            dict(env, OCC_TEST_PRODUCTION_IMAGE=images["controller"]),
+            dict(env, OCC_TEST_PRODUCTION_IMAGE=images["controller"], BUNDLE_TEST_SELECTION=str(Path(args.selection).resolve())),
             logs / "controller.tap",
         )
         state = (
@@ -428,7 +448,7 @@ def check(args, release):
                 report,
             ],
             source,
-            env,
+            dict(env, BUNDLE_TEST_SELECTION=str(Path(args.selection).resolve())),
             logs / "runtime.tap",
         )
         require(not state.exists(), "runtime cleanup incomplete")

@@ -6,8 +6,9 @@ ingredients used by maintained definitions; add a new file when changing one.
 Published source and definitions remain available at their immutable Git tags.
 
 See the [bundle schema](bundle-schema.md) for supported fields, source compatibility
-checks and adding plugins. Presets are shipped for optional import. Connections
-and live Agent configuration are outside this milestone.
+checks and adding native plugins. Selected presets are installed through OCE's
+seeding; packaged plugins are embedded in the runtime. Provider accounts, secrets
+and live Agent configuration belong to the installation owner.
 
 Installation examples live in `docs/examples/installations/`. They are shipped
 with the documentation and checked by the renderer. Customer settings belong in the installation owner's protected workspace.

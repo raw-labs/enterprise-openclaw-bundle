@@ -1,0 +1,160 @@
+// Real shipping image and Kubernetes volume checks; no external provider calls.
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import test from "node:test";
+import { pathToFileURL } from "node:url";
+
+const release = JSON.parse(await readFile(process.env.BUNDLE_TEST_SELECTION, "utf8"));
+const plugins = release.pluginPackages ?? [];
+const image = process.env.OCC_TEST_RUNTIME_IMAGE;
+
+test("packaged native extensions and their inventory match the selected release", () => {
+  const script = `
+    const assert = require('node:assert/strict'), fs = require('node:fs'), crypto = require('node:crypto');
+    const selected = ${JSON.stringify(plugins)};
+    const provenance = JSON.parse(fs.readFileSync('/opt/oce/runtime/provenance.json'));
+    const contents = fs.readFileSync('/opt/oce/runtime/contents.json');
+    assert.equal(crypto.createHash('sha256').update(contents).digest('hex'), provenance.runtimeContentsSha256);
+    const inventory = JSON.parse(contents);
+    if (selected.length) assert.deepEqual(provenance.pluginPackages, selected);
+    for (const plugin of selected) {
+      assert.ok(provenance.plugins.includes(plugin.id));
+      for (const [file, expected] of Object.entries(plugin.files)) {
+        const path = 'dist/extensions/' + plugin.id + '/' + file;
+        assert.equal(crypto.createHash('sha256').update(fs.readFileSync('/app/node_modules/openclaw/' + path)).digest('hex'), expected);
+        assert.equal(inventory.find(p => p.path === path)?.sha256, expected);
+      }
+    }
+  `;
+  execFileSync("docker", ["run", "--rm", "--network", "none", "--read-only", "--user", "1000:1000",
+    "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--entrypoint", "node", image, "-e", script],
+  {stdio: "pipe", timeout: 60_000});
+});
+
+test("Connections loads in the native Gateway and retains its database across Kubernetes Pod replacement", {timeout: 600_000}, async () => {
+  if (!plugins.some(p => p.id === "openclaw-connections")) return;
+  const { KubernetesComputeDriver } = await import(pathToFileURL(resolve("apps/controller/src/drivers/compute/kubernetes/index.ts")));
+  const driver = Object.create(KubernetesComputeDriver.prototype);
+  driver.options = {runtime: {gatewayStorageClassName: "local-path"}};
+  const mounts = driver.gatewayPrivateStateVolumeMounts(true);
+  assert.deepEqual(mounts.find(m => m.subPath === "connections"), {
+    name: "openclaw-gateway-state", mountPath: "/home/node/.openclaw/connections", subPath: "connections", readOnly: false,
+  });
+  const suffix = randomBytes(6).toString("hex");
+  const cluster = "bundle-connections-" + suffix;
+  const tag = "localhost/bundle-connections:" + suffix;
+  const directory = await mkdtemp(join(tmpdir(), cluster + "-"));
+  const kubeconfig = join(directory, "kubeconfig");
+  const run = (command, args, options = {}) => execFileSync(command, args, {encoding: "utf8", timeout: 180_000, maxBuffer: 4 * 1024 * 1024, ...options});
+  const kube = (...args) => run("kubectl", ["--kubeconfig", kubeconfig, "--context", "k3d-" + cluster, "-n", "bundle-connections", ...args]);
+  function put(object) {
+    return run("kubectl", ["--kubeconfig", kubeconfig, "--context", "k3d-" + cluster, "apply", "-f", "-"], {input: JSON.stringify(object)});
+  }
+  const token = "synthetic-bundle-gateway-token";
+  const config = {
+    gateway: {mode: "local", bind: "loopback", port: 18789, auth: {mode: "token", token}, controlUi: {experimental: {customPlugins: true}}},
+    plugins: {allow: ["openclaw-connections"], slots: {memory: "none"}, entries: {
+      "openclaw-connections": {enabled: true, config: {apiKey: {source: "env", provider: "default", id: "COMPOSIO_API_KEY"}}},
+    }},
+  };
+  const pod = {
+    apiVersion: "v1", kind: "Pod", metadata: {name: "gateway", namespace: "bundle-connections"},
+    spec: {
+      automountServiceAccountToken: false, restartPolicy: "Never", terminationGracePeriodSeconds: 120,
+      securityContext: {runAsUser: 1000, runAsGroup: 1000, runAsNonRoot: true, fsGroup: 1000, seccompProfile: {type: "RuntimeDefault"}},
+      initContainers: [driver.privateStateInitContainer("gateway", tag, true)],
+      containers: [{
+        name: "gateway", image: tag, imagePullPolicy: "Never", command: ["node", "/app/openclaw.mjs", "gateway", "run"],
+        securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}},
+        env: [{name: "OPENCLAW_STATE_DIR", value: "/home/node/.openclaw"}, {name: "OPENCLAW_CONFIG_PATH", value: "/config/openclaw.json"},
+          {name: "OPENCLAW_NO_AUTO_UPDATE", value: "1"}, {name: "COMPOSIO_API_KEY", value: "synthetic-never-sent-project-key"}],
+        volumeMounts: [
+          {name: "runtime-state", mountPath: "/home/node", subPath: "home"},
+          {name: "runtime-temporary", mountPath: "/tmp", subPath: "tmp"},
+          {name: "config", mountPath: "/config", readOnly: true}, ...mounts,
+        ],
+        readinessProbe: {exec: {command: ["node", "-e", "fetch('http://127.0.0.1:18789/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]}, periodSeconds: 2},
+      }],
+      volumes: [{name: "runtime-state", emptyDir: {}}, {name: "runtime-temporary", emptyDir: {}},
+        {name: "config", configMap: {name: "gateway"}}, {name: "openclaw-gateway-state", persistentVolumeClaim: {claimName: "gateway"}}],
+    },
+  };
+  const native = (...args) => kube("exec", "gateway", "-c", "gateway", "--", "node", "/app/openclaw.mjs", ...args);
+  const call = (method, params = {}) => JSON.parse(native("gateway", "call", method, "--url", "ws://127.0.0.1:18789", "--token", token, "--params", JSON.stringify(params), "--json"));
+  const start = () => {put(pod); kube("wait", "--for=condition=Ready", "pod/gateway", "--timeout=180s");};
+  const stop = () => kube("delete", "pod/gateway", "--wait=true", "--timeout=180s");
+  let created = false;
+  try {
+    run("docker", ["tag", image, tag]);
+    run("k3d", ["cluster", "create", cluster, "--servers", "1", "--agents", "0", "--no-lb", "--image",
+      "docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc",
+      "--kubeconfig-update-default=false", "--kubeconfig-switch-context=false", "--wait"]);
+    created = true;
+    await import("node:fs/promises").then(fs => fs.writeFile(kubeconfig, run("k3d", ["kubeconfig", "get", cluster]), {mode: 0o600}));
+    run("k3d", ["image", "import", tag, "--cluster", cluster], {timeout: 240_000});
+    put({apiVersion: "v1", kind: "Namespace", metadata: {name: "bundle-connections"}});
+    put({apiVersion: "v1", kind: "PersistentVolumeClaim", metadata: {name: "gateway", namespace: "bundle-connections"}, spec: {
+      accessModes: ["ReadWriteOnce"], storageClassName: "local-path", resources: {requests: {storage: "100Mi"}},
+    }});
+    const saveConfig = () => put({apiVersion: "v1", kind: "ConfigMap", metadata: {name: "gateway", namespace: "bundle-connections"}, data: {"openclaw.json": JSON.stringify(config)}});
+    saveConfig(); start();
+    const inspected = native("plugins", "inspect", "openclaw-connections", "--runtime", "--json");
+    for (const tool of ["connections_search", "connections_describe", "connections_call"]) assert.ok(inspected.includes(tool));
+    assert.ok(!inspected.includes("synthetic-never-sent-project-key"));
+    const before = call("connections.status");
+    assert.equal(before.configured, true); assert.ok(before.userId);
+    const connection = call("connections.create", {connectorId: "github", name: "Bundle persistence check", grant: {mode: "selected", agentIds: []}});
+    const ui = call("plugins.controlUi.list");
+    const asset = ui.plugins.find(p => p.pluginId === "openclaw-connections");
+    assert.ok(asset);
+    const plugin = plugins.find(p => p.id === "openclaw-connections");
+    const manifest = JSON.parse(await readFile(resolve("deploy/bundle/plugins/openclaw-connections/openclaw.plugin.json"), "utf8"));
+    kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
+      import assert from 'node:assert/strict';
+      import { createHash } from 'node:crypto';
+      import { GatewayClient } from 'openclaw/plugin-sdk/gateway-runtime';
+      const url = new URL(${JSON.stringify(asset.entryUrl)}, 'http://127.0.0.1:18789');
+      assert.equal(url.origin, 'http://127.0.0.1:18789');
+      const response = await fetch(url, {headers: {authorization: 'Bearer ${token}'}});
+      assert.equal(response.status, 200);
+      assert.equal(createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex'), ${JSON.stringify(plugin.files[manifest.controlUi.entry])});
+      let admitted, rejected;
+      const ready = new Promise((yes, no) => {admitted = yes; rejected = no});
+      const client = new GatewayClient({url: 'ws://127.0.0.1:18789', token: '${token}', clientName: 'cli', mode: 'cli', role: 'operator',
+        scopes: ['operator.read'], deviceIdentity: null, env: process.env, onHelloOk: admitted, onConnectError: rejected});
+      try {
+        client.start();
+        await Promise.race([ready, new Promise((_, reject) => setTimeout(() => reject(new Error('Handshake timed out')), 10000))]);
+        await assert.rejects(client.request('connections.status', {}), /scope|admin/i);
+      } finally {client.stop()}
+      const search = await fetch('http://127.0.0.1:18789/tools/invoke', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ${token}'},
+        body: JSON.stringify({tool: 'connections_search', args: {}, agentId: 'main', idempotencyKey: 'bundle-no-accounts'})});
+      const body = await search.text();
+      assert.equal(search.status, 200); assert.match(body, /no_usable_connections/);
+      assert.ok(!body.includes('synthetic-never-sent-project-key'));
+    `);
+    const permission = kube("exec", "gateway", "-c", "gateway", "--", "node", "-e", "const s=require('node:fs').statSync('/home/node/.openclaw/connections');if((s.mode&511)!==448||s.uid!==1000)process.exit(1)");
+    assert.equal(permission.trim(), "");
+    stop(); start();
+    assert.equal(call("connections.status").userId, before.userId);
+    const restored = call("connections.list").items.find(p => p.id === connection.id);
+    assert.ok(restored); assert.equal(restored.name, "Bundle persistence check"); assert.deepEqual(restored.grant, {mode: "selected", agentIds: []});
+    config.plugins.entries["openclaw-connections"].enabled = false;
+    stop(); saveConfig(); start();
+    assert.throws(() => call("connections.status"), /unknown method|not found|not registered/i);
+  } catch (error) {
+    if (created) {
+      try {process.stderr.write(kube("logs", "gateway", "-c", "gateway", "--tail=70"));} catch {}
+    }
+    throw error;
+  } finally {
+    // Remove only the cluster and local tag created with this random test identity.
+    if (created) run("k3d", ["cluster", "delete", cluster]);
+    run("docker", ["image", "rm", tag]);
+    await rm(directory, {recursive: true, force: true});
+  }
+});

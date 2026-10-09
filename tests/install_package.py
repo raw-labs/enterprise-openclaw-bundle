@@ -713,6 +713,36 @@ net.createServer(client => {
                     "authenticated Installation identity mismatch",
                 )
                 steps.append("packaged occ authenticated Installation request")
+                if release.get("presets"):
+                    def occ(*args):
+                        return json.loads(run([
+                            artifact / "bin/occ", "--url", "http://127.0.0.1:18080",
+                            "--service-key-file", key_path, "--output", "json", *args,
+                        ]))
+
+                    namespace = occ("namespace", "create", "Bundle preset check")
+                    namespace_id = namespace["id"]
+                    deadline = time.monotonic() + 180
+                    while occ("namespace", "get", namespace_id)["status"] != "ready":
+                        require(time.monotonic() < deadline, "preset test Namespace did not become ready")
+                        time.sleep(1)
+
+                    def seeded():
+                        result = occ("--namespace", namespace_id, "preset", "list")
+                        items = result if isinstance(result, list) else result["items"]
+                        return {p["name"]: p for p in items}
+
+                    before = seeded()
+                    for selected in release["presets"]:
+                        expected = load(artifact / "oce" / selected["path"].removeprefix("/app/"))
+                        require(selected["name"] in before and before[selected["name"]]["template"] == expected["template"], "selected RAW preset was not automatically seeded")
+                    steps.append("selected RAW presets automatically seeded with exact templates")
+                    kubectl("-n", cp["namespace"], "rollout", "restart", "deployment/openclaw-enterprise-api")
+                    kubectl("-n", cp["namespace"], "rollout", "status", "deployment/openclaw-enterprise-api", "--timeout=180s")
+                    after = seeded()
+                    for selected in release["presets"]:
+                        require(after[selected["name"]]["id"] == before[selected["name"]]["id"], "controller restart duplicated or replaced an existing preset")
+                    steps.append("controller restart preserves existing preset identities")
             finally:
                 forward.terminate()
                 forward.wait(timeout=15)

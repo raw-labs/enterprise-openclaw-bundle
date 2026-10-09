@@ -5,6 +5,7 @@ on:
     branches: [main]
 permissions:
   contents: read
+  packages: read
 jobs:
   validate:
     runs-on: depot-ubuntu-24.04-8
@@ -22,6 +23,8 @@ jobs:
       - name: Check all definitions and preserve published history
         run: python3 scripts/release.py validate-definitions
       - name: Resolve source and dependencies for packaging tests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/release.py resolve --output .work/resolved
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:

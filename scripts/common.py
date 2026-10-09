@@ -140,6 +140,24 @@ def read_release(path, root=None):
 
 def validate_stock(release):
     """Validate resolved ingredients and native artifact admission."""
+    from ingredients import plugin_selections
+
+    _, packages = plugin_selections(release["plugins"], release.get("definitionSchemaVersion", 2))
+    resolved = release.get("pluginPackages", [])
+    require(
+        [{k: v for k, v in p.items() if k != "files"} for p in resolved] == packages,
+        "resolved plugin package selection mismatch",
+    )
+    if resolved:
+        require(HASH.fullmatch(release["build"].get("ingredientLayerSha256", "")), "plugin build layer hash required")
+    for preset in release.get("presets", []):
+        require(
+            set(preset) == {"name", "path", "sha256"}
+            and isinstance(preset["name"], str) and preset["name"]
+            and re.fullmatch(r"/app/deploy/presets/raw/[a-z0-9-]+-preset\.json", preset["path"])
+            and HASH.fullmatch(preset["sha256"]),
+            "invalid image preset selection",
+        )
     require(
         re.fullmatch(r"v\d+\.\d+\.\d+-(alpha|beta|rc)\.[1-9]\d*", release["id"]),
         "stock candidate requires a numbered SemVer prerelease",

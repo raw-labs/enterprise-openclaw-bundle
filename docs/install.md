@@ -92,8 +92,11 @@ OCE owns authentication, tenant permissions and Agent setup. Continue with
 [production Agents](oce/docs/guides/deploy/production-agents.md) and, when enabled,
 [repository access](oce/docs/guides/repository-credentials/installation.md).
 Use the selected release images instead of upstream image-build steps.
-Human sign-in and presets use OCE's APIs and Console; optional RAW preset files
-are in `defaults/`. Packaged `occ` supports remote administration;
+Selected RAW presets are seeded automatically by OCE into Namespaces; no import
+command is needed. Existing same-name presets are preserved. Their image files
+are also available for inspection under `oce/deploy/presets/raw/`.
+Human sign-in and Agent setup use OCE's APIs and Console.
+Packaged `occ` supports remote administration;
 `occ dev` requires an OCE source checkout.
 
 Follow [OPERATE.md](OPERATE.md) for acceptance and upgrades. Each installation

@@ -32,6 +32,7 @@ from common import (
     save,
 )
 from stock import LICENSE_LAYER, github_json
+from ingredients import plugin_selections, resolve_plugins
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "raw-labs/enterprise-openclaw-bundle"
@@ -75,7 +76,7 @@ def definition(path):
         "unknown or missing bundle fields",
     )
     require(
-        spec["schemaVersion"] == 2 and SEMVER.fullmatch(spec["version"]),
+        spec["schemaVersion"] in (2, 3) and SEMVER.fullmatch(spec["version"]),
         "use an immutable numbered alpha, beta or rc version",
     )
     require(path.parent.name == spec["version"], "folder/version mismatch")
@@ -96,13 +97,7 @@ def definition(path):
         "both native targets required",
     )
     require(isinstance(spec["presets"], list), "presets must be a list")
-    require(
-        isinstance(spec["plugins"], list)
-        and spec["plugins"]
-        and len(set(spec["plugins"])) == len(spec["plugins"])
-        and all(re.fullmatch(r"[a-z][a-z0-9-]*", p) for p in spec["plugins"]),
-        "select unique bundled plugin IDs",
-    )
+    plugin_selections(spec["plugins"], spec["schemaVersion"])
     build = spec["build"]
     require(set(build) == {"patches", "confinement"}, "unknown or missing build fields")
     require(isinstance(build["patches"], list), "patches must be a list")
@@ -117,14 +112,16 @@ def definition(path):
         and all(HASH.fullmatch(h) for h in build["confinement"].values()),
         "pin reviewed source confinement inputs in bundle.json",
     )
-    targets = set()
+    targets, names = set(), set()
     for ref in spec["presets"]:
         source = pinned_file(ref)
         require(source.name.endswith("-preset.json"), "preset must be a JSON template")
         preset = load(source)
+        require(isinstance(preset.get("name"), str) and preset["name"].strip() and preset["name"] not in names, "preset names must be nonempty and unique")
+        names.add(preset["name"])
         require(
             preset.get("template", {}).get("agent", {}).get("plugins", {}) == {},
-            "Connections and live Agent plugin configuration are outside this milestone",
+            "preset Agent plugin policy must remain empty; native extension configuration belongs to OCE values",
         )
         require(source.name not in targets, "duplicate preset filename")
         targets.add(source.name)
@@ -201,6 +198,20 @@ def resolve(args):
             digest(safe_path(source, path).read_bytes()) == expected,
             "confinement input changed; review and repin bundle.json",
         )
+    bundled_plugins, package_plugins = plugin_selections(spec["plugins"], spec["schemaVersion"])
+    plugin_packages = resolve_plugins(package_plugins, source, getattr(args, "plugin_cache", None))
+    presets = []
+    if spec["schemaVersion"] == 3:
+        for ref in spec["presets"]:
+            path = "deploy/presets/raw/" + Path(ref["path"]).name
+            target = safe_path(source, path)
+            require(not target.exists(), "preset would overwrite source")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(pinned_file(ref), target)
+            presets.append({"name": load(target)["name"], "path": "/app/" + path, "sha256": ref["sha256"]})
+    if plugin_packages:
+        shutil.copyfile(ROOT / "scripts/ingredients-runtime.mjs", source / "deploy/bundle/runtime.mjs")
+        save(source / "deploy/bundle/plugins.json", plugin_packages)
     files = {}
     for path in sorted(source.rglob("*")):
         require(not path.is_symlink(), "source symlink rejected")
@@ -234,7 +245,7 @@ def resolve(args):
     ).split(",")
     retained_plugins = one(r"OPENCLAW_EXTENSIONS=([a-z0-9,-]+)").split(",")
     require(
-        spec["plugins"] == selected_plugins == retained_plugins,
+        bundled_plugins == selected_plugins == retained_plugins,
         "plugin selection differs from runtime recipe; select a compatible fork or patch",
     )
     oc_archive = one(r"echo '([a-f0-9]{64})  /tmp/openclaw-source.tar.gz'")
@@ -258,6 +269,9 @@ def resolve(args):
         },
         noticeLayerSha256=digest(LICENSE_LAYER),
     )
+    if plugin_packages:
+        from stock import INGREDIENT_LAYER
+        build["ingredientLayerSha256"] = digest(INGREDIENT_LAYER)
     patches = {
         p: h
         for p, h in files.items()
@@ -267,7 +281,7 @@ def resolve(args):
     chart_version = one(
         r"^version: ([\w.+-]+)$", (source / chart_path / "Chart.yaml").read_text()
     )
-    payload = {"defaults/" + Path(ref["path"]).name: ref for ref in spec["presets"]}
+    payload = {} if spec["schemaVersion"] == 3 else {"defaults/" + Path(ref["path"]).name: ref for ref in spec["presets"]}
     payload["defaults/codex-profile.json"] = spec["codexProfile"]
     examples = sorted((ROOT / "docs/examples/installations").glob("*.json"))
     require(examples, "installation documentation examples missing")
@@ -292,7 +306,7 @@ def resolve(args):
     )
     dependencies = {}
     cache = Path(args.dependency_cache) if args.dependency_cache else None
-    (out / "dependencies").mkdir()
+    (out / "dependencies").mkdir(exist_ok=True)
     for name, version in (("tldts", tldts), ("tldts-core", core)):
         integrity = one(
             r"  "
@@ -326,6 +340,7 @@ def resolve(args):
     images["runtime"].update(openclawCommit=oc, codexVersion=codex)
     selection = {
         "schemaVersion": 2,
+        "definitionSchemaVersion": spec["schemaVersion"],
         "id": spec["version"],
         "kind": "candidate",
         "architectures": spec["architectures"],
@@ -333,6 +348,8 @@ def resolve(args):
         "modifications": spec["build"]["patches"],
         "confinementInputs": spec["build"]["confinement"],
         "plugins": spec["plugins"],
+        "pluginPackages": plugin_packages,
+        "presets": presets,
         "sources": {
             "oce": oce,
             "openclaw": {
@@ -753,6 +770,7 @@ def main():
     p.add_argument("--output", required=True)
     p.add_argument("--from-git")
     p.add_argument("--dependency-cache")
+    p.add_argument("--plugin-cache")
     sub.add_parser("validate-definitions")
     p = sub.add_parser("preflight")
     p.add_argument("--definition", required=True)

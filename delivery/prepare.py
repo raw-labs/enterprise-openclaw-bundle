@@ -58,6 +58,14 @@ def render(args, release, admit=True):
     out = Path(args.output).resolve()
     require(not out.exists(), "render output exists; use a new directory")
     site = load(args.input)
+    # The bundle's selected templates are controller image ingredients.
+    # Reuse OCE's file seeding; installers do not import a second copy.
+    selected_presets = [p["path"] for p in release.get("presets", [])]
+    if selected_presets:
+        presets = site.setdefault("presets", {})
+        existing = presets.get("files", [])
+        require(isinstance(existing, list) and all(isinstance(p, str) for p in existing), "presets.files must contain paths")
+        presets["files"] = list(dict.fromkeys([*selected_presets, *existing]))
     refs = selected_images(release, args.mirrors)
     cp, runtime = site["controlPlane"], site["runtime"]
     architecture = args.architecture

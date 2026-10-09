@@ -43,6 +43,12 @@ def verify_source(release, selection, source):
         if path.is_file():
             actual[str(path.relative_to(source))] = digest(path.read_bytes())
     require(actual == expected, "source export differs from pinned inventory")
+    for preset in release.get("presets", []):
+        require(expected.get(preset["path"].removeprefix("/app/")) == preset["sha256"], "preset/source inventory mismatch")
+    for plugin in release.get("pluginPackages", []):
+        for name, checksum in plugin["files"].items():
+            path = "deploy/bundle/plugins/" + plugin["id"] + "/" + name
+            require(expected.get(path) == checksum, "plugin/source inventory mismatch")
     chart = Path(source) / release["chart"]["path"]
     require(
         f"version: {release['chart']['version']}\n"
@@ -199,6 +205,8 @@ def package(args, release):
         "docs/flows/coordinated-production-upgrade.md",
         "docs/guides/repository-credentials/installation.md",
     ]
+    for preset in release.get("presets", []):
+        shipped.append(preset["path"].removeprefix("/app/"))
     shipped.extend(
         str(p.relative_to(source))
         for p in sorted((source / "scripts").glob("upgrade-*"))
@@ -280,7 +288,7 @@ def package(args, release):
     files["INSTALL.md"] = ((ROOT / "docs/install.md").read_bytes(), 0o644)
     files["OPERATE.md"] = ((ROOT / "docs/operate.md").read_bytes(), 0o644)
     files["AGENTS.md"] = ((ROOT / "delivery/AGENTS.md").read_bytes(), 0o644)
-    # Runtime build overlay/private build inputs are deliberately excluded.
+    # Runtime build inputs are deliberately excluded.
     copy = json.loads(json.dumps(release))
     copy["operatorCli"] = cli
     copy["chart"]["artifact"] = chart_name

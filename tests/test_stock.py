@@ -121,7 +121,7 @@ class ReleaseSnapshots(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             record = Path(temp) / "release.json"
             record.write_bytes(SELECTION.read_bytes())
-            name = "defaults/coding-preset.json"
+            name = "defaults/codex-profile.json"
             tampered = record.parent / name
             tampered.parent.mkdir(parents=True)
             tampered.write_text("changed historical input\n")
@@ -631,7 +631,7 @@ class StockArtifact(unittest.TestCase):
                     installer.selected_images(release, path)
 
     def test_delivered_file_tampering_is_detected(self):
-        path = self.artifact / "defaults/coding-preset.json"
+        path = self.artifact / "oce/deploy/presets/raw/coding-preset.json"
         original = path.read_bytes()
         try:
             path.write_bytes(original + b" ")
@@ -668,6 +668,7 @@ class StockArtifact(unittest.TestCase):
                 )
                 installer.render(args, release, admit=False)
                 installation = helm_values(output / "installation.yaml")
+                self.assertEqual(installation["presets"]["files"], [p["path"] for p in release["presets"]])
                 runtime = installation["drivers"]["compute"]["configuration"]["runtime"]
                 self.assertEqual(runtime["nodeSelector"]["kubernetes.io/arch"], arch)
                 self.assertNotIn("kubernetes.io/arch", runtime["gatewayNodeSelector"])

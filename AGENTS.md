@@ -2,7 +2,8 @@
 
 Own release selection, reusable build/packaging, verification and customer handoff.
 Read other repositories without changing them. Do not deploy infrastructure, change
-live Agents, or add OpenClaw Connections in this milestone.
+live Agents. Native plugin packages are selected and verified as build ingredients;
+provider credentials and account setup belong to installation owners.
 
 `bundles/<version>/bundle.json` owns human-authored ingredient selection,
 optional source patches and reviewed confinement inputs. `defaults/` owns selectable

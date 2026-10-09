@@ -14,6 +14,7 @@ on:
 permissions:
   contents: read
   actions: read
+  packages: read
 concurrency:
   group: bundle-${{ inputs.definition }}
   cancel-in-progress: false
@@ -40,6 +41,7 @@ jobs:
         id: version
         env:
           DEFINITION: ${{ inputs.definition }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 scripts/release.py resolve --definition "$DEFINITION" --output .work/resolved
           python3 -c 'import json, os; d=json.load(open(".work/resolved/candidate.json")); open(os.environ["GITHUB_OUTPUT"], "a").write("version="+d["id"]+"\n")'

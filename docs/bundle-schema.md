@@ -12,14 +12,14 @@ are rejected.
 
 | Field | Meaning and constraints |
 | --- | --- |
-| `schemaVersion` | Definition format version. The current validator accepts `2`. |
+| `schemaVersion` | Definition format version. The validator accepts `2` and `3`. Version `3` installs selected presets and supports packaged native extensions. |
 | `version` | Bundle release version, matching its folder. Accepted form: `vMAJOR.MINOR.PATCH-alpha.N`, `-beta.N` or `-rc.N`, with a positive sequence number. Stable versions are not yet supported by the Action. |
 | `oce` | `repository`: HTTPS GitHub Git URL; `commit`: full 40-character commit hash. The source supplies the controller, chart, runtime Dockerfiles and tests. |
 | `openclawCommit` | Full 40-character OpenClaw commit hash. Must match the runtime Dockerfile after source patches. |
 | `codexVersion` | Three-part Codex version. Must match the runtime Dockerfile after source patches. |
 | `architectures` | Exactly `["linux/amd64", "linux/arm64"]`; both native builds and checks are required. |
-| `plugins` | Nonempty ordered list of unique bundled OpenClaw plugin IDs, using lowercase letters, digits and hyphens, starting with a letter. Must match both the Dockerfile's build selection and retained extensions, including order. |
-| `presets` | List of file references to optional OCE preset templates. May be empty. Each filename must end in `-preset.json` and be unique. Live Agent plugin settings must be empty. |
+| `plugins` | Nonempty ordered list of unique native plugin selections. String IDs select plugins built by the OCE recipe; they must match its build and retention lists. Version `3` also accepts checksum-pinned package objects described below. |
+| `presets` | List of file references to OCE preset templates. May be empty. Filenames end in `-preset.json`; names and filenames must be unique. Version `3` copies them into the controller image and prepares OCE’s `presets.files` automatically. Agent plugin policy stays empty; native configuration uses OCE Configuration values. |
 | `codexProfile` | File reference to the selected Codex installation profile, using OCE's profile format. The preparation tool passes it explicitly to the renderer; original upstream profiles remain available. |
 | `build.patches` | Ordered list of file references to Git patches. May be empty. Applied to the exported OCE source before compatibility checks, inventory and builds. Must preserve the upstream license. |
 | `build.confinement` | SHA-256 hashes of the selected source's `scripts/lib/codex-seccomp-profile.mjs` and `.github/actions/run-ci-lane/codex-sandbox.apparmor`. Checked after patches; changed policies require review and new hashes. |
@@ -34,24 +34,34 @@ Mandatory license handling belongs in build code. Installation examples belong i
 Image digests, inventories, receipts and provenance are generated outputs.
 Customer settings and credentials belong in the customer's private installation.
 
-## Adding plugins
+## Native plugins and presets
 
-`plugins` currently checks the source's plugin selection; it is not a package
-installer. Adding a name to this list alone fails resolution if the Dockerfile
-does not build and retain it.
+A string in `plugins` selects an extension already built by the OCE runtime recipe.
+For an additional RAW package, use a version `3` package object with exactly:
 
-To add a plugin supported by OpenClaw's existing build, select a compatible OCE
-commit or supply a hash-pinned source patch that updates the runtime Dockerfile's
-build selection and retained extensions. Update `plugins` to match. Use a new
-bundle version and run both native builds and checks, including a functional check
-for the added plugin. Shipping plugin code does not configure its credentials,
-Connections or customer access.
+- `id`: native OpenClaw plugin ID.
+- `package`: scoped `@raw-labs/...` npm package name.
+- `version`: exact package version.
+- `sha256`: SHA-256 of the published tarball.
+- `source`: `repository` HTTPS Git URL and full `commit` used to publish it.
 
-Installing arbitrary third-party plugins from a registry or Git repository is not
-implemented. When needed, extend the schema and build code together: define exact
-source/version and integrity pins, deterministic installation, license handling,
-generated provenance and native verification. Add this support when an ingredient
-requires it; do not predeclare unused fields.
+The Action downloads the package from GitHub's private npm registry using its
+job token. Grant the factory repository **Read** in the package's **Manage Actions
+access** settings. Resolution rejects changed bytes, wrong package identities,
+missing notices, links and unsafe archive paths. Native builds embed the compiled
+package without fetching dependencies at runtime, check its SDK identity, and
+record its file inventory and source pins in generated provenance.
+
+Shipping a plugin makes its code available. OCE native Configuration values,
+Secret bindings, tool policy and UI consent still control its use; provider
+accounts and grants belong to the installation owner. Added plugins require
+functional checks against both actual native shipping images.
+
+Selected preset files use OCE's existing seeding. They are included once under
+`oce/deploy/presets/raw/` for inspection and at the matching controller image path.
+No installer import command is needed. OCE adds missing presets and preserves
+existing same-name copies; a new bundle does not overwrite operator edits or
+reconcile preset removals. Version `2` retains its original archive-only behavior.
 
 ## Evolving the schema
 

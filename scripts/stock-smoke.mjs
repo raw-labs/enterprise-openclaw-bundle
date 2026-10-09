@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const [source, image, state, output] = process.argv.slice(2);
 const { prepareRuntimeImageSmoke } = await import(pathToFileURL(resolve(source, "scripts/ci/prepare.mjs")));
@@ -19,7 +19,8 @@ try {
     apparmor: prepared.env.OCC_TEST_CODEX_APPARMOR_PROFILE ?? null,
     scope: "Selected source's reviewed additions to this native CI node baseline; customer node policy requires review.",
   }, null, 2) + "\n");
-  execFileSync(process.execPath, ["--test", "--test-concurrency=1", "--test-reporter=tap", ...runtimeImageSmokeTests], {
+  execFileSync(process.execPath, ["--test", "--test-concurrency=1", "--test-reporter=tap", ...runtimeImageSmokeTests,
+    fileURLToPath(new URL("../tests/native_connections.mjs", import.meta.url))], {
     cwd: source,
     env: { ...process.env, ...prepared.env, OCC_TEST_RUNTIME_IMAGE: image, OCC_TEST_IMAGE_TIMEOUT_MULTIPLIER: "1" },
     stdio: "inherit",
