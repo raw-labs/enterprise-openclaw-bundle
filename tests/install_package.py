@@ -330,7 +330,15 @@ def exercise(args):
                                 ],
                                 "readinessProbe": {
                                     "exec": {
-                                        "command": ["pg_isready", "-U", "postgres"]
+                                        "command": [
+                                            "pg_isready",
+                                            "-h",
+                                            "127.0.0.1",
+                                            "-U",
+                                            "postgres",
+                                            "-d",
+                                            "openclaw_enterprise",
+                                        ]
                                     },
                                     "periodSeconds": 2,
                                 },
@@ -454,10 +462,16 @@ def exercise(args):
             claim["metadata"]["name"] = cp["bootstrapPasswordClaimName"]
             claim["spec"]["storageClassName"] = "local-path"
             apply(claim)
+            chart_values = helm_values(
+                upstream / "deploy/helm/openclaw-enterprise/values.yaml"
+            )
+            installation_settings = (
+                chart_values["installation"] | values["installation"]
+            )
             secret(
-                values["installation"]["secretName"],
+                installation_settings["secretName"],
                 {
-                    values["installation"]["key"]: (
+                    installation_settings["key"]: (
                         rendered / "installation.yaml"
                     ).read_text()
                 },
@@ -589,15 +603,78 @@ def exercise(args):
             )
             key_path = work / "service-key.json"
             key_path.write_bytes(key)
+            # The production API binds its Pod IP. Use an explicitly allowed client
+            # for the test connection; the relay is fixture-only and carries no key.
+            client = cp["apiClients"][0]
+            kubectl("create", "namespace", client["namespace"])
+            api_port = (chart_values["api"] | values.get("api", {}))["port"]
+            apply(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Pod",
+                    "metadata": {
+                        "name": "api-client",
+                        "namespace": client["namespace"],
+                        "labels": client["podLabels"],
+                    },
+                    "spec": {
+                        "nodeSelector": cp["nodeSelector"],
+                        "restartPolicy": "Never",
+                        "automountServiceAccountToken": False,
+                        "securityContext": reader["spec"]["securityContext"],
+                        "containers": [
+                            {
+                                "name": "client",
+                                "image": controller,
+                                "securityContext": reader["spec"]["containers"][0][
+                                    "securityContext"
+                                ],
+                                "command": [
+                                    "node",
+                                    "-e",
+                                    """
+const net = require('node:net');
+net.createServer(client => {
+  const upstream = net.connect(Number(process.env.API_PORT), process.env.API_HOST);
+  client.pipe(upstream).pipe(client);
+  client.on('error', () => upstream.destroy());
+  upstream.on('error', () => client.destroy());
+}).listen(8080, '0.0.0.0');
+""",
+                                ],
+                                "env": [
+                                    {
+                                        "name": "API_HOST",
+                                        "value": f"openclaw-enterprise-api.{cp['namespace']}.svc.cluster.local",
+                                    },
+                                    {"name": "API_PORT", "value": str(api_port)},
+                                ],
+                                "readinessProbe": {
+                                    "tcpSocket": {"port": 8080},
+                                    "periodSeconds": 1,
+                                },
+                            }
+                        ],
+                    },
+                }
+            )
+            kubectl(
+                "-n",
+                client["namespace"],
+                "wait",
+                "--for=condition=Ready",
+                "pod/api-client",
+                "--timeout=120s",
+            )
             forward = subprocess.Popen(
                 [
                     str(x)
                     for x in [
                         *kube,
                         "-n",
-                        cp["namespace"],
+                        client["namespace"],
                         "port-forward",
-                        "service/openclaw-enterprise-api",
+                        "pod/api-client",
                         "18080:8080",
                     ]
                 ],
