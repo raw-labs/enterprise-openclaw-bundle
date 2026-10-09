@@ -2,7 +2,7 @@
 # Disposable native release runners only; never an installation-host setup tool.
 set -euo pipefail
 test "${GITHUB_ACTIONS:-}" = true
-test "$(id -u)" = 1000
+printf 'Native runner UID: %s\n' "$(id -u)"
 test "$(. /etc/os-release; echo "$ID/$VERSION_CODENAME")" = ubuntu/noble
 
 sudo apt-get -o Acquire::Retries=3 update
@@ -28,4 +28,10 @@ config.setdefault('features', {})['containerd-snapshotter'] = True
 path.write_text(json.dumps(config) + '\n')
 PY
 sudo systemctl restart docker
+probe_user=$(getent passwd 1000 | cut -d: -f1 || true)
+if test -z "$probe_user"; then
+  sudo useradd --uid 1000 --no-create-home --shell /usr/sbin/nologin bundle-probe
+  probe_user=bundle-probe
+fi
+sudo usermod -a -G docker "$probe_user"
 python3 scripts/stock.py docker-preflight

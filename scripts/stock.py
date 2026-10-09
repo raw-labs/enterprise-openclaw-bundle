@@ -451,7 +451,8 @@ def tests(command, source, env, log):
 
 def check(args, release):
     native_arch(args.arch)
-    require(os.getuid() == 1000, "OCE's native image probe requires UID 1000")
+    require(os.getuid() == 1000 or os.environ.get("GITHUB_ACTIONS") == "true",
+            "run as UID 1000; CI may use its prepared UID 1000 probe user")
     toolchain = docker_preflight()
     out = Path(args.build).resolve()
     source = Path(args.source).resolve()
@@ -553,11 +554,14 @@ def check(args, release):
                 "shipping upstream notice mismatch",
             )
         log = logs / "upgrade-probe.json"
+        command = ["node", source / "scripts/upgrade-repository-image-probe.mjs",
+                   staged["controller"], staged["repositoryCredentials"], record["platform"]]
+        if os.getuid() != 1000:
+            command = ["sudo", "--user=#1000", "--", "env", "PATH=" + env["PATH"], *command]
         with log.open("w") as file:
             os.chmod(log, 0o600)
             result = subprocess.run(
-                ["node", source / "scripts/upgrade-repository-image-probe.mjs",
-                 staged["controller"], staged["repositoryCredentials"], record["platform"]],
+                command,
                 cwd=source, env=env, stdout=file, stderr=subprocess.STDOUT, timeout=360,
             )
         require(result.returncode == 0, f"OCE's image probe failed; private diagnostics: {log}")
