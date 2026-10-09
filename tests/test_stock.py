@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "delivery"))
 import prepare as installer  # noqa: E402
 from bundle import cli_files  # noqa: E402
+from release import verify_handoff_layout  # noqa: E402
 from common import (  # noqa: E402
     digest,
     helm_values,
@@ -427,6 +428,9 @@ class StockArtifact(unittest.TestCase):
         self.assertIn("candidate cannot be installed", result.stderr)
 
     def test_installer_layout_links_and_commands(self):
+        # Exercise the release validator on the actual unbuilt archive too.
+        # Native security files are checked on the native release archive in CI.
+        verify_handoff_layout(self.artifact, native=False)
         self.assertEqual(
             {p.name for p in self.artifact.iterdir()},
             {

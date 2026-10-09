@@ -23,6 +23,12 @@ from common import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+HANDOFF_DOCUMENTS = {
+    "AGENTS.md": ROOT / "delivery/AGENTS.md",
+    "INSTALL.md": ROOT / "docs/install.md",
+    "UPDATE.md": ROOT / "docs/update.md",
+    "OPERATE.md": ROOT / "docs/operate.md",
+}
 
 
 def source_files(release, selection):
@@ -285,10 +291,8 @@ def package(args, release):
     for name in release["payloadFiles"]:
         payload = release_file(args.release, ROOT, name)
         files[name] = (payload.read_bytes(), 0o644)
-    files["INSTALL.md"] = ((ROOT / "docs/install.md").read_bytes(), 0o644)
-    files["UPDATE.md"] = ((ROOT / "docs/update.md").read_bytes(), 0o644)
-    files["OPERATE.md"] = ((ROOT / "docs/operate.md").read_bytes(), 0o644)
-    files["AGENTS.md"] = ((ROOT / "delivery/AGENTS.md").read_bytes(), 0o644)
+    for name, document in HANDOFF_DOCUMENTS.items():
+        files[name] = (document.read_bytes(), 0o644)
     # Runtime build inputs are deliberately excluded.
     copy = json.loads(json.dumps(release))
     copy["operatorCli"] = cli

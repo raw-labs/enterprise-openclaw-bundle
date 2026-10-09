@@ -17,7 +17,7 @@ import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
-from bundle import package, verify_source
+from bundle import HANDOFF_DOCUMENTS, package, verify_source
 from common import (
     HASH,
     IMAGE,
@@ -442,6 +442,18 @@ def preflight(version, expected_sha):
     )
 
 
+def verify_handoff_layout(artifact, *, native=True):
+    expected = set(HANDOFF_DOCUMENTS) | {
+        "bin", "defaults", "examples", "lib", "metadata", "notices", "oce",
+    }
+    if native:
+        expected.add("security")
+    require(
+        {p.name for p in artifact.iterdir()} == expected,
+        "unexpected installer package layout",
+    )
+
+
 def verify_handoff(archive, published=True):
     """Exercise the delivered verifier and real charts/renderers before creating a release."""
     with tempfile.TemporaryDirectory() as temporary:
@@ -456,23 +468,7 @@ def verify_handoff(archive, published=True):
         dirs = list(root.iterdir())
         require(len(dirs) == 1 and dirs[0].is_dir(), "invalid handoff root")
         artifact = dirs[0]
-        require(
-            {p.name for p in artifact.iterdir()}
-            == {
-                "AGENTS.md",
-                "INSTALL.md",
-                "OPERATE.md",
-                "bin",
-                "defaults",
-                "examples",
-                "lib",
-                "metadata",
-                "notices",
-                "oce",
-                "security",
-            },
-            "unexpected installer package layout",
-        )
+        verify_handoff_layout(artifact)
         run(
             [artifact / "bin/prepare", "verify"],
             stdout=subprocess.DEVNULL,
