@@ -356,6 +356,18 @@ class StockArtifact(unittest.TestCase):
         self.assertTrue((chart / "LICENSE").is_file())
         self.assertFalse((self.artifact / "scripts").exists())
         self.assertNotIn("tools/common.py", manifest)
+        self.assertFalse(
+            any(
+                p.startswith(
+                    (
+                        "upstream/docs/contributing/",
+                        "upstream/docs/testing/",
+                        "upstream/docs/design/",
+                    )
+                )
+                for p in manifest
+            )
+        )
         self.assertEqual(
             (self.artifact / "upstream/deploy/profiles/codex.json").read_bytes(),
             (self.source / "deploy/profiles/codex.json").read_bytes(),

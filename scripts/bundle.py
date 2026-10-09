@@ -209,7 +209,7 @@ def package(args, release):
             for p in sorted((source / directory).rglob("*"))
             if p.is_file()
         )
-    # Include referenced product documentation so customer access does not depend on GitHub.
+    # Follow operator guides and product reference, excluding development manuals.
     pending = [name for name in shipped if name.endswith(".md")]
     while pending:
         name = pending.pop()
@@ -220,7 +220,8 @@ def package(args, release):
                 posixpath.join(posixpath.dirname(name), target.split("#")[0])
             )
             if (
-                relative.startswith("docs/")
+                relative.startswith(("docs/guides/", "docs/reference/"))
+                and relative != "docs/reference/README.md"
                 and relative.endswith(".md")
                 and relative not in shipped
                 and (source / relative).is_file()
