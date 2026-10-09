@@ -25,9 +25,17 @@ from pathlib import Path
 path = Path('/etc/docker/daemon.json')
 config = json.loads(path.read_text()) if path.exists() else {}
 config.setdefault('features', {})['containerd-snapshotter'] = True
+# Classic-store driver options do not apply to containerd's snapshotter.
+config.pop('storage-driver', None)
+config.pop('storage-opts', None)
 path.write_text(json.dumps(config) + '\n')
 PY
-sudo systemctl restart docker
+sudo systemctl restart containerd
+sudo systemctl reset-failed docker
+if ! sudo systemctl restart docker; then
+  sudo journalctl -u docker --no-pager -n 30
+  exit 1
+fi
 probe_user=$(getent passwd 1000 | cut -d: -f1 || true)
 if test -z "$probe_user"; then
   sudo useradd --uid 1000 --no-create-home --shell /usr/sbin/nologin bundle-probe
