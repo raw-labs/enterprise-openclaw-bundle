@@ -258,6 +258,18 @@ def verify_upgrade_probe(proof, release, arch, identities):
     )
 
 
+def verify_baseline_runtime(info, baseline, platform):
+    # The manifest binds its config and layers. Docker's image ID is not a config digest.
+    require(
+        info["Descriptor"]["digest"] == baseline["images"]["runtime"]["platforms"][platform]["digest"]
+        and info["Os"] + "/" + info["Architecture"] == platform
+        and info["Config"]["Labels"]["org.opencontainers.image.revision"] == baseline["oceCommit"]
+        and info["Config"]["Labels"]["org.opencontainers.image.source"]
+        == "https://github.com/raw-labs/enterprise-openclaw-bundle",
+        "upgrade baseline runtime identity mismatch",
+    )
+
+
 def inspect_oci(directory, platform, source_sha):
     root = load(directory / "index.json")
     require(len(root["manifests"]) == 1, "expected exactly one native export")
@@ -582,10 +594,7 @@ def check(args, release):
             run(["docker", "pull", "--platform", record["platform"], reference], stdout=subprocess.DEVNULL)
             info = json.loads(subprocess.check_output([
                 "docker", "image", "inspect", "--platform", record["platform"], reference]))[0]
-            require(info["Descriptor"]["digest"] == previous["platforms"][record["platform"]]["digest"]
-                    and info["Id"] == previous["platforms"][record["platform"]]["configDigest"]
-                    and info["Config"]["Labels"]["org.opencontainers.image.revision"] == baseline["oceCommit"],
-                    "upgrade baseline runtime identity mismatch")
+            verify_baseline_runtime(info, baseline, record["platform"])
             env["BUNDLE_UPGRADE_RUNTIME_IMAGE"] = info["Id"]
             receipt["upgradeBaseline"] = baseline
         receipt["lanes"]["controller"] = tests(

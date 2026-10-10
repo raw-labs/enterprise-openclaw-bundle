@@ -41,6 +41,7 @@ from stock import (  # noqa: E402
     staged_tag,
     tap_counts,
     tests as native_tests,
+    verify_baseline_runtime,
     verify_receipt,
     validate_docker,
 )
@@ -55,6 +56,27 @@ class StockInputs(unittest.TestCase):
         mutate(release)
         with self.assertRaises(ValueError):
             validate(release)
+
+    def test_baseline_manifest_binds_the_native_image_without_assuming_a_config_id(self):
+        manifest = "sha256:" + "1" * 64
+        source = "2" * 40
+        baseline = {"oceCommit": source, "images": {"runtime": {"platforms": {
+            "linux/amd64": {"digest": manifest, "configDigest": "sha256:" + "3" * 64},
+        }}}}
+        info = {"Id": manifest, "Descriptor": {"digest": manifest}, "Os": "linux", "Architecture": "amd64",
+                "Config": {"Labels": {"org.opencontainers.image.revision": source,
+                                      "org.opencontainers.image.source": "https://github.com/raw-labs/enterprise-openclaw-bundle"}}}
+        verify_baseline_runtime(info, baseline, "linux/amd64")
+        for mutate in (
+            lambda i: i["Descriptor"].update(digest="sha256:" + "4" * 64),
+            lambda i: i.update(Architecture="arm64"),
+            lambda i: i["Config"]["Labels"].update({"org.opencontainers.image.revision": "5" * 40}),
+            lambda i: i["Config"]["Labels"].update({"org.opencontainers.image.source": "https://example.invalid/other"}),
+        ):
+            changed = copy.deepcopy(info)
+            mutate(changed)
+            with self.assertRaises(ValueError):
+                verify_baseline_runtime(changed, baseline, "linux/amd64")
 
     def test_unbuilt_has_no_shipping_images(self):
         self.assertTrue(
