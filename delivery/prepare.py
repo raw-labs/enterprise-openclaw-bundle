@@ -61,8 +61,13 @@ def render(args, release, admit=True):
     # The bundle's selected templates are controller image ingredients.
     # Reuse OCE's file seeding; installers do not import a second copy.
     selected_presets = [p["path"] for p in release.get("presets", [])]
-    if selected_presets:
+    if selected_presets or "includeDefaultPresets" in release:
         presets = site.setdefault("presets", {})
+        if "includeDefaultPresets" in release:
+            selected = release["includeDefaultPresets"]
+            require(presets.get("includeDefaults", selected) == selected,
+                    "presets.includeDefaults is selected by the bundle definition")
+            presets["includeDefaults"] = selected
         existing = presets.get("files", [])
         require(isinstance(existing, list) and all(isinstance(p, str) for p in existing), "presets.files must contain paths")
         presets["files"] = list(dict.fromkeys([*selected_presets, *existing]))
@@ -157,6 +162,12 @@ def check(args, release):
     values = helm_values(out / "values.yaml")
     installation = (out / "installation.yaml").read_bytes()
     config = helm_values(out / "installation.yaml")
+    presets = config.get("presets", {})
+    require(all(p["path"] in presets.get("files", []) for p in release.get("presets", [])),
+            "rendered preset selection mismatch")
+    if "includeDefaultPresets" in release:
+        require(presets.get("includeDefaults") is release["includeDefaultPresets"],
+                "rendered preset default selection mismatch")
     compute = config["drivers"]["compute"]["configuration"]
     require(
         values["images"]["controller"] == selection["images"]["controller"],

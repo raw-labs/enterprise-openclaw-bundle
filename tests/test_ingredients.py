@@ -1,5 +1,6 @@
 """Native ingredient integrity, archive boundaries and release-bound preset wiring."""
 import io
+import json
 import sys
 import tarfile
 import unittest
@@ -10,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from common import digest, load
 from ingredients import RegistryRedirect, package_files, plugin_selections
-from release import latest_definition
+from release import latest_definition, preset_selection
 
 
 class Ingredients(unittest.TestCase):
@@ -71,9 +72,23 @@ class Ingredients(unittest.TestCase):
             with self.assertRaises(ValueError):
                 package_files(data.getvalue(), self.plugin | {"sha256": digest(data.getvalue())})
 
+    def test_missing_plugin_code_or_ui_is_not_an_unconfigured_plugin(self):
+        with tarfile.open(self.archive) as original:
+            ui = json.load(original.extractfile("package/openclaw.plugin.json"))["controlUi"]["entry"]
+            members = [(member, original.extractfile(member).read() if member.isfile() else None)
+                       for member in original.getmembers()]
+        for missing in ("package/dist/index.js", "package/openclaw.plugin.json", "package/" + ui):
+            data = io.BytesIO()
+            with tarfile.open(fileobj=data, mode="w:gz") as archive:
+                for member, content in members:
+                    if member.name != missing:
+                        archive.addfile(member, io.BytesIO(content) if content is not None else None)
+            with self.assertRaises((ValueError, KeyError)):
+                package_files(data.getvalue(), self.plugin | {"sha256": digest(data.getvalue())})
+
     def test_selected_presets_are_single_image_ingredients(self):
         release = load(ROOT / ".work/resolved/candidate.json")
-        self.assertEqual([p["name"] for p in release["presets"]], [load(ROOT / p["path"])["name"] for p in self.spec["presets"]])
+        self.assertEqual([p["name"] for p in release["presets"]], [load(ROOT / p["path"])["name"] for p in preset_selection(self.spec)[1]])
         self.assertFalse(any(p.endswith("-preset.json") for p in release["payloadFiles"]))
         for preset in release["presets"]:
             source = ROOT / ".work/resolved/source" / preset["path"].removeprefix("/app/")

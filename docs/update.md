@@ -63,10 +63,18 @@ In particular, newly selected preset files require adding their image paths to
 the existing Installation's `presets.files`. First update the controller so it
 contains those files, then apply that separate settings change. Paths are recorded
 under `presets` in `metadata/release.json`. Existing same-name presets, including
-edits, are preserved. Added plugins are packaged code; enable them separately
-through native Configuration and Secret bindings as described in
+edits, are preserved. Adopt plugin settings and Secret bindings as described in
 [OPERATE.md](OPERATE.md#presets-and-native-plugins). Review plugin state compatibility
 and verify provider access after the runtime update.
+
+To adopt changed preset templates, first read and retain the installed copies
+with `occ preset get ID -o json`. Compare the selected files in
+`oce/deploy/presets/raw/`; merge intended settings while retaining site Secret
+references and customizations. Update through OCE's Preset HTTP API. Disable
+unwanted default seeding in the Installation before using `occ preset delete ID`
+to remove reviewed obsolete copies, or startup can recreate them. Deleting a
+preset leaves copied Configurations and Agents intact. Template updates affect
+future creation only; update/redeploy existing Agent drafts separately.
 
 The helper stops the API and worker while Helm runs database migrations and
 bootstrap before rollout. Runtime updates redeploy all running Agents concurrently

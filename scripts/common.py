@@ -143,6 +143,8 @@ def validate_stock(release):
     from ingredients import plugin_selections
 
     _, packages = plugin_selections(release["plugins"], release.get("definitionSchemaVersion", 2))
+    if release.get("definitionSchemaVersion") == 4:
+        require(isinstance(release.get("includeDefaultPresets"), bool), "preset default selection is required")
     resolved = release.get("pluginPackages", [])
     require(
         [{k: v for k, v in p.items() if k != "files"} for p in resolved] == packages,

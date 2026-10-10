@@ -41,6 +41,16 @@ SEMVER = re.compile(
 )
 
 
+def preset_selection(spec):
+    if spec["schemaVersion"] < 4:
+        return True, spec["presets"]
+    value = spec["presets"]
+    require(isinstance(value, dict) and set(value) == {"includeDefaults", "files"}
+            and isinstance(value["includeDefaults"], bool),
+            "presets requires includeDefaults and files")
+    return value["includeDefaults"], value["files"]
+
+
 def pinned_file(reference):
     require(set(reference) == {"path", "sha256"}, "file requires path and sha256")
     require(HASH.fullmatch(reference["sha256"]), "invalid ingredient checksum")
@@ -76,7 +86,7 @@ def definition(path):
         "unknown or missing bundle fields",
     )
     require(
-        spec["schemaVersion"] in (2, 3) and SEMVER.fullmatch(spec["version"]),
+        spec["schemaVersion"] in (2, 3, 4) and SEMVER.fullmatch(spec["version"]),
         "use an immutable numbered alpha, beta or rc version",
     )
     require(path.parent.name == spec["version"], "folder/version mismatch")
@@ -96,7 +106,8 @@ def definition(path):
         spec["architectures"] == ["linux/amd64", "linux/arm64"],
         "both native targets required",
     )
-    require(isinstance(spec["presets"], list), "presets must be a list")
+    _, preset_refs = preset_selection(spec)
+    require(isinstance(preset_refs, list), "preset files must be a list")
     plugin_selections(spec["plugins"], spec["schemaVersion"])
     build = spec["build"]
     require(set(build) == {"patches", "confinement"}, "unknown or missing build fields")
@@ -113,7 +124,8 @@ def definition(path):
         "pin reviewed source confinement inputs in bundle.json",
     )
     targets, names = set(), set()
-    for ref in spec["presets"]:
+    plugin_ids = {p if isinstance(p, str) else p["id"] for p in spec["plugins"]}
+    for ref in preset_refs:
         source = pinned_file(ref)
         require(source.name.endswith("-preset.json"), "preset must be a JSON template")
         preset = load(source)
@@ -125,6 +137,12 @@ def definition(path):
         )
         require(source.name not in targets, "duplicate preset filename")
         targets.add(source.name)
+        values = preset.get("template", {}).get("configuration", {}).get("values", {})
+        enabled = {key for key, entry in values.get("plugins", {}).get("entries", {}).items()
+                   if entry.get("enabled") is True}
+        require(enabled <= plugin_ids, "preset enables a plugin not selected for the runtime")
+        allow = values.get("plugins", {}).get("allow")
+        require(allow is None or enabled <= set(allow), "preset allowlist excludes an enabled plugin")
     pinned_file(spec["codexProfile"])
     return spec
 
@@ -201,8 +219,9 @@ def resolve(args):
     bundled_plugins, package_plugins = plugin_selections(spec["plugins"], spec["schemaVersion"])
     plugin_packages = resolve_plugins(package_plugins, source, getattr(args, "plugin_cache", None))
     presets = []
-    if spec["schemaVersion"] == 3:
-        for ref in spec["presets"]:
+    include_defaults, preset_refs = preset_selection(spec)
+    if spec["schemaVersion"] >= 3:
+        for ref in preset_refs:
             path = "deploy/presets/raw/" + Path(ref["path"]).name
             target = safe_path(source, path)
             require(not target.exists(), "preset would overwrite source")
@@ -281,7 +300,7 @@ def resolve(args):
     chart_version = one(
         r"^version: ([\w.+-]+)$", (source / chart_path / "Chart.yaml").read_text()
     )
-    payload = {} if spec["schemaVersion"] == 3 else {"defaults/" + Path(ref["path"]).name: ref for ref in spec["presets"]}
+    payload = {} if spec["schemaVersion"] >= 3 else {"defaults/" + Path(ref["path"]).name: ref for ref in preset_refs}
     payload["defaults/codex-profile.json"] = spec["codexProfile"]
     examples = sorted((ROOT / "docs/examples/installations").glob("*.json"))
     require(examples, "installation documentation examples missing")
@@ -350,6 +369,7 @@ def resolve(args):
         "plugins": spec["plugins"],
         "pluginPackages": plugin_packages,
         "presets": presets,
+        **({"includeDefaultPresets": include_defaults} if spec["schemaVersion"] >= 4 else {}),
         "sources": {
             "oce": oce,
             "openclaw": {

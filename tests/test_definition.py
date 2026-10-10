@@ -16,6 +16,7 @@ from release import (  # noqa: E402
     definition,
     latest_definition,
     pinned_file,
+    preset_selection,
     preflight,
 )
 from stock import publish  # noqa: E402
@@ -29,7 +30,7 @@ class DefinitionInputs(unittest.TestCase):
     def rejected(self, mutate):
         spec = copy.deepcopy(self.spec)
         mutate(spec)
-        with patch("release.load", return_value=spec):
+        with patch("release.load", side_effect=lambda path: spec if Path(path) == self.path else load(path)):
             with self.assertRaises(ValueError):
                 definition(self.path)
 
@@ -53,6 +54,16 @@ class DefinitionInputs(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 pinned_file(ref)
+
+    def test_preset_policy_and_enabled_plugin_must_match_selection(self):
+        for mutate in (
+            lambda s: s["presets"].update(includeDefaults="false"),
+            lambda s: s["presets"].update(files={}),
+            lambda s: s["presets"].update(default="unknown"),
+            lambda s: s.update(plugins=["codex", "slack"]),
+        ):
+            self.rejected(mutate)
+        self.assertFalse(preset_selection(self.spec)[0])
 
     def test_all_definitions_have_one_complete_selection(self):
         paths = list((ROOT / "bundles").glob("*/bundle.json"))

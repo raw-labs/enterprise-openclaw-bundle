@@ -740,7 +740,8 @@ class StockArtifact(unittest.TestCase):
                     installer.selected_images(release, path)
 
     def test_delivered_file_tampering_is_detected(self):
-        path = self.artifact / "oce/deploy/presets/raw/coding-preset.json"
+        release = load(self.artifact / "metadata/release.json")
+        path = self.artifact / "oce" / release["presets"][0]["path"].removeprefix("/app/")
         original = path.read_bytes()
         try:
             path.write_bytes(original + b" ")
@@ -778,6 +779,7 @@ class StockArtifact(unittest.TestCase):
                 installer.render(args, release, admit=False)
                 installation = helm_values(output / "installation.yaml")
                 self.assertEqual(installation["presets"]["files"], [p["path"] for p in release["presets"]])
+                self.assertEqual(installation["presets"]["includeDefaults"], release["includeDefaultPresets"])
                 runtime = installation["drivers"]["compute"]["configuration"]["runtime"]
                 self.assertEqual(runtime["nodeSelector"]["kubernetes.io/arch"], arch)
                 self.assertNotIn("kubernetes.io/arch", runtime["gatewayNodeSelector"])
@@ -790,4 +792,16 @@ class StockArtifact(unittest.TestCase):
             args.architecture = None
             args.output = self.out / "missing-arch-contract"
             with self.assertRaisesRegex(ValueError, "select a released"):
+                installer.render(args, release, admit=False)
+
+    def test_site_cannot_override_selected_default_presets(self):
+        release = load(self.artifact / "metadata/release.json")
+        site = load(self.artifact / "examples/installations/site.json")
+        site["presets"] = {"includeDefaults": not release["includeDefaultPresets"]}
+        with tempfile.TemporaryDirectory() as temp, patch.object(installer, "ROOT", self.artifact):
+            path = Path(temp) / "site.json"
+            save(path, site)
+            args = SimpleNamespace(input=path, output=Path(temp) / "rendered", mirrors=None,
+                                   architecture="linux/amd64", profile="codex")
+            with self.assertRaisesRegex(ValueError, "selected by the bundle"):
                 installer.render(args, release, admit=False)

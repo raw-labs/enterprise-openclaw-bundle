@@ -1,0 +1,81 @@
+--- a/apps/controller/src/console/agents/presets.mjs
++++ b/apps/controller/src/console/agents/presets.mjs
+@@ -5,6 +5,8 @@
+   validatePresetTemplate,
+ } from "../preset-variables.mjs";
+ import { message, namespacePath } from "./list.mjs";
++
++import { defaultPresetId } from "./starter-model.mjs";
+ 
+ const NEW_SECRET = "new";
+ const EXISTING_SECRET = "existing";
+@@ -58,7 +60,7 @@
+   const chooseHint = () =>
+     defaultId
+       ? "Choose a Preset or start with the default Preset."
+-      : "Choose a Preset. default-codex is not available to you in this Namespace.";
++      : "Choose a Preset. No readable default is available in this Namespace.";
+   const startDefault = button(
+     "Start with default Preset",
+     () => {
+@@ -445,7 +447,7 @@
+           .map((preset) => element("option", { value: preset.id }, preset.name)),
+       );
+       selector.disabled = false;
+-      defaultId = presets.find((preset) => preset.name === "default-codex")?.id;
++      defaultId = defaultPresetId(presets);
+       startDefault.disabled = !defaultId;
+       if (retained && presets.some((preset) => preset.id === retained.id)) {
+         selector.value = retained.id;
+@@ -454,7 +456,7 @@
+       }
+       if (presets.length === 0) {
+         status.textContent =
+-          "No Presets available to you in this Namespace. Ask an administrator to install default-codex or another Preset, or to give you read access to a Preset.";
++          "No Presets available to you in this Namespace. Ask an administrator to install a Preset or give you read access to one.";
+       } else {
+         status.textContent = chooseHint();
+       }
+--- a/apps/controller/src/console/agents/starter-model.mjs
++++ b/apps/controller/src/console/agents/starter-model.mjs
+@@ -1 +1,6 @@
+ export const defaultAgentModel = "gpt-6-astra";
++
++export function defaultPresetId(presets) {
++  return (presets.find((preset) => preset.name === "default-codex") ??
++    presets.toSorted((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))[0])?.id;
++}
+--- a/apps/controller/src/console/agents/create.mjs
++++ b/apps/controller/src/console/agents/create.mjs
+@@ -676,7 +676,10 @@
+     if (next.plugins) {
+       values.plugins = {
+         ...values.plugins,
+-        allow: [...new Set([...(values.plugins?.allow ?? []), ...next.plugins.allow])],
++        // An absent allowlist is unrestricted; a Harness switch must not narrow it.
++        ...(Array.isArray(values.plugins?.allow)
++          ? { allow: [...new Set([...values.plugins.allow, ...next.plugins.allow])] }
++          : {}),
+         entries: {
+           ...values.plugins?.entries,
+           codex: resetTransport
+--- a/scripts/render-installation-profile.mjs
++++ b/scripts/render-installation-profile.mjs
+@@ -692,7 +692,7 @@
+   const codex = section(input, "codex", diagnostics, false);
+   const repository = section(input, "repository", diagnostics, false);
+   const presets = section(input, "presets", diagnostics, false);
+-  closed(presets, "presets", ["files"], diagnostics);
++  closed(presets, "presets", ["includeDefaults", "files"], diagnostics);
+   closed(
+     controlPlane,
+     "controlPlane",
+@@ -1135,7 +1135,7 @@
+     ...(observabilityUrl === undefined ? {} : { observability: { url: observabilityUrl } }),
+     backend: [],
+     presets: {
+-      includeDefaults: true,
++      includeDefaults: asBoolean(presets, ["presets", "includeDefaults"], diagnostics, true),
+       ...(presets.files === undefined
+         ? {}
+         : { files: stringArray(presets, ["presets", "files"], diagnostics, { nonempty: false }) }),

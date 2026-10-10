@@ -55,12 +55,13 @@ test("Connections loads in the native Gateway and retains its database across Ku
     return run("kubectl", ["--kubeconfig", kubeconfig, "--context", "k3d-" + cluster, "apply", "-f", "-"], {input: JSON.stringify(object)});
   }
   const token = "synthetic-bundle-gateway-token";
-  const config = {
+  let config = {
     gateway: {mode: "local", bind: "loopback", port: 18789, auth: {mode: "token", token}, controlUi: {experimental: {customPlugins: true}}},
     plugins: {allow: ["openclaw-connections"], slots: {memory: "none"}, entries: {
       "openclaw-connections": {enabled: true, config: {apiKey: {source: "env", provider: "default", id: "COMPOSIO_API_KEY"}}},
     }},
   };
+  const configuredBase = structuredClone(config);
   const pod = {
     apiVersion: "v1", kind: "Pod", metadata: {name: "gateway", namespace: "bundle-connections"},
     spec: {
@@ -108,6 +109,79 @@ test("Connections loads in the native Gateway and retains its database across Ku
       accessModes: ["ReadWriteOnce"], storageClassName: "local-path", resources: {requests: {storage: "100Mi"}},
     }});
     const saveConfig = () => put({apiVersion: "v1", kind: "ConfigMap", metadata: {name: "gateway", namespace: "bundle-connections"}, data: {"openclaw.json": JSON.stringify(config)}});
+    const uiAvailable = () => assert.ok(call("plugins.controlUi.list").plugins.some(p => p.pluginId === "openclaw-connections"));
+    const selectedConfig = async (preset) => {
+      assert.ok(preset.path.startsWith("/app/"));
+      const selected = JSON.parse(await readFile(resolve(preset.path.slice(5)), "utf8"));
+      const values = JSON.parse(JSON.stringify(selected.template.configuration.values).replaceAll("{{ vars.model }}", selected.template.variables.model.default));
+      values.gateway = {...values.gateway, bind:"loopback", port:18789, auth:{mode:"token",token}};
+      values.plugins.slots = {memory:"none"};
+      return values;
+    };
+    const noTools = () => kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
+      import assert from 'node:assert/strict';
+      for (const name of ['connections_search','connections_describe','connections_call']) {
+        const response = await fetch('http://127.0.0.1:18789/tools/invoke', {method:'POST',
+          headers:{authorization:'Bearer ${token}','content-type':'application/json'},
+          body:JSON.stringify({tool:name,args:{},agentId:'main',idempotencyKey:'unconfigured-'+name})});
+        assert.equal(response.status,404); assert.match(await response.text(),/Tool not available/);
+      }
+      assert.equal(await import('node:fs').then(fs=>fs.existsSync('/home/node/.openclaw/connections/connections.sqlite')),false);
+    `);
+    if (release.includeDefaultPresets === false) {
+      pod.spec.containers[0].env = pod.spec.containers[0].env.filter(e => e.name !== "COMPOSIO_API_KEY");
+      pod.spec.containers[0].env.push({name:"APP_SERVER_URL",value:"ws://127.0.0.1:9"}, {name:"APP_SERVER_TOKEN",value:"synthetic-guardian-token"});
+      for (const preset of release.presets) {
+        config = await selectedConfig(preset);
+        phase = "unconfigured selected preset " + preset.name;
+        saveConfig(); start();
+        assert.deepEqual(call("connections.status"), {configured:false,userId:null});
+        uiAvailable(); noTools(); stop();
+      }
+      phase = "missing native capability SecretRef";
+      config.plugins.entries["openclaw-connections"].config = {apiKey:{source:"env",provider:"default",id:"COMPOSIO_API_KEY"}};
+      saveConfig(); start();
+      kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
+        import assert from 'node:assert/strict';
+        import { GatewayClient } from 'openclaw/plugin-sdk/gateway-runtime';
+        let admitted, rejected;
+        const ready = new Promise((yes,no) => {admitted=yes; rejected=no});
+        const client = new GatewayClient({url:'ws://127.0.0.1:18789',token:'${token}',clientName:'cli',mode:'cli',
+          role:'operator',scopes:['operator.admin'],deviceIdentity:null,env:process.env,onHelloOk:admitted,onConnectError:rejected});
+        try {
+          client.start();
+          await Promise.race([ready,new Promise((_,reject)=>setTimeout(()=>reject(new Error('Handshake timed out')),10000))]);
+          for (const method of ['connections.status','connections.list']) {
+            await assert.rejects(client.request(method,{}), error => {
+              assert.equal(error.details?.code,'SECRET_SURFACE_UNAVAILABLE');
+              assert.match(error.message,/capability:.*apiKey.*unavailable/);
+              assert.doesNotMatch(error.message,/synthetic-never-sent/);
+              return true;
+            });
+          }
+        } finally {client.stop()}
+      `);
+      uiAvailable();
+      noTools(); stop();
+      pod.spec.containers[0].env.push({name:"COMPOSIO_API_KEY",value:"synthetic-never-sent-project-key"});
+      for (const preset of release.presets) {
+        config = await selectedConfig(preset);
+        config.plugins.entries["openclaw-connections"].config = {apiKey:{source:"env",provider:"default",id:"COMPOSIO_API_KEY"}};
+        phase = "configured selected preset " + preset.name;
+        saveConfig(); start();
+        assert.equal(call("connections.status").configured, true);
+        uiAvailable();
+        kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
+          import assert from 'node:assert/strict';
+          const response = await fetch('http://127.0.0.1:18789/tools/invoke', {method:'POST',
+            headers:{authorization:'Bearer ${token}','content-type':'application/json'},
+            body:JSON.stringify({tool:'connections_search',args:{},agentId:'main',idempotencyKey:'configured-preset'})});
+          assert.equal(response.status,200); assert.match(await response.text(),/no_usable_connections/);
+        `);
+        stop();
+      }
+      config = structuredClone(configuredBase);
+    }
     phase = "start Gateway with native plugin configuration";
     saveConfig(); start();
     phase = "inspect native plugin";

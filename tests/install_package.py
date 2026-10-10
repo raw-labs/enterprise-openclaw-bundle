@@ -756,16 +756,32 @@ net.createServer(client => {
                         return {p["name"]: p for p in items}
 
                     before = seeded()
+                    if release.get("includeDefaultPresets") is False:
+                        require(set(before) == {p["name"] for p in release["presets"]}, "unexpected seeded preset choices")
                     for selected in release["presets"]:
                         expected = load(artifact / "oce" / selected["path"].removeprefix("/app/"))
                         require(selected["name"] in before and before[selected["name"]]["template"] == expected["template"], "selected RAW preset was not automatically seeded")
                     steps.append("selected RAW presets automatically seeded with exact templates")
+                    if release.get("includeDefaultPresets") is False:
+                        with urllib.request.urlopen("http://127.0.0.1:18080/console/agents/starter-model.mjs", timeout=30) as response:
+                            require(b"export function defaultPresetId" in response.read(), "Console did not serve the selected default preset helper")
+                        edited = before[release["presets"][0]["name"]]
+                        edited["template"]["variables"]["name"]["description"] = "Retained installation edit"
+                        request = urllib.request.Request(
+                            f"http://127.0.0.1:18080/namespaces/{namespace_id}/presets/{edited['id']}",
+                            method="PUT", data=json.dumps({"template": edited["template"]}).encode(),
+                            headers={"content-type": "application/json", "x-api-key": json.loads(key)["data"]["key"]},
+                        )
+                        with urllib.request.urlopen(request, timeout=30) as response:
+                            updated = json.load(response)["data"]
+                        require(updated["template"] == edited["template"], "native Preset update did not retain the edited template")
                     kubectl("-n", cp["namespace"], "rollout", "restart", "deployment/openclaw-enterprise-api")
                     kubectl("-n", cp["namespace"], "rollout", "status", "deployment/openclaw-enterprise-api", "--timeout=180s")
                     after = seeded()
                     for selected in release["presets"]:
                         require(after[selected["name"]]["id"] == before[selected["name"]]["id"], "controller restart duplicated or replaced an existing preset")
-                    steps.append("controller restart preserves existing preset identities")
+                        require(after[selected["name"]]["template"] == before[selected["name"]]["template"], "controller restart replaced an installed preset template")
+                    steps.append("controller restart preserves existing preset identities and edits")
             finally:
                 forward.terminate()
                 forward.wait(timeout=15)
