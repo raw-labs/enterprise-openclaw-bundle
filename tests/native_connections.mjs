@@ -98,10 +98,16 @@ test("Connections loads in the native Gateway and retains its database across Ku
   const start = () => {put(pod); kube("wait", "--for=condition=Ready", "pod/gateway", "--timeout=180s");};
   const stop = () => kube("delete", "pod/gateway", "--wait=true", "--timeout=180s");
   let created = false;
+  let tagged = false;
+  let previousTagged = false;
   let phase = "create disposable cluster";
   try {
     run("docker", ["tag", image, tag]);
-    if (previousImage) run("docker", ["tag", previousImage, previousTag]);
+    tagged = true;
+    if (previousImage) {
+      run("docker", ["tag", previousImage, previousTag]);
+      previousTagged = true;
+    }
     run("k3d", ["cluster", "create", cluster, "--servers", "1", "--agents", "0", "--no-lb", "--image",
       "docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc",
       "--kubeconfig-update-default=false", "--kubeconfig-switch-context=false", "--wait"]);
@@ -260,8 +266,8 @@ test("Connections loads in the native Gateway and retains its database across Ku
   } finally {
     // Remove only the cluster and local tag created with this random test identity.
     if (created) run("k3d", ["cluster", "delete", cluster]);
-    run("docker", ["image", "rm", tag]);
-    if (previousImage) run("docker", ["image", "rm", previousTag]);
+    if (tagged) run("docker", ["image", "rm", tag]);
+    if (previousTagged) run("docker", ["image", "rm", previousTag]);
     await rm(directory, {recursive: true, force: true});
   }
 });

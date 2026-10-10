@@ -586,7 +586,9 @@ def check(args, release):
         baseline = release.get("upgradeBaseline")
         if baseline:
             previous = baseline["images"]["runtime"]
-            reference = previous["reference"]
+            # Import only this target's immutable manifest, as k3d needs a complete local image.
+            reference = (previous["reference"].split("@", 1)[0] + "@"
+                         + previous["platforms"][record["platform"]]["digest"])
             existing = subprocess.run(["docker", "image", "inspect", reference],
                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if existing.returncode != 0:
@@ -595,13 +597,20 @@ def check(args, release):
             info = json.loads(subprocess.check_output([
                 "docker", "image", "inspect", "--platform", record["platform"], reference]))[0]
             verify_baseline_runtime(info, baseline, record["platform"])
-            env["BUNDLE_UPGRADE_RUNTIME_IMAGE"] = info["Id"]
+            env["BUNDLE_UPGRADE_RUNTIME_IMAGE"] = reference
             receipt["upgradeBaseline"] = baseline
         receipt["lanes"]["controller"] = tests(
             [*node, "tests/integration/production-image-startup.test.mjs", ROOT / "tests/native_presets.mjs"],
             source,
             dict(env, OCC_TEST_PRODUCTION_IMAGE=images["controller"], BUNDLE_TEST_SELECTION=str(Path(args.selection).resolve())),
             logs / "controller.tap",
+        )
+        connections = tests(
+            [*node, ROOT / "tests/native_connections.mjs"],
+            source,
+            dict(env, OCC_TEST_RUNTIME_IMAGE=images["runtime"],
+                 BUNDLE_TEST_SELECTION=str(Path(args.selection).resolve())),
+            logs / "connections.tap",
         )
         state = (
             Path(env.get("RUNNER_TEMP", tempfile.gettempdir()))
@@ -620,6 +629,8 @@ def check(args, release):
             dict(env, BUNDLE_TEST_SELECTION=str(Path(args.selection).resolve())),
             logs / "runtime.tap",
         )
+        for key, value in connections.items():
+            receipt["lanes"]["runtime"][key] += value
         require(not state.exists(), "runtime cleanup incomplete")
         receipt["confinement"] = load(report / "confinement.json")
         receipt["confinement"]["reviewedInputs"] = {
