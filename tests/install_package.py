@@ -9,6 +9,7 @@ import os
 import platform
 import secrets
 import shlex
+import ssl
 import subprocess
 import sys
 import tarfile
@@ -277,12 +278,12 @@ def exercise(args):
                 secrets.token_hex(24),
             )
 
-            def secret(name, values):
+            def secret(name, values, namespace="openclaw-system"):
                 apply(
                     {
                         "apiVersion": "v1",
                         "kind": "Secret",
-                        "metadata": {"name": name, "namespace": "openclaw-system"},
+                        "metadata": {"name": name, "namespace": namespace},
                         "stringData": values,
                     }
                 )
@@ -627,6 +628,14 @@ def exercise(args):
             # for the test connection; the relay is fixture-only and carries no key.
             client = cp["apiClients"][0]
             kubectl("create", "namespace", client["namespace"])
+            api_ca = work / "api.crt"
+            run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                 "-days", "1", "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
+                 "-keyout", work / "api.key", "-out", api_ca])
+            secret("api-client-tls", {"server.crt": api_ca.read_text(), "server.key": (work / "api.key").read_text()},
+                   namespace=client["namespace"])
+            api_origin = "https://127.0.0.1:18080"
+            api_tls = ssl.create_default_context(cafile=api_ca)
             api_port = (chart_values["api"] | values.get("api", {}))["port"]
             apply(
                 {
@@ -653,8 +662,8 @@ def exercise(args):
                                     "node",
                                     "-e",
                                     """
-const net = require('node:net');
-net.createServer(client => {
+const net = require('node:net'), tls = require('node:tls'), fs = require('node:fs');
+tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/tls/server.key')}, client => {
   const upstream = net.connect(Number(process.env.API_PORT), process.env.API_HOST);
   client.pipe(upstream).pipe(client);
   client.on('error', () => upstream.destroy());
@@ -669,12 +678,14 @@ net.createServer(client => {
                                     },
                                     {"name": "API_PORT", "value": str(api_port)},
                                 ],
+                                "volumeMounts": [{"name": "tls", "mountPath": "/tls", "readOnly": True}],
                                 "readinessProbe": {
                                     "tcpSocket": {"port": 8080},
                                     "periodSeconds": 1,
                                 },
                             }
                         ],
+                        "volumes": [{"name": "tls", "secret": {"secretName": "api-client-tls", "defaultMode": 0o440}}],
                     },
                 }
             )
@@ -706,7 +717,7 @@ net.createServer(client => {
                 while True:
                     try:
                         with urllib.request.urlopen(
-                            "http://127.0.0.1:18080/healthz", timeout=2
+                            api_origin + "/healthz", timeout=2, context=api_tls
                         ) as response:
                             require(response.status == 200, "API health failed")
                         break
@@ -721,7 +732,9 @@ net.createServer(client => {
                         [
                             artifact / "bin/occ",
                             "--url",
-                            "http://127.0.0.1:18080",
+                            api_origin,
+                            "--ca-bundle",
+                            api_ca,
                             "--service-key-file",
                             key_path,
                             "installation",
@@ -739,7 +752,7 @@ net.createServer(client => {
                 if release.get("presets"):
                     def occ(*args):
                         return json.loads(run([
-                            artifact / "bin/occ", "--url", "http://127.0.0.1:18080",
+                            artifact / "bin/occ", "--url", api_origin, "--ca-bundle", api_ca,
                             "--service-key-file", key_path, "--output", "json", *args,
                         ]))
 
@@ -789,11 +802,11 @@ net.createServer(client => {
                         edited = before[release["presets"][0]["name"]]
                         edited["template"]["variables"]["name"]["description"] = "Retained installation edit"
                         request = urllib.request.Request(
-                            f"http://127.0.0.1:18080/namespaces/{namespace_id}/presets/{edited['id']}",
+                            f"{api_origin}/namespaces/{namespace_id}/presets/{edited['id']}",
                             method="PATCH", data=json.dumps({"template": edited["template"]}).encode(),
                             headers={"content-type": "application/json", "x-api-key": json.loads(key)["data"]["key"]},
                         )
-                        with urllib.request.urlopen(request, timeout=30) as response:
+                        with urllib.request.urlopen(request, timeout=30, context=api_tls) as response:
                             updated = json.load(response)["data"]
                         require(updated["template"] == edited["template"], "native Preset update did not retain the edited template")
                     if baseline:
@@ -812,7 +825,8 @@ net.createServer(client => {
                              "--source-revision", candidate_release["sources"]["oce"]["commit"],
                              "--evidence-dir", work / "upgrade-evidence", "--occ", candidate / "bin/occ",
                              "--timeout-seconds", "600"], cwd=candidate / "oce", timeout=900,
-                            env=dict(os.environ, OCC_URL="http://127.0.0.1:18080", OCC_SERVICE_KEY_FILE=str(key_path)))
+                            env=dict(os.environ, OCC_URL=api_origin, OCC_SERVICE_KEY_FILE=str(key_path), OCC_CA_BUNDLE=str(api_ca)),
+                            diagnostics=True)
                         artifact = candidate
                         require(occ("installation", "get")["id"] == installation_id, "upgrade replaced the Installation")
                         require(occ("namespace", "get", namespace_id)["status"] == "ready", "upgrade lost the Namespace")
