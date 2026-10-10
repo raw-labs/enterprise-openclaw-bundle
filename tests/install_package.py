@@ -769,7 +769,7 @@ net.createServer(client => {
                         edited["template"]["variables"]["name"]["description"] = "Retained installation edit"
                         request = urllib.request.Request(
                             f"http://127.0.0.1:18080/namespaces/{namespace_id}/presets/{edited['id']}",
-                            method="PUT", data=json.dumps({"template": edited["template"]}).encode(),
+                            method="PATCH", data=json.dumps({"template": edited["template"]}).encode(),
                             headers={"content-type": "application/json", "x-api-key": json.loads(key)["data"]["key"]},
                         )
                         with urllib.request.urlopen(request, timeout=30) as response:

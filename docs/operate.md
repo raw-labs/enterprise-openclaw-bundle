@@ -54,7 +54,7 @@ For each Namespace, an installation owner:
    does not grant Secret access. See OCE's [IAM procedure](oce/docs/guides/topics/iam.md).
 3. Gets each installed preset with `occ preset get ID -o json`, preserves its
    template, and merges the following native configuration. Submit `{ "template":
-   MODIFIED_TEMPLATE }` to `PUT /namespaces/NAMESPACE_ID/presets/PRESET_ID` through
+   MODIFIED_TEMPLATE }` to `PATCH /namespaces/NAMESPACE_ID/presets/PRESET_ID` through
    the [authenticated HTTP API](oce/docs/guides/http-api.md). This requires exact
    preset `update`; the CLI does not implement preset updates.
 
