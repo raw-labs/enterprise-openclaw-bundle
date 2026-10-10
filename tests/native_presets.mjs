@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import test from "node:test";
 
 test("selected RAW presets are image-resident and accepted by OCE's real loader", () => {
   const release = JSON.parse(readFileSync(process.env.BUNDLE_TEST_SELECTION, "utf8"));
+  const sourceFiles = JSON.parse(readFileSync(resolve(dirname(process.env.BUNDLE_TEST_SELECTION), release.sources.oce.files), "utf8"));
+  const consoleFiles = Object.fromEntries(["presets.mjs", "starter-model.mjs"].map(name => {
+    const path = "apps/controller/src/console/agents/" + name;
+    return [path, sourceFiles[path]];
+  }));
   const script = `
     import assert from 'node:assert/strict';
     import { readFile } from 'node:fs/promises';
@@ -19,14 +25,11 @@ test("selected RAW presets are image-resident and accepted by OCE's real loader"
     const loaded = await loadInstallationPresets({presets: {includeDefaults, files: presets.map(p => p.path)}}, '/installation.yaml');
     for (const preset of presets) assert.ok(loaded.defaultPresets.some(p => p.name === preset.name));
     if (!includeDefaults) {
-      const { defaultPresetId } = await import('/app/apps/controller/src/console/agents/starter-model.mjs');
       assert.deepEqual(loaded.defaultPresets.map(p => p.name), presets.map(p => p.name));
-      const choices = loaded.defaultPresets.map((p, i) => ({id: String(i), name: p.name}));
-      const first = choices.toSorted((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}))[0];
-      assert.equal(defaultPresetId(choices), first.id);
-      assert.equal(defaultPresetId(choices.toReversed()), first.id);
-      assert.equal(defaultPresetId([]), undefined);
-      assert.equal(defaultPresetId([...choices,{id:'legacy',name:'default-codex'}]), 'legacy');
+      // Console behavior belongs to OCE's browser suite; ship its exact reviewed code.
+      for (const [path, expected] of Object.entries(${JSON.stringify(consoleFiles)})) {
+        assert.equal(createHash('sha256').update(await readFile('/app/' + path)).digest('hex'), expected);
+      }
       for (const preset of loaded.defaultPresets) {
         const {values, secretBindings} = preset.template.configuration;
         assert.deepEqual(secretBindings, {});
