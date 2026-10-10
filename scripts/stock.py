@@ -571,6 +571,23 @@ def check(args, release):
             "version", "daemonPlatform", "controller", "broker", "reports"
         )}
         node = ["node", "--test", "--test-concurrency=1", "--test-reporter=tap"]
+        baseline = release.get("upgradeBaseline")
+        if baseline:
+            previous = baseline["images"]["runtime"]
+            reference = previous["reference"]
+            existing = subprocess.run(["docker", "image", "inspect", reference],
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if existing.returncode != 0:
+                tags.append(reference)
+            run(["docker", "pull", "--platform", record["platform"], reference], stdout=subprocess.DEVNULL)
+            info = json.loads(subprocess.check_output([
+                "docker", "image", "inspect", "--platform", record["platform"], reference]))[0]
+            require(info["Descriptor"]["digest"] == previous["platforms"][record["platform"]]["digest"]
+                    and info["Id"] == previous["platforms"][record["platform"]]["configDigest"]
+                    and info["Config"]["Labels"]["org.opencontainers.image.revision"] == baseline["oceCommit"],
+                    "upgrade baseline runtime identity mismatch")
+            env["BUNDLE_UPGRADE_RUNTIME_IMAGE"] = info["Id"]
+            receipt["upgradeBaseline"] = baseline
         receipt["lanes"]["controller"] = tests(
             [*node, "tests/integration/production-image-startup.test.mjs", ROOT / "tests/native_presets.mjs"],
             source,
@@ -668,6 +685,8 @@ def check(args, release):
 
 
 def verify_receipt(receipt, release, arch, identities):
+    require(receipt.get("upgradeBaseline") == release.get("upgradeBaseline"),
+            "native upgrade baseline mismatch")
     require(
         receipt["status"] == "passed-native-export-checks"
         and receipt["cleanup"] == "completed"

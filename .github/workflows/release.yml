@@ -80,6 +80,13 @@ jobs:
           node-version: '24.16.0'
       - name: Prepare Docker for OCE's immutable image probe
         run: bash scripts/setup-docker.sh
+      - name: Read private baseline images for retained-state checks
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/bundle-registry"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/bundle-registry" >> "$GITHUB_ENV"
+          printf '%s' "$REGISTRY_TOKEN" | docker --config "$RUNNER_TEMP/bundle-registry" login --username "$GITHUB_ACTOR" --password-stdin ghcr.io
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
         with:
           buildkitd-config-inline: |
@@ -115,6 +122,7 @@ jobs:
             node .work/resolved/source/scripts/ci/cleanup.mjs --state "$RUNNER_TEMP/bundle-runtime-$ARCH.json"
             bash .work/resolved/source/.github/actions/run-ci-lane/codex-sandbox.sh unload
           fi
+          rm -f "$RUNNER_TEMP/bundle-registry/config.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-${{ matrix.arch }}
@@ -137,6 +145,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24.16.0'
+      - name: Prepare Docker for the packaged OCE upgrade helper
+        run: bash scripts/setup-docker.sh
       - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
         with:
           version: v3.21.3
@@ -156,9 +166,17 @@ jobs:
       - name: Verify reproducibility and real chart rendering before publication
         run: python3 scripts/release.py finish --selection .work/assembled/candidate.json --source .work/resolved/source --dependencies .work/resolved/dependencies --output .work/checked-handoff
       - name: Prepare disposable installation test prerequisites
-        run: bash .work/resolved/source/scripts/ci/setup-tools.sh k3d
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .work/resolved/source/scripts/ci/setup-tools.sh k3d
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install --no-install-recommends -y skopeo
+          mkdir -m 700 "$RUNNER_TEMP/registry-auth"
+          printf '%s' "$REGISTRY_TOKEN" | skopeo login --authfile "$RUNNER_TEMP/registry-auth/auth.json" --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+          echo "REGISTRY_AUTH_FILE=$RUNNER_TEMP/registry-auth/auth.json" >> "$GITHUB_ENV"
       - name: Test the extracted package before registry publication
-        run: python3 scripts/release.py verify-installation --output .work/checked-handoff --controller .work/assembled/oci/controller --logs .work/private-installation-review.log
+        run: python3 scripts/release.py verify-installation --output .work/checked-handoff --controller .work/assembled/oci/controller --baseline .work/resolved/baseline/bundle.tar.gz --logs .work/private-installation-review.log
       - name: Publish exact checked image indexes
         if: inputs.publish
         env:
@@ -167,10 +185,6 @@ jobs:
           DEFINITION: ${{ inputs.definition }}
         run: |
           python3 scripts/release.py preflight --definition "$DEFINITION"
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install --no-install-recommends -y skopeo
-          mkdir -m 700 "$RUNNER_TEMP/registry-auth"
-          printf '%s' "$REGISTRY_TOKEN" | skopeo login --authfile "$RUNNER_TEMP/registry-auth/auth.json" --username "$GITHUB_ACTOR" --password-stdin ghcr.io
           python3 scripts/stock.py --selection .work/resolved/candidate.json publish --inputs .work/inputs --output .work/published --authfile "$RUNNER_TEMP/registry-auth/auth.json"
       - name: Package and verify customer handoff
         env:
@@ -183,7 +197,7 @@ jobs:
           fi
       - name: Test the extracted package on disposable reference infrastructure
         if: inputs.publish
-        run: python3 scripts/release.py verify-installation --output dist --controller .work/assembled/oci/controller --logs .work/private-installation.log
+        run: python3 scripts/release.py verify-installation --output dist --controller .work/assembled/oci/controller --baseline .work/resolved/baseline/bundle.tar.gz --logs .work/private-installation.log
       - name: Create immutable tag and private prerelease with generated evidence
         if: inputs.publish
         env:

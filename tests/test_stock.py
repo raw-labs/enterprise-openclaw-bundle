@@ -353,6 +353,7 @@ class OciInputs(unittest.TestCase):
             "oceCommit": self.sha,
             "openclawCommit": self.release["sources"]["openclaw"]["commit"],
             "codexVersion": self.release["runtime"]["codexVersion"],
+            **({"upgradeBaseline": self.release["upgradeBaseline"]} if self.release.get("upgradeBaseline") else {}),
             "images": identities,
             "lanes": {
                 r: {"tests": 1, "pass": 1, "fail": 0, "skipped": 0, "cancelled": 0}
@@ -381,6 +382,7 @@ class OciInputs(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_receipt(proof, self.release, "amd64", changed)
         for mutate in (
+            lambda p: p.update(upgradeBaseline={}),
             lambda p: p.pop("upgradeProbe"),
             lambda p: p["upgradeProbe"].update(daemonPlatform="linux/arm64"),
             lambda p: p["upgradeProbe"]["controller"].update(manifestDigest="sha256:" + "9" * 64),
@@ -623,7 +625,8 @@ class StockArtifact(unittest.TestCase):
         release = load(self.artifact / "metadata/release.json")
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory)
-            (out / "tldts-7.0.18.tgz").write_bytes(b"corrupt")
+            version = release["rendererDependencies"]["tldts"]["version"]
+            (out / f"tldts-{version}.tgz").write_bytes(b"corrupt")
             with self.assertRaises(ValueError):
                 renderer_files(release, out)
 
@@ -677,7 +680,7 @@ class StockArtifact(unittest.TestCase):
             )
             preflight = load(output / "preflight.json")
             self.assertEqual(
-                any("Hosted discovery" in item for item in preflight["prerequisites"]),
+                any(re.search(r"Hosted.*discovery", item) for item in preflight["prerequisites"]),
                 label == "stock",
             )
             self.assertTrue(

@@ -55,6 +55,21 @@ class DefinitionInputs(unittest.TestCase):
             with self.assertRaises(ValueError):
                 pinned_file(ref)
 
+    def test_codex_prereleases_and_upgrade_baseline_are_explicit(self):
+        self.assertEqual(self.spec["schemaVersion"], 5)
+        for version in ("0.163.0", "0.163.0-alpha.2", "0.163.0-beta.1", "0.163.0-rc.0"):
+            with patch("release.load", side_effect=lambda path: self.spec | {"codexVersion": version} if Path(path) == self.path else load(path)):
+                definition(self.path)
+        for mutate in (
+            lambda s: s.update(codexVersion="latest"),
+            lambda s: s.update(codexVersion="0.163.0-alpha.02"),
+            lambda s: s.update(codexVersion="0.163.0-alpha.2+unreviewed"),
+            lambda s: s.update(schemaVersion=4),
+            lambda s: s["build"].update(upgradeFrom=s["version"]),
+            lambda s: s["build"].update(upgradeFrom="latest"),
+        ):
+            self.rejected(mutate)
+
     def test_preset_policy_and_enabled_plugin_must_match_selection(self):
         for mutate in (
             lambda s: s["presets"].update(includeDefaults="false"),
@@ -70,7 +85,7 @@ class DefinitionInputs(unittest.TestCase):
         self.assertTrue(paths)
         for path in paths:
             spec = definition(path)
-            self.assertEqual(set(spec["build"]), {"patches", "confinement"})
+            self.assertTrue({"patches", "confinement"} <= set(spec["build"]) <= {"patches", "confinement", "upgradeFrom"})
             self.assertNotIn("recipe", spec)
             self.assertNotIn("installationExample", spec)
 
@@ -95,6 +110,15 @@ class DefinitionInputs(unittest.TestCase):
                 verify_source(release, selection, source)
         finally:
             extra.unlink()
+
+    def test_codex_recipe_requires_the_entire_selected_version(self):
+        selection = ROOT / ".work/resolved/candidate.json"
+        release = read_release(selection, ROOT)
+        # A recipe suffix must not be mistaken for the shorter selected prerelease.
+        source = selection.parent / "source"
+        release["runtime"]["codexVersion"] += "0"
+        with self.assertRaisesRegex(ValueError, "stock Codex/source mismatch"):
+            verify_source(release, selection, source)
 
     def test_unpublished_native_artifact_cannot_be_installed(self):
         release = load(ROOT / ".work/resolved/candidate.json")

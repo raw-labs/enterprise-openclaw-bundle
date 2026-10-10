@@ -19,6 +19,7 @@ from types import SimpleNamespace
 
 from bundle import HANDOFF_DOCUMENTS, package, verify_source
 from common import (
+    CODEX_VERSION,
     HASH,
     IMAGE,
     ROLES,
@@ -86,7 +87,7 @@ def definition(path):
         "unknown or missing bundle fields",
     )
     require(
-        spec["schemaVersion"] in (2, 3, 4) and SEMVER.fullmatch(spec["version"]),
+        spec["schemaVersion"] in (2, 3, 4, 5) and SEMVER.fullmatch(spec["version"]),
         "use an immutable numbered alpha, beta or rc version",
     )
     require(path.parent.name == spec["version"], "folder/version mismatch")
@@ -100,7 +101,9 @@ def definition(path):
     )
     require(SHA.fullmatch(spec["openclawCommit"]), "OpenClaw requires an exact commit")
     require(
-        re.fullmatch(r"\d+\.\d+\.\d+", spec["codexVersion"]), "invalid Codex version"
+        CODEX_VERSION.fullmatch(spec["codexVersion"])
+        and (spec["schemaVersion"] >= 5 or "-" not in spec["codexVersion"]),
+        "invalid Codex version",
     )
     require(
         spec["architectures"] == ["linux/amd64", "linux/arm64"],
@@ -110,7 +113,14 @@ def definition(path):
     require(isinstance(preset_refs, list), "preset files must be a list")
     plugin_selections(spec["plugins"], spec["schemaVersion"])
     build = spec["build"]
-    require(set(build) == {"patches", "confinement"}, "unknown or missing build fields")
+    required = {"patches", "confinement"}
+    allowed = required | ({"upgradeFrom"} if spec["schemaVersion"] >= 5 else set())
+    require(required <= set(build) <= allowed, "unknown or missing build fields")
+    if "upgradeFrom" in build:
+        require(isinstance(build["upgradeFrom"], str)
+                and SEMVER.fullmatch(build["upgradeFrom"])
+                and build["upgradeFrom"] != spec["version"],
+                "upgradeFrom requires a different immutable bundle version")
     require(isinstance(build["patches"], list), "patches must be a list")
     for patch in build["patches"]:
         pinned_file(patch)
@@ -194,11 +204,57 @@ def export_source(spec, output, from_git=None):
     return {**src, "archiveSha256": digest(archive), "commitEpoch": epoch}
 
 
+def resolve_baseline(version, output):
+    """Retain an immutable published package as a qualification input, never a payload."""
+    repo = github_json(f"repos/{REPOSITORY}")
+    release = github_json(f"repos/{REPOSITORY}/releases/tags/{version}")
+    require(repo and repo["private"] is True and release and not release["draft"]
+            and release["tag_name"] == version, "upgrade baseline must be a private published release")
+    directory = output / "baseline"
+    directory.mkdir()
+    run(["gh", "release", "download", version, "--repo", REPOSITORY,
+         "--dir", directory, "--pattern", "bundle.tar.gz",
+         "--pattern", "bundle.tar.gz.sha256", "--pattern", "provenance.json"])
+    provenance = load(directory / "provenance.json")
+    archive = directory / "bundle.tar.gz"
+    checksum = digest(archive.read_bytes())
+    require(provenance["version"] == version and provenance["published"] is True
+            and provenance["nativeArtifactsVerified"] is True
+            and checksum == provenance["artifactSha256"] == provenance["files"][archive.name],
+            "upgrade baseline provenance mismatch")
+    checksum_file = directory / "bundle.tar.gz.sha256"
+    require(digest(checksum_file.read_bytes()) == provenance["files"][checksum_file.name]
+            and checksum_file.read_text().split() == [checksum, archive.name],
+            "upgrade baseline archive checksum mismatch")
+    ref = github_json(f"repos/{REPOSITORY}/git/ref/tags/{version}")
+    require(ref and ref["object"]["type"] == "commit"
+            and ref["object"]["sha"] == provenance["bundleCommit"],
+            "upgrade baseline tag/source mismatch")
+    with tarfile.open(archive) as tar:
+        require(all(m.isfile() and m.name.startswith(version + "/") for m in tar.getmembers()),
+                "invalid baseline archive")
+        for member in tar.getmembers():
+            safe_path(directory, member.name)
+        tar.extractall(directory, filter="data")
+    artifact = directory / version
+    run([artifact / "bin/prepare", "verify"], stdout=subprocess.DEVNULL)
+    metadata = load(artifact / "metadata/release.json")
+    require(metadata["id"] == version and metadata["distribution"]["published"] is True
+            and metadata["definitionSha256"] == provenance["definitionSha256"]
+            and metadata["qualification"]["status"] == "native-verified",
+            "upgrade baseline release identity mismatch")
+    return {"releaseId": version, "artifactSha256": checksum,
+            "bundleCommit": provenance["bundleCommit"],
+            "oceCommit": metadata["sources"]["oce"]["commit"], "images": metadata["images"]}
+
+
 def resolve(args):
     spec = definition(args.definition)
     out = Path(args.output).resolve()
     require(not out.exists(), "resolved output already exists")
     out.mkdir(parents=True)
+    baseline = (resolve_baseline(spec["build"]["upgradeFrom"], out)
+                if spec["build"].get("upgradeFrom") else None)
     source = out / "source"
     oce = export_source(spec, source, args.from_git)
     original_license = (source / "LICENSE").read_bytes()
@@ -254,7 +310,7 @@ def resolve(args):
         return matches[0]
 
     oc = one(r"^ARG OPENCLAW_COMMIT=([a-f0-9]{40})$")
-    codex = one(r"^ENV OPENAI_CODEX_VERSION=(\d+\.\d+\.\d+)$")
+    codex = one(r"^ENV OPENAI_CODEX_VERSION=(" + CODEX_VERSION.pattern + r")$")
     require(
         oc == spec["openclawCommit"] and codex == spec["codexVersion"],
         "bundle/runtime source mismatch",
@@ -360,6 +416,7 @@ def resolve(args):
     selection = {
         "schemaVersion": 2,
         "definitionSchemaVersion": spec["schemaVersion"],
+        **({"upgradeBaseline": baseline} if baseline else {}),
         "id": spec["version"],
         "kind": "candidate",
         "architectures": spec["architectures"],
@@ -654,20 +711,23 @@ def verify_installation(args):
         "handoff changed before installation check",
     )
     receipt = out / "installation-receipt.json"
-    run(
-        [
-            sys.executable,
-            ROOT / "tests/install_package.py",
-            "--archive",
-            archive,
-            "--controller",
-            args.controller,
-            "--output",
-            receipt,
-            "--logs",
-            args.logs,
-        ]
-    )
+    command = [
+        sys.executable,
+        ROOT / "tests/install_package.py",
+        "--archive",
+        archive,
+        "--controller",
+        args.controller,
+        "--output",
+        receipt,
+        "--logs",
+        args.logs,
+    ]
+    baseline = load(out / "release.json").get("upgradeBaseline")
+    if baseline:
+        require(args.baseline and digest(Path(args.baseline).read_bytes()) == baseline["artifactSha256"],
+                "selected upgrade baseline archive is required")
+    run(command)
     proof = load(receipt)
     require(
         proof["status"] == "passed-package-installation"
@@ -676,6 +736,30 @@ def verify_installation(args):
         and proof["releaseId"] == provenance["version"],
         "package installation receipt mismatch",
     )
+    with tempfile.TemporaryDirectory(prefix="bundle-baseline-controller-") as temp:
+        if baseline:
+            layout = Path(temp) / "oci"
+            copy = ["skopeo", "copy", "--all", "--preserve-digests"]
+            if os.environ.get("REGISTRY_AUTH_FILE"):
+                copy.extend(["--authfile", os.environ["REGISTRY_AUTH_FILE"]])
+            run([*copy, "docker://" + baseline["images"]["controller"]["reference"], "oci:" + str(layout)],
+                stdout=subprocess.DEVNULL)
+            upgrade_receipt = Path(temp) / "upgrade-receipt.json"
+            upgrade_command = command.copy()
+            upgrade_command[upgrade_command.index("--output") + 1] = upgrade_receipt
+            upgrade_command[upgrade_command.index("--logs") + 1] = str(args.logs) + ".upgrade"
+            run([*upgrade_command, "--baseline", args.baseline, "--baseline-controller", layout])
+            upgrade = load(upgrade_receipt)
+            require(upgrade["status"] == "passed-package-installation"
+                    and upgrade["cleanup"] == "completed"
+                    and upgrade["artifactSha256"] == provenance["artifactSha256"]
+                    and upgrade["releaseId"] == provenance["version"]
+                    and upgrade["upgrade"]["fromReleaseId"] == baseline["releaseId"]
+                    and upgrade["upgrade"]["artifactSha256"] == baseline["artifactSha256"]
+                    and upgrade["upgrade"]["status"] == "passed-retained-installation-upgrade",
+                    "retained installation upgrade receipt mismatch")
+            proof["upgrade"] = {**upgrade["upgrade"], "checks": upgrade["checks"]}
+    save(receipt, proof)
     provenance["files"][receipt.name] = digest(receipt.read_bytes())
     save(out / "provenance.json", provenance)
 
@@ -801,6 +885,7 @@ def main():
     p.add_argument("--output", required=True)
     p.add_argument("--controller", required=True)
     p.add_argument("--logs", required=True)
+    p.add_argument("--baseline")
     args = parser.parse_args()
     if args.command == "validate-definitions":
         validate_definitions()

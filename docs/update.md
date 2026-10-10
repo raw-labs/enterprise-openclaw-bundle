@@ -56,13 +56,16 @@ Retain the live values and Installation as the baseline. An image update preserv
 existing Installation settings; rerendered inputs are comparison material, not a
 replacement baseline. The helper supports only the candidate setting changes
 listed in OCE's guide. Apply other Installation changes separately with its
-[documented procedure](oce/docs/guides/deploy/production-upgrade.md#apply-other-installation-changes).
+[documented procedure](oce/docs/guides/deploy/production-installation-changes.md).
 Use the bundle matching the currently installed controller for that step.
 
 In particular, newly selected preset files require adding their image paths to
 the existing Installation's `presets.files`. First update the controller so it
 contains those files, then apply that separate settings change. Paths are recorded
-under `presets` in `metadata/release.json`. Existing same-name presets, including
+under `presets` in `metadata/release.json`. If the candidate removes a referenced
+file, remove that seed reference separately while the old controller still runs;
+otherwise the image helper refuses before stopping OCC. Removing a seed reference
+preserves stored presets. Existing same-name presets, including
 edits, are preserved. Adopt plugin settings and Secret bindings as described in
 [OPERATE.md](OPERATE.md#presets-and-native-plugins). Review plugin state compatibility
 and verify provider access after the runtime update.

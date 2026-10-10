@@ -7,22 +7,23 @@ that the selected source actually supports those ingredients.
 
 ## Supported fields
 
-All fields below are required. Unknown top-level fields and unknown `build` fields
-are rejected.
+Top-level fields and `build.patches`/`build.confinement` are required;
+`build.upgradeFrom` is optional. Unknown fields are rejected.
 
 | Field | Meaning and constraints |
 | --- | --- |
-| `schemaVersion` | Definition format version: `2`, `3` or `4`. Version `3` installs presets and native packages; version `4` explicitly selects upstream default seeding. |
+| `schemaVersion` | Definition format version: `2`–`5`. Version `3` installs presets and native packages; `4` explicitly selects upstream default seeding; `5` also accepts Codex prereleases and a retained upgrade-test baseline. |
 | `version` | Bundle release version, matching its folder. Accepted form: `vMAJOR.MINOR.PATCH-alpha.N`, `-beta.N` or `-rc.N`, with a positive sequence number. Stable versions are not yet supported by the Action. |
 | `oce` | `repository`: HTTPS GitHub Git URL; `commit`: full 40-character commit hash. The source supplies the controller, chart, runtime Dockerfiles and tests. |
 | `openclawCommit` | Full 40-character OpenClaw commit hash. Must match the runtime Dockerfile after source patches. |
-| `codexVersion` | Three-part Codex version. Must match the runtime Dockerfile after source patches. |
+| `codexVersion` | Exact three-part Codex version; schema `5` also accepts `-alpha.N`, `-beta.N` and `-rc.N`. Must match the runtime Dockerfile after source patches. |
 | `architectures` | Exactly `["linux/amd64", "linux/arm64"]`; both native builds and checks are required. |
-| `plugins` | Nonempty ordered list of unique native plugin selections. String IDs must match OCE's build/retention lists. Versions `3` and `4` also accept pinned package objects. |
-| `presets` | Version `4`: `{ "includeDefaults": false, "files": [...] }`, using OCE's native seeding fields. `files` contains file references; names and filenames are unique and filenames end in `-preset.json`. Versions `2`/`3` use a list and retain their original behavior. Versions `3`/`4` install files in the controller and prepare their image paths. Agent plugin policy stays empty; native plugin settings use Configuration values. Enabled native plugins must be selected for the runtime. |
+| `plugins` | Nonempty ordered list of unique native plugin selections. String IDs must match OCE's build/retention lists. Versions `3`–`5` also accept pinned package objects. |
+| `presets` | Versions `4`/`5`: `{ "includeDefaults": false, "files": [...] }`, using OCE's native seeding fields. `files` contains file references; names and filenames are unique and filenames end in `-preset.json`. Versions `2`/`3` use a list and retain their original behavior. Versions `3`–`5` install files in the controller and prepare their image paths. Agent plugin policy stays empty; native plugin settings use Configuration values. Enabled native plugins must be selected for the runtime. |
 | `codexProfile` | File reference to the selected Codex installation profile, using OCE's profile format. The preparation tool passes it explicitly to the renderer; original upstream profiles remain available. |
 | `build.patches` | Ordered list of file references to Git patches. May be empty. Applied to the exported OCE source before compatibility checks, inventory and builds. Must preserve the upstream license. |
 | `build.confinement` | SHA-256 hashes of the selected source's `scripts/lib/codex-seccomp-profile.mjs` and `.github/actions/run-ci-lane/codex-sandbox.apparmor`. Checked after patches; changed policies require review and new hashes. |
+| `build.upgradeFrom` | Optional in schema `5`: immutable published bundle version used for retained-state qualification. The Action verifies its tag, archive and provenance, tests Connections state across native runtime replacement and upgrades its installed controller through the packaged OCE helper. This input stays out of the customer archive. |
 
 A file reference has exactly `path` and `sha256`: a repository-relative path and
 the lowercase SHA-256 of its exact bytes. References cannot escape the repository. Commit the
@@ -37,7 +38,7 @@ Customer settings and credentials belong in the customer's private installation.
 ## Native plugins and presets
 
 A string in `plugins` selects an extension already built by the OCE runtime recipe.
-For an additional RAW package, use a version `3` or `4` package object with exactly:
+For an additional RAW package, use a version `3`–`5` package object with exactly:
 
 - `id`: native OpenClaw plugin ID.
 - `package`: scoped `@raw-labs/...` npm package name.

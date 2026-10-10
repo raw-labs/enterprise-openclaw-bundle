@@ -47,6 +47,9 @@ test("Connections loads in the native Gateway and retains its database across Ku
   const suffix = randomBytes(6).toString("hex");
   const cluster = "bundle-connections-" + suffix;
   const tag = "localhost/bundle-connections:" + suffix;
+  const previousImage = process.env.BUNDLE_UPGRADE_RUNTIME_IMAGE;
+  assert.equal(Boolean(previousImage), Boolean(release.upgradeBaseline), "selected runtime upgrade baseline is required");
+  const previousTag = "localhost/bundle-connections-previous:" + suffix;
   const directory = await mkdtemp(join(tmpdir(), cluster + "-"));
   const kubeconfig = join(directory, "kubeconfig");
   const run = (command, args, options = {}) => execFileSync(command, args, {encoding: "utf8", timeout: 180_000, maxBuffer: 4 * 1024 * 1024, ...options});
@@ -98,12 +101,16 @@ test("Connections loads in the native Gateway and retains its database across Ku
   let phase = "create disposable cluster";
   try {
     run("docker", ["tag", image, tag]);
+    if (previousImage) run("docker", ["tag", previousImage, previousTag]);
     run("k3d", ["cluster", "create", cluster, "--servers", "1", "--agents", "0", "--no-lb", "--image",
       "docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc",
       "--kubeconfig-update-default=false", "--kubeconfig-switch-context=false", "--wait"]);
     created = true;
     await import("node:fs/promises").then(fs => fs.writeFile(kubeconfig, run("k3d", ["kubeconfig", "get", cluster]), {mode: 0o600}));
     run("k3d", ["image", "import", tag, "--cluster", cluster], {timeout: 240_000});
+    if (previousImage) {
+      run("k3d", ["image", "import", previousTag, "--cluster", cluster], {timeout: 240_000});
+    }
     put({apiVersion: "v1", kind: "Namespace", metadata: {name: "bundle-connections"}});
     put({apiVersion: "v1", kind: "PersistentVolumeClaim", metadata: {name: "gateway", namespace: "bundle-connections"}, spec: {
       accessModes: ["ReadWriteOnce"], storageClassName: "local-path", resources: {requests: {storage: "100Mi"}},
@@ -183,6 +190,7 @@ test("Connections loads in the native Gateway and retains its database across Ku
       config = structuredClone(configuredBase);
     }
     phase = "start Gateway with native plugin configuration";
+    if (previousImage) pod.spec.containers[0].image = previousTag;
     saveConfig(); start();
     phase = "inspect native plugin";
     const inspected = native("plugins", "inspect", "openclaw-connections", "--runtime", "--json");
@@ -229,6 +237,14 @@ test("Connections loads in the native Gateway and retains its database across Ku
     assert.equal(call("connections.status").userId, before.userId);
     const restored = call("connections.list").items.find(p => p.id === connection.id);
     assert.ok(restored); assert.equal(restored.name, "Bundle persistence check"); assert.deepEqual(restored.grant, {mode: "selected", agentIds: []});
+    if (previousImage) {
+      phase = "upgrade retained Connections state to the candidate runtime";
+      stop(); pod.spec.containers[0].image = tag; start();
+      assert.equal(call("connections.status").userId, before.userId);
+      const upgraded = call("connections.list").items.find(p => p.id === connection.id);
+      assert.ok(upgraded); assert.equal(upgraded.name, restored.name); assert.deepEqual(upgraded.grant, restored.grant);
+      uiAvailable();
+    }
     phase = "explicitly disabled plugin";
     config.plugins.entries["openclaw-connections"].enabled = false;
     stop(); saveConfig(); start();
@@ -245,6 +261,7 @@ test("Connections loads in the native Gateway and retains its database across Ku
     // Remove only the cluster and local tag created with this random test identity.
     if (created) run("k3d", ["cluster", "delete", cluster]);
     run("docker", ["image", "rm", tag]);
+    if (previousImage) run("docker", ["image", "rm", previousTag]);
     await rm(directory, {recursive: true, force: true});
   }
 });

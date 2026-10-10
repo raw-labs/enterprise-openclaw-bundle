@@ -75,7 +75,7 @@ def verify_source(release, selection, source):
     )
     if release["schemaVersion"] == 2:
         require(
-            "ENV OPENAI_CODEX_VERSION=" + runtime["codexVersion"] in recipe,
+            re.search(r"^ENV OPENAI_CODEX_VERSION=" + re.escape(runtime["codexVersion"]) + r"$", recipe, re.MULTILINE),
             "stock Codex/source mismatch",
         )
         for name, expected in runtime["bridgePatches"].items():
@@ -217,6 +217,16 @@ def package(args, release):
         str(p.relative_to(source))
         for p in sorted((source / "scripts").glob("upgrade-*"))
         if p.is_file()
+    )
+    shipped.extend(
+        name
+        for name in (
+            "scripts/split-layout-adopt.mjs",
+            "scripts/split-layout-tenants.mjs",
+            "apps/controller/src/drivers/compute/kubernetes/resource-name.ts",
+            "packages/contracts/src/api/plain-text.ts",
+        )
+        if (source / name).is_file()
     )
     for directory in ("deploy/examples/production", "deploy/logging"):
         shipped.extend(

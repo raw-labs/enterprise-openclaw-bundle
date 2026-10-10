@@ -29,8 +29,12 @@ Linux executables and build three images, then run the selected source's control
 runtime and credential isolation tests with confinement and no skips. It also runs
 OCE's image-identity and controller/broker compatibility probe on both native
 targets using locally staged OCI indexes containing the exact built manifests.
-The native receipts bind that proof to the exports; this does not test a retained
-installation's database or Agent upgrade. The Action assembles the tested manifests
+The native receipts bind that proof to the exports. When `build.upgradeFrom` is
+selected, both targets also check retained Connections state from that published
+runtime; the installation check installs the previous package, preserves its
+edited presets and upgrades the controller/database through the packaged OCE
+helper. These checks do not prove a running Agent fleet rollout or provider access.
+The Action assembles the tested manifests
 and verifies the archive and real chart renders before publishing private GHCR indexes, checks
 the published handoff again, installs the extracted package on disposable k3d
 with PostgreSQL TLS and checks authenticated `occ` access, then creates the

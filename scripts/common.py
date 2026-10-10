@@ -11,6 +11,7 @@ ROLES = ("controller", "runtime", "repositoryCredentials")
 SHA = re.compile(r"^[a-f0-9]{40}$")
 HASH = re.compile(r"^[a-f0-9]{64}$")
 IMAGE = re.compile(r"^[a-zA-Z0-9][^@\s]+@sha256:[a-f0-9]{64}$")
+CODEX_VERSION = re.compile(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:alpha|beta|rc)\.(?:0|[1-9]\d*))?")
 
 
 def require(condition, message):
@@ -96,6 +97,7 @@ def read_release(path, root=None):
                 and proof["oceCommit"] == release["sources"]["oce"]["commit"]
                 and proof["openclawCommit"] == release["sources"]["openclaw"]["commit"]
                 and proof["codexVersion"] == release["runtime"]["codexVersion"]
+                and proof.get("upgradeBaseline") == release.get("upgradeBaseline")
                 and proof["images"]
                 == {
                     r: release["images"][r]["platforms"]["linux/" + arch] for r in ROLES
@@ -143,7 +145,17 @@ def validate_stock(release):
     from ingredients import plugin_selections
 
     _, packages = plugin_selections(release["plugins"], release.get("definitionSchemaVersion", 2))
-    if release.get("definitionSchemaVersion") == 4:
+    baseline = release.get("upgradeBaseline")
+    if baseline:
+        require(release.get("definitionSchemaVersion", 2) >= 5
+                and baseline["releaseId"] != release["id"]
+                and HASH.fullmatch(baseline["artifactSha256"])
+                and SHA.fullmatch(baseline["bundleCommit"])
+                and SHA.fullmatch(baseline["oceCommit"])
+                and set(baseline["images"]) == set(ROLES)
+                and all(IMAGE.fullmatch(image["reference"]) for image in baseline["images"].values()),
+                "invalid published upgrade baseline")
+    if release.get("definitionSchemaVersion", 2) >= 4:
         require(isinstance(release.get("includeDefaultPresets"), bool), "preset default selection is required")
     resolved = release.get("pluginPackages", [])
     require(
@@ -187,7 +199,9 @@ def validate_stock(release):
         "stock source does not accept a hidden overlay",
     )
     require(
-        re.fullmatch(r"\d+\.\d+\.\d+", runtime["codexVersion"]), "invalid Codex version"
+        CODEX_VERSION.fullmatch(runtime["codexVersion"])
+        and (release.get("definitionSchemaVersion", 2) >= 5 or "-" not in runtime["codexVersion"]),
+        "invalid Codex version",
     )
     require(HASH.fullmatch(runtime["inventoryHelperSha256"]), "helper hash required")
     require(

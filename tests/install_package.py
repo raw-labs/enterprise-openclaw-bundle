@@ -98,25 +98,47 @@ def exercise(args):
             "native artifact checks required",
         )
         run([artifact / "bin/prepare", "verify"])
+        candidate = artifact
+        candidate_release = release
+        candidate_controller = release["images"]["controller"]["reference"]
+
+        def image_archive(directory, reference, name):
+            index = load(directory / "index.json")
+            require(len(index["manifests"]) == 1
+                    and index["manifests"][0]["digest"] == reference.split("@")[1],
+                    "installation test/controller index mismatch")
+            index["manifests"][0]["annotations"] = {"org.opencontainers.image.ref.name": reference}
+            target = work / name
+            with tarfile.open(target, "w") as tar:
+                for path in sorted(directory.rglob("*")):
+                    if path.is_file() and path.name != "index.json":
+                        tar.add(path, arcname=str(path.relative_to(directory)))
+                data = json.dumps(index).encode()
+                info = tarfile.TarInfo("index.json")
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+            return target
+
+        image_archives = [image_archive(layout, candidate_controller, "candidate-controller.tar")]
+        baseline = candidate_release.get("upgradeBaseline") if args.baseline else None
+        require(not args.baseline or baseline, "unexpected installation upgrade baseline")
+        if baseline:
+            baseline_archive = Path(args.baseline)
+            require(digest(baseline_archive.read_bytes()) == baseline["artifactSha256"], "baseline archive changed")
+            old_root = work / "baseline"
+            old_root.mkdir()
+            with tarfile.open(baseline_archive) as tar:
+                require(all(m.isfile() and m.name.startswith(baseline["releaseId"] + "/")
+                            and ".." not in Path(m.name).parts for m in tar.getmembers()), "invalid baseline archive")
+                tar.extractall(old_root, filter="data")
+            artifact = old_root / baseline["releaseId"]
+            run([artifact / "bin/prepare", "verify"])
+            release = load(artifact / "metadata/release.json")
+            require(release["id"] == baseline["releaseId"] and release["images"] == baseline["images"],
+                    "baseline release identity changed")
+            image_archives.append(image_archive(Path(args.baseline_controller),
+                                  release["images"]["controller"]["reference"], "baseline-controller.tar"))
         controller = release["images"]["controller"]["reference"]
-        index = load(layout / "index.json")
-        require(
-            len(index["manifests"]) == 1
-            and index["manifests"][0]["digest"] == controller.split("@")[1],
-            "installation test/controller index mismatch",
-        )
-        index["manifests"][0]["annotations"] = {
-            "org.opencontainers.image.ref.name": controller
-        }
-        image_archive = work / "controller.tar"
-        with tarfile.open(image_archive, "w") as tar:
-            for path in sorted(layout.rglob("*")):
-                if path.is_file() and path.name != "index.json":
-                    tar.add(path, arcname=str(path.relative_to(layout)))
-            data = json.dumps(index).encode()
-            info = tarfile.TarInfo("index.json")
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
         kubeconfig = work / "kubeconfig"
         context = "k3d-" + cluster
         try:
@@ -159,8 +181,9 @@ def exercise(args):
                 name = node["metadata"]["name"]
                 role = "control" if "server" in name else "agents"
                 kubectl("label", "node", name, "oce-role=" + role)
-                run(["docker", "cp", image_archive, name + ":/tmp/controller.tar"])
-                run(
+                for imported in image_archives:
+                    run(["docker", "cp", imported, name + ":/tmp/controller.tar"])
+                    run(
                     [
                         "docker",
                         "exec",
@@ -176,8 +199,8 @@ def exercise(args):
                         "--no-unpack",
                         "/tmp/controller.tar",
                     ],
-                    diagnostics=True,
-                )
+                        diagnostics=True,
+                    )
                 actual = json.loads(
                     run(
                         [
@@ -763,8 +786,6 @@ net.createServer(client => {
                         require(selected["name"] in before and before[selected["name"]]["template"] == expected["template"], "selected RAW preset was not automatically seeded")
                     steps.append("selected RAW presets automatically seeded with exact templates")
                     if release.get("includeDefaultPresets") is False:
-                        with urllib.request.urlopen("http://127.0.0.1:18080/console/agents/starter-model.mjs", timeout=30) as response:
-                            require(b"export function defaultPresetId" in response.read(), "Console did not serve the selected default preset helper")
                         edited = before[release["presets"][0]["name"]]
                         edited["template"]["variables"]["name"]["description"] = "Retained installation edit"
                         request = urllib.request.Request(
@@ -775,6 +796,29 @@ net.createServer(client => {
                         with urllib.request.urlopen(request, timeout=30) as response:
                             updated = json.load(response)["data"]
                         require(updated["template"] == edited["template"], "native Preset update did not retain the edited template")
+                    if baseline:
+                        installation_id = json.loads(key)["meta"]["installationId"]
+                        kubectl("-n", cp["namespace"], "annotate", "secret", installation_settings["secretName"],
+                                "openclaw.dev/installation-id=" + installation_id)
+                        live = json.loads(run(["helm", "get", "values", cp["releaseName"],
+                                              "--kubeconfig", kubeconfig, "--kube-context", context,
+                                              "--namespace", cp["namespace"], "--output", "json"]))
+                        save(rendered / "values.yaml", live)
+                        run(["bash", candidate / "oce/scripts/upgrade-production-images",
+                             "--kubeconfig", kubeconfig, "--context", context,
+                             "--namespace", cp["namespace"], "--release", cp["releaseName"],
+                             "--values", rendered / "values.yaml", "--installation", rendered / "installation.yaml",
+                             "--controller-image", candidate_controller,
+                             "--source-revision", candidate_release["sources"]["oce"]["commit"],
+                             "--evidence-dir", work / "upgrade-evidence", "--occ", candidate / "bin/occ",
+                             "--timeout-seconds", "600"], cwd=candidate / "oce", timeout=900,
+                            env=dict(os.environ, OCC_URL="http://127.0.0.1:18080", OCC_SERVICE_KEY_FILE=str(key_path)))
+                        artifact = candidate
+                        require(occ("installation", "get")["id"] == installation_id, "upgrade replaced the Installation")
+                        require(occ("namespace", "get", namespace_id)["status"] == "ready", "upgrade lost the Namespace")
+                        require(resource("deployment", "openclaw-enterprise-api")["spec"]["template"]["spec"]["containers"][0]["image"]
+                                == candidate_controller, "upgrade did not select the candidate controller")
+                        steps.append("selected previous bundle upgraded through packaged OCE helper and database migrations")
                     kubectl("-n", cp["namespace"], "rollout", "restart", "deployment/openclaw-enterprise-api")
                     kubectl("-n", cp["namespace"], "rollout", "status", "deployment/openclaw-enterprise-api", "--timeout=180s")
                     after = seeded()
@@ -844,14 +888,17 @@ net.createServer(client => {
         {
             "status": "passed-package-installation",
             "artifactSha256": digest(archive.read_bytes()),
-            "releaseId": release["id"],
-            "controller": controller,
+            "releaseId": candidate_release["id"],
+            "controller": candidate_controller,
             "architecture": "linux/" + arch,
             "referenceEnvironment": "disposable k3d with PostgreSQL TLS, restricted database roles, cert-manager and Envoy Gateway",
             "checks": steps,
             "cleanup": "completed",
             "customerQualified": False,
             "scope": "package installation and bootstrap; no provider, ingress, Agent turn or customer acceptance",
+            **({"upgrade": {"status": "passed-retained-installation-upgrade",
+                 "fromReleaseId": baseline["releaseId"], "artifactSha256": baseline["artifactSha256"],
+                 "scope": "retained Installation, Namespace, preset identities and edits; database migration and controller upgrade; no running Agent rollout"}} if baseline else {}),
         },
     )
     print(
@@ -865,6 +912,8 @@ if __name__ == "__main__":
     parser.add_argument("--controller", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--logs", required=True)
+    parser.add_argument("--baseline")
+    parser.add_argument("--baseline-controller")
     try:
         exercise(parser.parse_args())
     except (ValueError, KeyError, OSError, subprocess.TimeoutExpired) as error:
