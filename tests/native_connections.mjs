@@ -122,7 +122,18 @@ test("Connections loads in the native Gateway and retains its database across Ku
       accessModes: ["ReadWriteOnce"], storageClassName: "local-path", resources: {requests: {storage: "100Mi"}},
     }});
     const saveConfig = () => put({apiVersion: "v1", kind: "ConfigMap", metadata: {name: "gateway", namespace: "bundle-connections"}, data: {"openclaw.json": JSON.stringify(config)}});
-    const uiAvailable = () => assert.ok(call("plugins.controlUi.list").plugins.some(p => p.pluginId === "openclaw-connections"));
+    const uiAvailable = () => {
+      assert.ok(call("plugins.controlUi.list").plugins.some(p => p.pluginId === "openclaw-connections"));
+      if (config.gateway.controlUi?.communityInvite === false) {
+        kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
+          import assert from 'node:assert/strict';
+          const response = await fetch('http://127.0.0.1:18789/control-ui-config.json', {
+            headers: {authorization:'Bearer ${token}'}});
+          assert.equal(response.status,200);
+          assert.equal((await response.json()).communityInvite,false);
+        `);
+      }
+    };
     const selectedConfig = async (preset) => {
       assert.ok(preset.path.startsWith("/app/"));
       const selected = JSON.parse(await readFile(resolve(preset.path.slice(5)), "utf8"));

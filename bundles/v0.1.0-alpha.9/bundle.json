@@ -15,12 +15,12 @@
     "includeDefaults": false,
     "files": [
       {
-        "path": "defaults/connections-coding-preset.json",
-        "sha256": "bebca4cfc3dbfec64431e32d8567859b3ddaa2a6138abead9e3d1053c21fdf69"
+        "path": "defaults/v0.1.0-alpha.9/connections-coding-preset.json",
+        "sha256": "6b614bd473b79c236315e8342e17eee1660e927bff77792cec28c0b7033f5d6a"
       },
       {
-        "path": "defaults/connections-assistant-preset.json",
-        "sha256": "c5a605495ade17dc3e96bb0e375dcf97f34870c97d8868720d297dd807ac6edd"
+        "path": "defaults/v0.1.0-alpha.9/connections-assistant-preset.json",
+        "sha256": "0e65a1a5eefbd5542c4a583b56fdd2c4fdcb5ae85f9d1f4397b3209f2a3f9e3b"
       }
     ]
   },
