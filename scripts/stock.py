@@ -451,7 +451,7 @@ def tests(command, source, env, log):
         public_tests = {
             "selected RAW presets are image-resident and accepted by OCE's real loader",
             "packaged native extensions and their inventory match the selected release",
-            "Connections loads in the native Gateway and retains its database across Kubernetes Pod replacement",
+            "Connections loads in the native Gateway and retains state across Kubernetes Pod replacement",
         }
         for block in re.split(r"(?m)(?=^# Subtest: )", output):
             failure = re.match(r"^# Subtest: ([^\n]+)\nnot ok [^\n]+\n  ---\n.*?\n  \.\.\.(?:\n|$)", block, re.DOTALL)

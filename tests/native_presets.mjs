@@ -16,6 +16,7 @@ test("selected RAW presets are image-resident and accepted by OCE's real loader"
     import { readFile } from 'node:fs/promises';
     import { createHash } from 'node:crypto';
     import { loadInstallationPresets } from '/app/apps/controller/src/composition/installation-presets.ts';
+    import { KubernetesComputeDriver } from '/app/apps/controller/src/drivers/compute/kubernetes/index.ts';
     const presets = ${JSON.stringify(release.presets ?? [])};
     for (const preset of presets) {
       const bytes = await readFile(preset.path);
@@ -36,10 +37,14 @@ test("selected RAW presets are image-resident and accepted by OCE's real loader"
         assert.deepEqual(preset.template.agent.plugins, {});
         assert.equal(values.gateway.controlUi.experimental.customPlugins, true);
         const connections = values.plugins.entries['openclaw-connections'];
-        assert.equal(connections.enabled, true);
-        assert.deepEqual(connections.config, {});
-        for (const tool of ['connections_search','connections_describe','connections_call'])
-          assert.ok(values.tools.alsoAllow.includes(tool));
+        if (connections.enabled) {
+          assert.deepEqual(connections.config, {});
+          for (const tool of ['connections_search','connections_describe','connections_call'])
+            assert.ok(values.tools.alsoAllow.includes(tool));
+        } else {
+          assert.equal(connections.enabled, false);
+          assert.ok(!(values.tools.alsoAllow ?? []).some(tool => tool.startsWith('connections_')));
+        }
         assert.equal(values.agents.defaults.thinkingDefault, 'medium');
         assert.equal(values.browser.enabled, false);
         assert.equal(values.tools.elevated.enabled, false);
@@ -56,6 +61,19 @@ test("selected RAW presets are image-resident and accepted by OCE's real loader"
           assert.equal(values.agents.defaults.models[values.agents.defaults.model].agentRuntime.id, 'openclaw');
         }
         assert.equal(values.tools.web.fetch.enabled, true);
+        const driver = Object.create(KubernetesComputeDriver.prototype);
+        driver.options = {gatewayRouting: {hostname: 'agents.example.invalid'},
+          network: {gatewayPort: 18789, gatewayTrustedProxyCidrs: ['127.0.0.1/32']}};
+        const original = structuredClone(values);
+        const origin = 'https://' + preset.name.toLowerCase() + '.agents.example.invalid';
+        const admitted = driver.configureAgent(values, {nativeAdminOrigin: origin});
+        assert.deepEqual(values, original, 'shared preset must remain unchanged');
+        assert.equal(admitted.gateway.publicOrigin, origin);
+        assert.ok(admitted.gateway.controlUi.allowedOrigins.includes(origin));
+        assert.deepEqual(admitted.gateway.auth.trustedProxy.deviceAutoApprove,
+          {enabled: true, scopes: ['operator.admin']});
+        assert.equal(admitted.gateway.controlUi.communityInvite, false);
+        assert.deepEqual(admitted.plugins, values.plugins);
       }
     }
     await assert.rejects(loadInstallationPresets({presets: {files: ['/missing-preset.json']}}, '/installation.yaml'));

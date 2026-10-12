@@ -21,7 +21,8 @@ OCE seeds selected presets when it starts and when a Namespace is created.
 Existing same-name presets are preserved, including operator edits; changed
 bundle templates do not automatically replace them.
 
-The selected Assistant and Coding presets enable Connections and native plugin UI.
+Assistant enables Connections and native plugin UI. Coding disables Connections:
+OCE's dedicated Gateway currently lacks the required provider HTTPS access.
 The default shortcut chooses a readable `default-codex` if retained; otherwise it
 chooses the first readable preset alphabetically. A fresh two-preset installation
 therefore starts with Assistant. **Reset template** uses OCE's generic starter;
@@ -52,7 +53,7 @@ For each Namespace, an installation owner:
 2. Grants each intended Agent creator exact `operate` permission on that Secret,
    using a Namespace Role and exact-resource AccessBinding. Preset read access
    does not grant Secret access. See OCE's [IAM procedure](oce/docs/guides/topics/iam.md).
-3. Gets each installed preset with `occ preset get ID -o json`, preserves its
+3. Gets the intended installed preset with `occ preset get ID -o json`, preserves its
    template, and merges the following native configuration. Submit `{ "template":
    MODIFIED_TEMPLATE }` to `PATCH /namespaces/NAMESPACE_ID/presets/PRESET_ID` through
    the [authenticated HTTP API](oce/docs/guides/http-api.md). This requires exact
@@ -99,9 +100,10 @@ verify the exact Namespace, Secret, principal and Role.
 
 Each OCE Agent has its own Gateway Connections page, accounts and grants; the shared
 project credential does not create a central account list. Administrators link
-provider accounts and grant their use there. The complete Connections directory
-uses that Gateway's private claim. Verify provider access, consent and retained
-state in the installation; fixture checks do not prove external OAuth or execution.
+provider accounts and grant their use there. Connections uses OpenClaw's retained
+SDK storage under the Gateway's persisted `state/` directory. Verify provider
+access, consent and retained state in the installation; fixture checks do not
+prove external OAuth or execution.
 
 ## Diagnose
 

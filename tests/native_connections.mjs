@@ -35,14 +35,15 @@ test("packaged native extensions and their inventory match the selected release"
   {stdio: "pipe", timeout: 60_000});
 });
 
-test("Connections loads in the native Gateway and retains its database across Kubernetes Pod replacement", {timeout: 600_000}, async () => {
+test("Connections loads in the native Gateway and retains state across Kubernetes Pod replacement", {timeout: 600_000}, async () => {
   if (!plugins.some(p => p.id === "openclaw-connections")) return;
   const { KubernetesComputeDriver } = await import(pathToFileURL(resolve("apps/controller/src/drivers/compute/kubernetes/index.ts")));
   const driver = Object.create(KubernetesComputeDriver.prototype);
   driver.options = {runtime: {gatewayStorageClassName: "local-path"}};
   const mounts = driver.gatewayPrivateStateVolumeMounts(true);
-  assert.deepEqual(mounts.find(m => m.subPath === "connections"), {
-    name: "openclaw-gateway-state", mountPath: "/home/node/.openclaw/connections", subPath: "connections", readOnly: false,
+  const stateDirectory = "/home/node/.openclaw/state";
+  assert.deepEqual(mounts.find(m => m.subPath === "state"), {
+    name: "openclaw-gateway-state", mountPath: stateDirectory, subPath: "state", readOnly: false,
   });
   const suffix = randomBytes(6).toString("hex");
   const cluster = "bundle-connections-" + suffix;
@@ -150,7 +151,6 @@ test("Connections loads in the native Gateway and retains its database across Ku
           body:JSON.stringify({tool:name,args:{},agentId:'main',idempotencyKey:'unconfigured-'+name})});
         assert.equal(response.status,404); assert.match(await response.text(),/Tool not available/);
       }
-      assert.equal(await import('node:fs').then(fs=>fs.existsSync('/home/node/.openclaw/connections/connections.sqlite')),false);
     `);
     if (release.includeDefaultPresets === false) {
       pod.spec.containers[0].env = pod.spec.containers[0].env.filter(e => e.name !== "COMPOSIO_API_KEY");
@@ -159,10 +159,16 @@ test("Connections loads in the native Gateway and retains its database across Ku
         config = await selectedConfig(preset);
         phase = "unconfigured selected preset " + preset.name;
         saveConfig(); start();
-        assert.deepEqual(call("connections.status"), {configured:false,userId:null});
-        uiAvailable(); noTools(); stop();
+        if (config.plugins.entries["openclaw-connections"]?.enabled === true) {
+          assert.deepEqual(call("connections.status"), {configured:false,userId:null});
+          uiAvailable();
+        } else {
+          assert.throws(() => call("connections.status"), /unknown method|not found|not registered/i);
+        }
+        noTools(); stop();
       }
       phase = "missing native capability SecretRef";
+      config = structuredClone(configuredBase);
       config.plugins.entries["openclaw-connections"].config = {apiKey:{source:"env",provider:"default",id:"COMPOSIO_API_KEY"}};
       saveConfig(); start();
       kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
@@ -190,6 +196,7 @@ test("Connections loads in the native Gateway and retains its database across Ku
       pod.spec.containers[0].env.push({name:"COMPOSIO_API_KEY",value:"synthetic-never-sent-project-key"});
       for (const preset of release.presets) {
         config = await selectedConfig(preset);
+        if (config.plugins.entries["openclaw-connections"]?.enabled !== true) continue;
         config.plugins.entries["openclaw-connections"].config = {apiKey:{source:"env",provider:"default",id:"COMPOSIO_API_KEY"}};
         phase = "configured selected preset " + preset.name;
         saveConfig(); start();
@@ -248,7 +255,9 @@ test("Connections loads in the native Gateway and retains its database across Ku
       assert.ok(!body.includes('synthetic-never-sent-project-key'));
     `);
     phase = "private volume permissions and Pod replacement";
-    const permission = kube("exec", "gateway", "-c", "gateway", "--", "node", "-e", "const s=require('node:fs').statSync('/home/node/.openclaw/connections');if((s.mode&511)!==448||s.uid!==1000)process.exit(1)");
+    const permission = kube("exec", "gateway", "-c", "gateway", "--", "node", "-e",
+      `const fs=require('node:fs'),s=fs.statSync(${JSON.stringify(stateDirectory)});if((s.mode&511)!==448||s.uid!==1000)process.exit(1);` +
+      `if(!fs.existsSync(${JSON.stringify(stateDirectory + "/openclaw.sqlite")}))process.exit(1);`);
     assert.equal(permission.trim(), "");
     stop(); start();
     assert.equal(call("connections.status").userId, before.userId);
