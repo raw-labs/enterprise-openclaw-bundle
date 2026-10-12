@@ -123,6 +123,14 @@ jobs:
             bash .work/resolved/source/.github/actions/run-ci-lane/codex-sandbox.sh unload
           fi
           rm -f "$RUNNER_TEMP/bundle-registry/config.json"
+      - name: Retain failed native diagnostics in private CI only
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: private-native-diagnostics-${{ matrix.arch }}
+          path: .work/private-check-logs
+          retention-days: 1
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-${{ matrix.arch }}

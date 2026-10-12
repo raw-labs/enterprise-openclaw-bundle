@@ -446,6 +446,9 @@ def tests(command, source, env, log):
         )
     output = log.read_text()
     if result.returncode:
+        # Expose test names, never private assertion values or raw source-test logs.
+        for name in re.findall(r"(?m)^\s*not ok \d+ - ([^\n]+)$", output):
+            print(f"Failed native subtest: {name[:240]}", file=sys.stderr)
         # Only these factory tests use fresh state and fixed, synthetic credentials.
         # Other source-test diagnostics remain in the private log.
         public_tests = {
