@@ -30,11 +30,11 @@
     {
       "id": "openclaw-connections",
       "package": "@raw-labs/openclaw-connections",
-      "version": "0.2.1",
-      "sha256": "94b2cbc9b71dd4c333adecebb162109a009aaa427e7757514314e755e024cd98",
+      "version": "0.2.2",
+      "sha256": "d960f751ca50ca71bd4d6d1c791b6b8c2966e4b114ef5231103217339c528b6b",
       "source": {
         "repository": "https://github.com/raw-labs/openclaw-connections.git",
-        "commit": "8bce1a37bbb9456994cc42700f434faec156d736"
+        "commit": "745857e2a77a3caf7448cde6f73446290bdc1393"
       }
     }
   ],
