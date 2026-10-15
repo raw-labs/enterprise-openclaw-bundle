@@ -91,3 +91,51 @@
  
  test("missing-profile preparation cannot forget a reported container before a later valid observation", async (t) => {
    const control = await missingProfileFixture(t, [reportedContainer, missingProfileWaiting]);
+--- a/scripts/ci/prepare.mjs
++++ b/scripts/ci/prepare.mjs
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env node
++import assert from "node:assert/strict";
+ import { createRequire } from "node:module";
+ import { createHash, randomUUID } from "node:crypto";
+ import { spawn } from "node:child_process";
+@@ -1266,6 +1267,31 @@
+   if (!openShell) {
+     await commandAvailable(process.env.OCC_KUBECTL_BIN ?? "kubectl", ["version", "--client=true"]);
+   }
++  const ciApparmor = process.env.OCC_TEST_CODEX_APPARMOR_PROFILE;
++  const apparmorMounts = [];
++  if (ciApparmor !== undefined) {
++    assert.equal(ciApparmor, "oce-ci-codex-sandbox", "Only the reviewed CI AppArmor policy is supported.");
++    const parser = "/usr/sbin/apparmor_parser";
++    await execFile(parser, ["--version"]);
++    const dependencies = await execFile("ldd", [parser]);
++    assert.ok(!dependencies.stdout.includes("not found"), "CI AppArmor parser dependencies must be present.");
++    const libraries = new Set(dependencies.stdout.split("\n").flatMap((line) => {
++      const match = line.match(/(?:=>\s*)?(\/[^\s()]+)/);
++      return match ? [match[1]] : [];
++    }));
++    // The minimal K3s image needs real userspace support as well as loaded policies.
++    const binds = [
++      ["/sys/kernel/security", "/sys/kernel/security"],
++      [parser, "/sbin/apparmor_parser"],
++      ["/etc/apparmor.d", "/etc/apparmor.d"],
++      ...Array.from(libraries, (path) => [path, path]),
++    ];
++    for (const [source, target] of binds) {
++      assert.ok(isAbsolute(source) && isAbsolute(target));
++      await stat(source);
++      apparmorMounts.push("--volume", `${source}:${target}:ro@all`);
++    }
++  }
+   const cluster = ownedName("openclaw-k8s", state.prefix, { maxLength: 32 });
+   const apiPort = await reserveLoopbackPort();
+   const directory = await mkdtemp(join(process.env.RUNNER_TEMP ?? tmpdir(), `${cluster}-`));
+@@ -1319,6 +1345,7 @@
+       cluster,
+       ...(resource.nodeImage ? ["--image", resource.nodeImage] : []),
+       ...(resource.podSecurityAdmissionK3dArgs ?? []),
++      ...apparmorMounts,
+       "--servers",
+       "1",
+       "--agents",
