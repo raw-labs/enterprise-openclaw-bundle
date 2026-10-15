@@ -32,10 +32,16 @@ jobs:
           bash "$source/.github/actions/run-ci-lane/codex-sandbox.sh" load
           trap 'k3d cluster delete bundle-apparmor; bash "$source/.github/actions/run-ci-lane/codex-sandbox.sh" unload' EXIT
           uname -r
-          k3d cluster create bundle-apparmor --image 'docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc' --volume /sys/kernel/security:/sys/kernel/security:ro@all --servers 1 --agents 0 --no-lb --wait --timeout 120s --kubeconfig-update-default=false --kubeconfig-switch-context=false
+          mounts=(--volume /sys/kernel/security:/sys/kernel/security:ro@all --volume /usr/sbin/apparmor_parser:/sbin/apparmor_parser:ro@all --volume /etc/apparmor.d:/etc/apparmor.d:ro@all)
+          while read -r library; do
+            mounts+=(--volume "$library:$library:ro@all")
+          done < <(ldd /usr/sbin/apparmor_parser | awk '/=> \// {print $3} /^[[:space:]]*\// {print $1}')
+          k3d cluster create bundle-apparmor --image 'docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc' "${mounts[@]}" --servers 1 --agents 0 --no-lb --wait --timeout 120s --kubeconfig-update-default=false --kubeconfig-switch-context=false
           export KUBECONFIG="$RUNNER_TEMP/bundle-apparmor-kubeconfig"
           k3d kubeconfig get bundle-apparmor > "$KUBECONFIG"
           docker exec k3d-bundle-apparmor-server-0 sh -c 'cat /sys/module/apparmor/parameters/enabled; grep oce-ci /sys/kernel/security/apparmor/profiles' || true
+          docker exec k3d-bundle-apparmor-server-0 /sbin/apparmor_parser --version
+          docker exec k3d-bundle-apparmor-server-0 sh -c 'cat /proc/self/uid_map; grep disable_apparmor /var/lib/rancher/k3s/agent/etc/containerd/config.toml || true; printf "container=%s\n" "${container-}"'
           kubectl create serviceaccount probe
           kubectl apply -f - <<'JSON'
           {"apiVersion":"v1","kind":"Pod","metadata":{"name":"probe"},"spec":{"serviceAccountName":"probe","automountServiceAccountToken":false,"securityContext":{"runAsNonRoot":true,"runAsUser":1000,"runAsGroup":1000,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"registry.k8s.io/pause:3.10","securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"capabilities":{"drop":["ALL"]},"appArmorProfile":{"type":"Localhost","localhostProfile":"oce-ci-codex-sandbox"}}}]}}
