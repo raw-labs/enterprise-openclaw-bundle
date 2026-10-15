@@ -1,0 +1,38 @@
+name: Diagnose native sandbox
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    if: github.ref == 'refs/heads/main' && github.event.repository.private
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: resolved-inputs
+          run-id: 38744626151
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs
+      - name: Compare unprofiled and reviewed-profile namespace setup
+        run: |
+          tar -xzf inputs/resolved.tar.gz -C inputs
+          policy=inputs/resolved/source/.github/actions/run-ci-lane/codex-sandbox.apparmor
+          echo '188c9142ca4de344a7f0e0c8252d0b9e37f233e3f12814f1a29b4f9210cec32b  '"$policy" | sha256sum -c -
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install --no-install-recommends -y bubblewrap apparmor apparmor-utils
+          uname -r
+          sysctl kernel.apparmor_restrict_unprivileged_userns kernel.apparmor_restrict_unprivileged_unconfined
+          cp /usr/bin/bwrap "$RUNNER_TEMP/bundle-bwrap"
+          sudo apparmor_parser --add "$policy"
+          trap 'sudo apparmor_parser --remove "$policy"' EXIT
+          set +e
+          "$RUNNER_TEMP/bundle-bwrap" --unshare-user --unshare-net --ro-bind / / --proc /proc --dev /dev /bin/true
+          echo "Unprofiled namespace probe exit: $?"
+          aa-exec -p oce-ci-codex-sandbox -- "$RUNNER_TEMP/bundle-bwrap" --unshare-user --unshare-net --ro-bind / / --proc /proc --dev /dev /bin/true
+          profiled=$?
+          echo "Reviewed-profile namespace probe exit: $profiled"
+          sudo journalctl -k --since '5 minutes ago' --no-pager | grep -E 'apparmor="DENIED"|unprivileged_userns' | tail -30
+          exit "$profiled"
