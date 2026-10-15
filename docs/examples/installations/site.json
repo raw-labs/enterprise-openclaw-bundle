@@ -53,10 +53,7 @@
     "gatewayNodeSelector": {
       "oce-role": "control"
     },
-    "transportSecretPrefix": "openclaw-agent-transport",
-    "channels": {
-      "experimentalEmbeddedChannels": true
-    }
+    "transportSecretPrefix": "openclaw-agent-transport"
   },
   "repository": {
     "enabled": false
@@ -70,5 +67,8 @@
       "192.168.0.0/16",
       "169.254.0.0/16"
     ]
+  },
+  "channels": {
+    "experimentalEmbeddedChannels": true
   }
 }

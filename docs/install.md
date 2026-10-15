@@ -99,7 +99,7 @@ owner configures that once in the stored presets as described in
 [OPERATE.md](OPERATE.md#connections). Existing same-name presets are preserved.
 Selected files are available under `oce/deploy/presets/raw/` for inspection.
 The supplied site example enables managed Gateway outbound and
-`runtime.channels.experimentalEmbeddedChannels` for embedded Slack/Teams testing.
+`channels.experimentalEmbeddedChannels` for embedded Slack/Teams testing.
 Review its denied infrastructure CIDRs for your cluster. This experimental mode
 shares channel and model credentials in the Agent workload; disable the option
 outside trusted evaluation. Configure provider credentials through OCE and follow

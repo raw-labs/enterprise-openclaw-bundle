@@ -655,7 +655,7 @@ class StockArtifact(unittest.TestCase):
                 ({"channels": {"experimentalEmbeddedChannels": True, "unknown": True}}, "not supported"),
             ):
                 rejected = copy.deepcopy(site)
-                rejected["runtime"].update(changes)
+                rejected.update(changes)
                 save(input, rejected)
                 result = subprocess.run(["node", str(self.artifact / "oce/scripts/render-installation-profile.mjs"),
                     "--profile", profile, "--input", str(input), "--out-dir", str(output)], capture_output=True)

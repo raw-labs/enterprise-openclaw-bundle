@@ -3,7 +3,7 @@
   "version": "v0.1.0-alpha.12",
   "oce": {
     "repository": "https://github.com/raw-labs/openclaw-enterprise.git",
-    "commit": "c0e8f4d97a39fcd160b5924ad50c2c74e8f7d776"
+    "commit": "bbfdfc5c7a40d26e99a025aa1476a5bbe78d98d4"
   },
   "openclawCommit": "90d30a1178a79dddd92e6190b66b95d89dfb3ca8",
   "codexVersion": "0.163.0-alpha.2",
@@ -53,10 +53,6 @@
       {
         "path": "bundles/v0.1.0-alpha.12/assistant-browser.patch",
         "sha256": "8dd5e6778774932e28cd557f5fdec606fe6afc7e6677ba86ea48af1483c652e6"
-      },
-      {
-        "path": "bundles/v0.1.0-alpha.12/embedded-channels-renderer.patch",
-        "sha256": "ed503ba1deb49f2c770f72248d8f5d56f1b463a6a5a0d780185afe3c9b356362"
       }
     ],
     "confinement": {
