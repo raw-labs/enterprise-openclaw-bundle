@@ -28,6 +28,7 @@ jobs:
           tar -xzf inputs/resolved.tar.gz -C inputs
           source="$PWD/inputs/resolved/source"
           bash "$source/scripts/ci/setup-tools.sh" k3d
+          export PATH="$RUNNER_TEMP/bin:$PATH"
           bash "$source/.github/actions/run-ci-lane/codex-sandbox.sh" load
           trap 'k3d cluster delete bundle-apparmor; bash "$source/.github/actions/run-ci-lane/codex-sandbox.sh" unload' EXIT
           uname -r
