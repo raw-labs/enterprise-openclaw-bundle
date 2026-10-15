@@ -98,6 +98,18 @@ Assistant enables Connections without a provider key; an installation
 owner configures that once in the stored presets as described in
 [OPERATE.md](OPERATE.md#connections). Existing same-name presets are preserved.
 Selected files are available under `oce/deploy/presets/raw/` for inspection.
+The supplied site example enables managed Gateway outbound and
+`runtime.channels.experimentalEmbeddedChannels` for embedded Slack/Teams testing.
+Review its denied infrastructure CIDRs for your cluster. This experimental mode
+shares channel and model credentials in the Agent workload; disable the option
+outside trusted evaluation. Configure provider credentials through OCE and follow
+its [embedded channel procedure](oce/docs/guides/integrations/embedded-channel-trial.md).
+Teams also requires the public callback listener described there.
+
+Assistant includes the native browser plugin and headless Chromium. Chromium's
+internal sandbox is disabled for container compatibility; the Agent retains OCE's
+pod restrictions. Coding keeps browser disabled.
+
 Human sign-in and Agent setup use OCE's APIs and Console.
 Packaged `occ` supports remote administration;
 `occ dev` requires an OCE source checkout.

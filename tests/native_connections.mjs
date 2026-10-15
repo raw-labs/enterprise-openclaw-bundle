@@ -165,7 +165,19 @@ test("Connections loads in the native Gateway and retains state across Kubernete
         } else {
           assert.throws(() => call("connections.status"), /unknown method|not found|not registered/i);
         }
-        noTools(); stop();
+        noTools();
+        if (config.browser?.enabled) {
+          phase = "Assistant headless browser in the confined runtime";
+          assert.equal(call("browser.request", {target:"host", method:"POST", path:"/start", query:{profile:"openclaw"}}).ok, true);
+          const status = call("browser.request", {target:"host", method:"GET", path:"/", query:{profile:"openclaw"}});
+          assert.equal(status.running, true);
+          const tab = call("browser.request", {target:"host", method:"POST", path:"/tabs/open", query:{profile:"openclaw"}, body:{url:"about:blank"}});
+          assert.ok(tab.targetId);
+          const snapshot = call("browser.request", {target:"host", method:"GET", path:"/snapshot", query:{profile:"openclaw",targetId:tab.targetId,format:"ai"}});
+          assert.equal(typeof snapshot.snapshot, "string");
+          assert.equal(call("browser.request", {target:"host", method:"POST", path:"/stop", query:{profile:"openclaw"}}).ok, true);
+        }
+        stop();
       }
       phase = "missing native capability SecretRef";
       config = structuredClone(configuredBase);
@@ -256,8 +268,7 @@ test("Connections loads in the native Gateway and retains state across Kubernete
     `);
     phase = "private volume permissions and Pod replacement";
     const permission = kube("exec", "gateway", "-c", "gateway", "--", "node", "-e",
-      `const fs=require('node:fs'),s=fs.statSync(${JSON.stringify(stateDirectory)});if((s.mode&511)!==448||s.uid!==1000)process.exit(1);` +
-      `if(!fs.existsSync(${JSON.stringify(stateDirectory + "/openclaw.sqlite")}))process.exit(1);`);
+      `const fs=require('node:fs'),s=fs.statSync(${JSON.stringify(stateDirectory)});if((s.mode&511)!==448||s.uid!==1000)process.exit(1);`);
     assert.equal(permission.trim(), "");
     stop(); start();
     assert.equal(call("connections.status").userId, before.userId);

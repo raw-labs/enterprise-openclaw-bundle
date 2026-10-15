@@ -1,0 +1,44 @@
+--- a/scripts/render-installation-profile.mjs
++++ b/scripts/render-installation-profile.mjs
+@@ -1200,9 +1200,12 @@
+       "transportSecretPrefix",
+       "codexSeccompProfile",
+       "codexModelBaseUrl",
++      "channels",
+     ],
+     diagnostics,
+   );
++  const channels = section(runtime, "channels", diagnostics, false);
++  closed(channels, "runtime.channels", ["experimentalEmbeddedChannels"], diagnostics);
+   closed(
+     gatewayOutbound,
+     "gatewayOutbound",
+@@ -1567,6 +1570,18 @@
+     diagnostics,
+     false,
+   );
++  const experimentalEmbeddedChannels = asBoolean(
++    runtime.channels ?? {},
++    ["runtime.channels", "experimentalEmbeddedChannels"],
++    diagnostics,
++    false,
++  );
++  if (experimentalEmbeddedChannels && !gatewayOutboundEnabled) {
++    diagnostics.errors.push("runtime.channels.experimentalEmbeddedChannels requires gatewayOutbound.enabled.");
++  }
++  if (experimentalEmbeddedChannels) {
++    diagnostics.warnings.push("Embedded channels share model and channel credentials in the Agent workload; evaluation only.");
++  }
+   const managedOutboundProxyEnabled = asBoolean(
+     controlPlaneOutbound,
+     ["controlPlaneOutbound", "managedProxy"],
+@@ -1969,6 +1984,9 @@
+                     : { codexModelBaseUrl: codexModelBaseUrl(runtime, diagnostics) }),
+                 }
+               : {}),
++            ...(runtime.channels === undefined
++              ? {}
++              : { channels: { experimentalEmbeddedChannels } }),
+             ...(gatewayOutboundEnabled
+               ? {
+                   gatewayOutbound: {

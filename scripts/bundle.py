@@ -224,6 +224,8 @@ def package(args, release):
             "scripts/split-layout-adopt.mjs",
             "scripts/split-layout-tenants.mjs",
             "apps/controller/src/drivers/compute/kubernetes/resource-name.ts",
+            "apps/controller/src/drivers/openai-endpoint.ts",
+            "packages/occ/src/image-reference.ts",
             "packages/contracts/src/api/plain-text.ts",
         )
         if (source / name).is_file()

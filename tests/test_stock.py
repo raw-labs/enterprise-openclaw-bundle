@@ -642,6 +642,28 @@ class StockArtifact(unittest.TestCase):
             )
             self.assertIn(b"kind: Deployment", rendered)
             self.assertIn(b"kind: NetworkPolicy", rendered)
+            installation = helm_values(output / "installation.yaml")
+            runtime = installation["drivers"]["compute"]["configuration"]["runtime"]
+            self.assertTrue(runtime["channels"]["experimentalEmbeddedChannels"])
+            self.assertTrue(runtime["gatewayOutbound"]["enabled"])
+            for changes, error in (
+                ({"channels": {"experimentalEmbeddedChannels": "true"}}, "must be a boolean"),
+                ({"channels": {"experimentalEmbeddedChannels": True, "unknown": True}}, "not supported"),
+            ):
+                rejected = copy.deepcopy(site)
+                rejected["runtime"].update(changes)
+                save(input, rejected)
+                result = subprocess.run(["node", str(self.artifact / "oce/scripts/render-installation-profile.mjs"),
+                    "--profile", profile, "--input", str(input), "--out-dir", str(output)], capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(error, " ".join(load(output / "preflight.json")["errors"]))
+            rejected = copy.deepcopy(site)
+            rejected["gatewayOutbound"] = {"enabled": False}
+            save(input, rejected)
+            result = subprocess.run(["node", str(self.artifact / "oce/scripts/render-installation-profile.mjs"),
+                "--profile", profile, "--input", str(input), "--out-dir", str(output)], capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("requires gatewayOutbound.enabled", " ".join(load(output / "preflight.json")["errors"]))
 
     def test_corrupt_dependency_rejected(self):
         release = load(self.artifact / "metadata/release.json")

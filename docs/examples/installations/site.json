@@ -53,12 +53,22 @@
     "gatewayNodeSelector": {
       "oce-role": "control"
     },
-    "transportSecretPrefix": "openclaw-agent-transport"
-  },
-  "channels": {
-    "managedSlackProxy": false
+    "transportSecretPrefix": "openclaw-agent-transport",
+    "channels": {
+      "experimentalEmbeddedChannels": true
+    }
   },
   "repository": {
     "enabled": false
+  },
+  "gatewayOutbound": {
+    "enabled": true,
+    "denyCidrs": [
+      "10.0.0.0/8",
+      "100.64.0.0/10",
+      "172.16.0.0/12",
+      "192.168.0.0/16",
+      "169.254.0.0/16"
+    ]
   }
 }

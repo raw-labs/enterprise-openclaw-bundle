@@ -46,9 +46,9 @@ test("selected RAW presets are image-resident and accepted by OCE's real loader"
           assert.ok(!(values.tools.alsoAllow ?? []).some(tool => tool.startsWith('connections_')));
         }
         assert.equal(values.agents.defaults.thinkingDefault, 'medium');
-        assert.equal(values.browser.enabled, false);
         assert.equal(values.tools.elevated.enabled, false);
         if (preset.template.agent.executionMode === 'dedicated') {
+          assert.equal(values.browser.enabled, false);
           assert.equal(values.plugins.entries.codex.enabled, true);
           const appServer = values.plugins.entries.codex.config.appServer;
           assert.equal(appServer.approvalPolicy, 'never');
@@ -58,6 +58,12 @@ test("selected RAW presets are image-resident and accepted by OCE's real loader"
           assert.equal(values.agents.defaults.models[values.agents.defaults.model].agentRuntime.id, 'codex');
         } else {
           assert.equal(preset.template.agent.executionMode, 'embedded');
+          assert.equal(values.browser.enabled, true);
+          assert.equal(values.browser.headless, true);
+          assert.equal(values.browser.executablePath, '/usr/bin/chromium');
+          assert.equal(values.plugins.entries.browser.enabled, true);
+          assert.ok(values.tools.alsoAllow.includes('browser'));
+          for (const channel of ['slack', 'msteams']) assert.equal(values.plugins.entries[channel].enabled, true);
           assert.equal(values.agents.defaults.models[values.agents.defaults.model].agentRuntime.id, 'openclaw');
         }
         assert.equal(values.tools.web.fetch.enabled, true);
