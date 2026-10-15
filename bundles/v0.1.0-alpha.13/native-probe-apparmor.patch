@@ -1,0 +1,93 @@
+--- a/scripts/lib/codex-seccomp-k3d.mjs
++++ b/scripts/lib/codex-seccomp-k3d.mjs
+@@ -167,6 +167,10 @@
+ }
+ 
+ function restrictedProbePod({ name, namespace, nodeName, image, localhostProfile }) {
++  const apparmor = process.env.OCC_TEST_CODEX_APPARMOR_PROFILE;
++  if (apparmor !== undefined) {
++    assert.equal(apparmor, "oce-ci-codex-sandbox", "Only the reviewed CI AppArmor policy is supported.");
++  }
+   return {
+     apiVersion: "v1",
+     kind: "Pod",
+@@ -198,6 +202,9 @@
+             allowPrivilegeEscalation: false,
+             readOnlyRootFilesystem: true,
+             capabilities: { drop: ["ALL"] },
++            ...(apparmor === undefined
++              ? {}
++              : { appArmorProfile: { type: "Localhost", localhostProfile: apparmor } }),
+             ...(localhostProfile === undefined
+               ? {}
+               : { seccompProfile: { type: "Localhost", localhostProfile } }),
+@@ -295,6 +302,11 @@
+     throw new Error("CRI inspect returned an invalid runtime specification.");
+   }
+   assert.ok(runtimeSpec?.linux?.seccomp, "CRI inspect did not expose runtimeSpec.linux.seccomp.");
++  const apparmor = process.env.OCC_TEST_CODEX_APPARMOR_PROFILE;
++  if (apparmor !== undefined) {
++    assert.equal(apparmor, "oce-ci-codex-sandbox", "Only the reviewed CI AppArmor policy is supported.");
++    assert.equal(runtimeSpec.process?.apparmorProfile, apparmor, "The reviewed CI AppArmor policy must be enforced.");
++  }
+   return runtimeSpec;
+ }
+ 
+--- a/tests/conformance/codex-seccomp-profile.test.mjs
++++ b/tests/conformance/codex-seccomp-profile.test.mjs
+@@ -332,6 +332,7 @@
+       if (args.includes("apply")) {
+         const manifest = JSON.parse(await readFile(args.at(-1), "utf8"));
+         applied.set(manifest.metadata.name, manifest);
++        options.inspectManifest?.(manifest);
+         return { stdout: "", stderr: "" };
+       }
+       if (args.includes("nodes")) {
+@@ -403,7 +404,7 @@
+       if (args[0] === "exec" && args[2] === "crictl") {
+         const seccomp = args[4] === "runtime-default" ? runtimeDefaultBaseline : installedProfile;
+         return {
+-          stdout: JSON.stringify({ info: { runtimeSpec: { linux: { seccomp } } } }),
++          stdout: JSON.stringify({ info: { runtimeSpec: { linux: { seccomp }, process: { apparmorProfile: options.apparmorProfile } } } }),
+           stderr: "",
+         };
+       }
+@@ -459,6 +460,38 @@
+ const missingProfileWaiting = (profile) =>
+   profileWaiting(`failed to create containerd container: ${missingProfileMessage(profile)}`);
+ const reportedContainer = { name: "probe", containerID: "containerd://reported-probe" };
++
++for (const effectiveProfile of ["oce-ci-codex-sandbox", "unconfined", undefined]) {
++  test(`CI AppArmor request requires matching effective policy (${effectiveProfile ?? "missing"})`, async (t) => {
++    const before = process.env.OCC_TEST_CODEX_APPARMOR_PROFILE;
++    process.env.OCC_TEST_CODEX_APPARMOR_PROFILE = "oce-ci-codex-sandbox";
++    t.after(() => {
++      if (before === undefined) delete process.env.OCC_TEST_CODEX_APPARMOR_PROFILE;
++      else process.env.OCC_TEST_CODEX_APPARMOR_PROFILE = before;
++    });
++    let probes = 0;
++    const control = await missingProfileFixture(t, [missingProfileWaiting], {
++      apparmorProfile: effectiveProfile,
++      inspectManifest(manifest) {
++        probes++;
++        const security = manifest.spec.containers[0].securityContext;
++        assert.deepEqual(security.appArmorProfile, {
++          type: "Localhost", localhostProfile: "oce-ci-codex-sandbox",
++        });
++        assert.equal(security.allowPrivilegeEscalation, false);
++        assert.equal(security.readOnlyRootFilesystem, true);
++        assert.deepEqual(security.capabilities, {drop: ["ALL"]});
++      },
++    });
++    if (effectiveProfile === "oce-ci-codex-sandbox") {
++      await control.run();
++      assert.equal(probes, 3);
++    } else {
++      await assert.rejects(control.run, /The reviewed CI AppArmor policy must be enforced/);
++    }
++    await control.assertCleanup();
++  });
++}
+ 
+ test("missing-profile preparation cannot forget a reported container before a later valid observation", async (t) => {
+   const control = await missingProfileFixture(t, [reportedContainer, missingProfileWaiting]);

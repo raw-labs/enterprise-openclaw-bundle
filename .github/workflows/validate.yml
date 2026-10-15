@@ -32,5 +32,7 @@ jobs:
           cache-dependency-path: .work/resolved/source/go.sum
       - name: Build and test the unchanged exact-source CLI
         run: python3 scripts/cli.py build --selection .work/resolved/candidate.json --source .work/resolved/source --output .work/resolved/cli
+      - name: Test selected source confinement preparation
+        run: env -u OCC_TEST_CODEX_APPARMOR_PROFILE node --test .work/resolved/source/tests/conformance/codex-seccomp-profile.test.mjs
       - name: Check rejection paths, provenance, reproducibility and actual chart rendering
         run: python3 -m unittest discover -s tests -v
