@@ -789,7 +789,10 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                     def seeded():
                         result = occ("--namespace", namespace_id, "preset", "list")
                         items = result if isinstance(result, list) else result["items"]
-                        return {p["name"]: p for p in items}
+                        return {
+                            p["name"]: occ("--namespace", namespace_id, "preset", "get", p["id"])
+                            for p in items
+                        }
 
                     before = seeded()
                     if release.get("includeDefaultPresets") is False:
