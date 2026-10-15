@@ -89,9 +89,9 @@ test("Connections loads in the native Gateway and retains state across Kubernete
     },
   };
   const native = (...args) => kube("exec", "gateway", "-c", "gateway", "--", "node", "/app/openclaw.mjs", ...args);
-  const call = (method, params = {}) => {
+  const call = (method, params = {}, timeoutMs = 10000) => {
     try {
-      return JSON.parse(native("gateway", "call", method, "--url", "ws://127.0.0.1:18789", "--token", token, "--params", JSON.stringify(params), "--json"));
+      return JSON.parse(native("gateway", "call", method, "--url", "ws://127.0.0.1:18789", "--token", token, "--params", JSON.stringify(params), "--timeout", String(timeoutMs), "--json"));
     } catch (error) {
       throw new Error([error.message, error.stdout, error.stderr].filter(Boolean).join("\n"), {cause: error});
     }
@@ -168,7 +168,7 @@ test("Connections loads in the native Gateway and retains state across Kubernete
         noTools();
         if (config.browser?.enabled) {
           phase = "Assistant headless browser in the confined runtime";
-          assert.equal(call("browser.request", {target:"host", method:"POST", path:"/start", query:{profile:"openclaw"}}).ok, true);
+          assert.equal(call("browser.request", {target:"host", method:"POST", path:"/start", query:{profile:"openclaw"}, timeoutMs:45000}, 60000).ok, true);
           const status = call("browser.request", {target:"host", method:"GET", path:"/", query:{profile:"openclaw"}});
           assert.equal(status.running, true);
           const tab = call("browser.request", {target:"host", method:"POST", path:"/tabs/open", query:{profile:"openclaw"}, body:{url:"about:blank"}});
@@ -290,6 +290,11 @@ test("Connections loads in the native Gateway and retains state across Kubernete
     let logs = "";
     if (created) {
       try {logs = kube("logs", "gateway", "-c", "gateway", "--tail=70");} catch {}
+      if (phase.includes("browser")) {
+        try {logs += "\n" + kube("exec", "gateway", "-c", "gateway", "--", "sh", "-c",
+          "chromium --version; timeout 20 chromium --headless --no-sandbox --disable-dev-shm-usage --user-data-dir=/tmp/browser-diagnostic --dump-dom about:blank");}
+        catch (diagnostic) { logs += "\n" + [diagnostic.stdout, diagnostic.stderr].filter(Boolean).join("\n"); }
+      }
     }
     const detail = `${String(error.message)}\n${logs}`
       .replaceAll(token, "[synthetic token]").replaceAll("synthetic-never-sent-project-key", "[synthetic key]");
