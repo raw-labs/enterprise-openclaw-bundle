@@ -222,6 +222,14 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           if-no-files-found: error
+      - name: Retain failed installation diagnostics in private CI only
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: private-installation-diagnostics
+          path: .work/private-installation*.log
+          retention-days: 1
+          if-no-files-found: ignore
       - name: Remove job credentials
         if: always()
         run: rm -f "$RUNNER_TEMP/registry-auth/auth.json"

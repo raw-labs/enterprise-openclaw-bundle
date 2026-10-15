@@ -477,6 +477,10 @@ class StockArtifact(unittest.TestCase):
         )
         self.assertTrue((chart / "LICENSE").is_file())
         self.assertFalse((self.artifact / "scripts").exists())
+        image_check = self.artifact / "oce/scripts/lib/image-reference-problem.mjs"
+        for image, expected in (("fixture.invalid/controller@sha256:" + "0" * 64, b""),
+                                ("fixture.invalid/INVALID@sha256:" + "0" * 64, b"uppercase-repository")):
+            self.assertEqual(subprocess.check_output(["node", image_check, image]), expected)
         self.assertNotIn("lib/common.py", manifest)
         self.assertFalse(
             any(

@@ -223,6 +223,7 @@ def package(args, release):
         for name in (
             "scripts/split-layout-adopt.mjs",
             "scripts/split-layout-tenants.mjs",
+            "scripts/lib/image-reference-problem.mjs",
             "apps/controller/src/drivers/compute/kubernetes/resource-name.ts",
             "apps/controller/src/drivers/openai-endpoint.ts",
             "packages/occ/src/image-reference.ts",
