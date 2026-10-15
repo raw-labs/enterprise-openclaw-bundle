@@ -94,8 +94,8 @@ OCE owns authentication, tenant permissions and Agent setup. Continue with
 Use the selected release images instead of upstream image-build steps.
 The definition selects preset files and whether to seed OCE's additional defaults.
 Preparation applies that selection; OCE seeds missing copies automatically.
-Assistant enables Connections without a provider key; an installation
-owner configures that once in the stored presets as described in
+Presets can enable Connections without a provider key; an installation
+owner configures the key and outbound access in OCE as described in
 [OPERATE.md](OPERATE.md#connections). Existing same-name presets are preserved.
 Selected files are available under `oce/deploy/presets/raw/` for inspection.
 The supplied site example enables managed Gateway outbound and

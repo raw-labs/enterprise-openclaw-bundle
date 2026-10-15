@@ -21,8 +21,8 @@ OCE seeds selected presets when it starts and when a Namespace is created.
 Existing same-name presets are preserved, including operator edits; changed
 bundle templates do not automatically replace them.
 
-Assistant enables Connections and native plugin UI. Coding leaves Connections
-disabled; enabling it requires a reviewed Gateway outbound policy and provider setup.
+Inspect the selected preset files for plugin and skill defaults. Connections
+requires provider setup and Gateway outbound access even when enabled in a preset.
 The default shortcut chooses a readable `default-codex` if retained; otherwise it
 chooses the first readable preset alphabetically. A fresh two-preset installation
 therefore starts with Assistant. **Reset template** uses OCE's generic starter;
