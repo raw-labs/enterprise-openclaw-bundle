@@ -32,7 +32,7 @@ jobs:
           bash "$source/.github/actions/run-ci-lane/codex-sandbox.sh" load
           trap 'k3d cluster delete bundle-apparmor; bash "$source/.github/actions/run-ci-lane/codex-sandbox.sh" unload' EXIT
           uname -r
-          k3d cluster create bundle-apparmor --image 'docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc' --servers 1 --agents 0 --no-lb --wait --timeout 120s --kubeconfig-update-default=false --kubeconfig-switch-context=false
+          k3d cluster create bundle-apparmor --image 'docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc' --volume /sys/kernel/security:/sys/kernel/security:ro@all --servers 1 --agents 0 --no-lb --wait --timeout 120s --kubeconfig-update-default=false --kubeconfig-switch-context=false
           export KUBECONFIG="$RUNNER_TEMP/bundle-apparmor-kubeconfig"
           k3d kubeconfig get bundle-apparmor > "$KUBECONFIG"
           docker exec k3d-bundle-apparmor-server-0 sh -c 'cat /sys/module/apparmor/parameters/enabled; grep oce-ci /sys/kernel/security/apparmor/profiles' || true
@@ -40,8 +40,10 @@ jobs:
           kubectl apply -f - <<'JSON'
           {"apiVersion":"v1","kind":"Pod","metadata":{"name":"probe"},"spec":{"serviceAccountName":"probe","automountServiceAccountToken":false,"securityContext":{"runAsNonRoot":true,"runAsUser":1000,"runAsGroup":1000,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"registry.k8s.io/pause:3.10","securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"capabilities":{"drop":["ALL"]},"appArmorProfile":{"type":"Localhost","localhostProfile":"oce-ci-codex-sandbox"}}}]}}
           JSON
-          kubectl wait --for=condition=Ready pod/probe --timeout=45s || true
+          ready=0
+          kubectl wait --for=condition=Ready pod/probe --timeout=45s || ready=$?
           kubectl get pod probe -o json | python3 -c 'import json,sys; p=json.load(sys.stdin); print(json.dumps(p.get("status",{})))'
           kubectl get events --field-selector involvedObject.name=probe -o json | python3 -c 'import json,sys; print(json.dumps([{k:e.get(k) for k in ["reason","message"]} for e in json.load(sys.stdin)["items"]]))'
           docker exec k3d-bundle-apparmor-server-0 sh -c 'cat /sys/module/apparmor/parameters/enabled; grep oce-ci /sys/kernel/security/apparmor/profiles' || true
           sudo journalctl -k --since '10 minutes ago' --no-pager | grep -E 'apparmor="DENIED"|unprivileged_userns' | tail -25 || true
+          exit "$ready"
