@@ -50,7 +50,8 @@ The Action downloads the package from GitHub's private npm registry using its
 job token. Grant the factory repository **Read** in the package's **Manage Actions
 access** settings. Resolution rejects changed bytes, wrong package identities,
 missing notices, links and unsafe archive paths. Native builds embed the compiled
-package without fetching dependencies at runtime, check its SDK identity, and
+package without fetching dependencies at runtime, check its identity and declared
+OpenClaw API compatibility (or exact SDK version when no range is declared), and
 record its file inventory and source pins in generated provenance.
 
 Shipping a plugin makes its code available. OCE native Configuration values,
