@@ -11,7 +11,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from bundle import verify_source  # noqa: E402
-from common import digest, install_gate, load, read_release, save  # noqa: E402
+from common import APPARMOR_PROFILES, confinement_profile, digest, install_gate, load, read_release, save  # noqa: E402
 from release import (  # noqa: E402
     definition,
     latest_definition,
@@ -54,6 +54,19 @@ class DefinitionInputs(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 pinned_file(ref)
+
+    def test_confinement_requires_one_complete_known_policy_layout(self):
+        seccomp = {"scripts/lib/codex-seccomp-profile.mjs": "1" * 64}
+        for path, profile in APPARMOR_PROFILES.items():
+            self.assertEqual(confinement_profile(seccomp | {path: "2" * 64}), (path, profile))
+        for inputs in (
+            {}, seccomp, {next(iter(APPARMOR_PROFILES)): "2" * 64},
+            seccomp | {path: "2" * 64 for path in APPARMOR_PROFILES},
+            seccomp | {"../unreviewed.apparmor": "2" * 64},
+            seccomp | {"scripts/ci/codex-bwrap.apparmor": "not-a-hash"},
+        ):
+            with self.assertRaises(ValueError):
+                confinement_profile(inputs)
 
     def test_codex_prereleases_and_upgrade_baseline_are_explicit(self):
         self.assertEqual(self.spec["schemaVersion"], 5)

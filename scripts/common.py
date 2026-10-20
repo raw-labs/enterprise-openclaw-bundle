@@ -12,6 +12,10 @@ SHA = re.compile(r"^[a-f0-9]{40}$")
 HASH = re.compile(r"^[a-f0-9]{64}$")
 IMAGE = re.compile(r"^[a-zA-Z0-9][^@\s]+@sha256:[a-f0-9]{64}$")
 CODEX_VERSION = re.compile(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:alpha|beta|rc)\.(?:0|[1-9]\d*))?")
+APPARMOR_PROFILES = {
+    ".github/actions/run-ci-lane/codex-sandbox.apparmor": "oce-ci-codex-sandbox",
+    "scripts/ci/codex-bwrap.apparmor": "oce-ci-codex-bwrap",
+}
 
 
 def require(condition, message):
@@ -21,6 +25,18 @@ def require(condition, message):
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def confinement_profile(inputs):
+    """Accept the reviewed historical or current OCE CI policy layout."""
+    require(isinstance(inputs, dict), "pin reviewed source confinement inputs in bundle.json")
+    policies = set(inputs) & APPARMOR_PROFILES.keys()
+    require(len(policies) == 1
+            and set(inputs) == {"scripts/lib/codex-seccomp-profile.mjs", *policies}
+            and all(isinstance(h, str) and HASH.fullmatch(h) for h in inputs.values()),
+            "pin reviewed source confinement inputs in bundle.json")
+    path = next(iter(policies))
+    return path, APPARMOR_PROFILES[path]
 
 
 def load(path):

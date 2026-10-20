@@ -16,7 +16,7 @@ try {
   writeFileSync(resolve(output, "confinement.json"), JSON.stringify({
     seccompSha256: sha256,
     kubernetesProfile: prepared.env.OCC_TEST_KUBERNETES_CODEX_SECCOMP_PROFILE,
-    apparmor: prepared.env.OCC_TEST_CODEX_APPARMOR_PROFILE ?? null,
+    apparmor: prepared.env.OCC_TEST_CODEX_APPARMOR_PROFILE ?? process.env.OCC_TEST_CODEX_APPARMOR_PROFILE ?? null,
     scope: "Selected source's reviewed additions to this native CI node baseline; customer node policy requires review.",
   }, null, 2) + "\n");
   execFileSync(process.execPath, ["--test", "--test-concurrency=1", "--test-reporter=tap", ...runtimeImageSmokeTests], {

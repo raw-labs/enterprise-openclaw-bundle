@@ -20,6 +20,7 @@ from pathlib import Path
 from bundle import source_files, verify_source
 from common import (
     ROLES,
+    confinement_profile,
     digest,
     load,
     read_release,
@@ -464,6 +465,49 @@ def tests(command, source, env, log):
     return tap_counts(output)
 
 
+def apparmor(args, release):
+    """Load only the selected source's hash-pinned policy on the owned CI runner."""
+    require(sys.platform == "linux", "CI AppArmor setup requires Linux")
+    marker = Path(os.environ["RUNNER_TEMP"]) / "bundle-ci-apparmor.json"
+    if args.operation == "unload" and not marker.exists():
+        return
+    source = Path(args.source).resolve()
+    # Test preparation has installed node_modules; all inventoried source files
+    # must remain intact, while build-context purity was checked before build.
+    verify_files(source, source_files(release, args.selection))
+    path, profile = confinement_profile(release["confinementInputs"])
+    policy = source / path
+    require(digest(policy.read_bytes()) == release["confinementInputs"][path]
+            and re.findall(r"^profile ([a-z0-9-]+) flags=", policy.read_text(), re.MULTILINE) == [profile],
+            "selected AppArmor policy identity mismatch")
+    ownership = {"profile": profile, "sha256": digest(policy.read_bytes())}
+    if args.operation == "unload":
+        require(load(marker) == ownership, "CI AppArmor policy ownership mismatch")
+        run(["sudo", "apparmor_parser", "--remove", policy])
+        marker.unlink()
+        return
+    require(not marker.exists(), "CI AppArmor policy already owned")
+    options = json.loads(subprocess.check_output(["docker", "info", "--format", "{{json .SecurityOptions}}"], text=True))
+    if not any("name=apparmor" in option for option in options):
+        print("Docker AppArmor is disabled; no CI policy loaded")
+        return
+    environment = Path(os.environ["GITHUB_ENV"])
+    if not shutil.which("apparmor_parser"):
+        run(["sudo", "apt-get", "-o", "Acquire::Retries=3", "update"])
+        run(["sudo", "apt-get", "-o", "Acquire::Retries=3", "install", "--no-install-recommends", "-y", "apparmor"])
+    # Never replace or remove a policy already owned by another process.
+    run(["sudo", "apparmor_parser", "--add", policy])
+    try:
+        with marker.open("x") as file:
+            file.write(json.dumps(ownership))
+        with environment.open("a") as file:
+            file.write("OCC_TEST_CODEX_APPARMOR_PROFILE=" + profile + "\n")
+    except BaseException:
+        run(["sudo", "apparmor_parser", "--remove", policy])
+        marker.unlink(missing_ok=True)
+        raise
+
+
 def check(args, release):
     native_arch(args.arch)
     require(os.getuid() == 1000 or os.environ.get("GITHUB_ACTIONS") == "true",
@@ -636,12 +680,10 @@ def check(args, release):
             receipt["lanes"]["runtime"][key] += value
         require(not state.exists(), "runtime cleanup incomplete")
         receipt["confinement"] = load(report / "confinement.json")
+        confinement_profile(release["confinementInputs"])
         receipt["confinement"]["reviewedInputs"] = {
             p: digest((source / p).read_bytes())
-            for p in (
-                "scripts/lib/codex-seccomp-profile.mjs",
-                ".github/actions/run-ci-lane/codex-sandbox.apparmor",
-            )
+            for p in release["confinementInputs"]
         }
         require(
             digest((report / "codex-seccomp.json").read_bytes())
@@ -894,12 +936,9 @@ def publish(args, release):
             and receipt["definitionSha256"] == release["definitionSha256"],
             "native receipts belong to another workflow or definition",
         )
+        confinement_profile(release["confinementInputs"])
         require(
-            set(receipt["confinement"]["reviewedInputs"])
-            == {
-                "scripts/lib/codex-seccomp-profile.mjs",
-                ".github/actions/run-ci-lane/codex-sandbox.apparmor",
-            },
+            receipt["confinement"]["reviewedInputs"] == release["confinementInputs"],
             "native confinement input inventory incomplete",
         )
         for name, hash in receipt["confinement"]["reviewedInputs"].items():
@@ -1047,6 +1086,9 @@ def main():
     sub.add_parser("docker-preflight")
     p = sub.add_parser("dependencies")
     p.add_argument("--output", required=True)
+    p = sub.add_parser("apparmor")
+    p.add_argument("--source", required=True)
+    p.add_argument("operation", choices=("load", "unload"))
     p = sub.add_parser("build")
     p.add_argument("--source", required=True)
     p.add_argument("--arch", choices=("amd64", "arm64"), required=True)

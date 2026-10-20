@@ -24,6 +24,7 @@ from common import (
     IMAGE,
     ROLES,
     SHA,
+    confinement_profile,
     digest,
     load,
     read_release,
@@ -124,15 +125,7 @@ def definition(path):
     require(isinstance(build["patches"], list), "patches must be a list")
     for patch in build["patches"]:
         pinned_file(patch)
-    require(
-        set(build["confinement"])
-        == {
-            "scripts/lib/codex-seccomp-profile.mjs",
-            ".github/actions/run-ci-lane/codex-sandbox.apparmor",
-        }
-        and all(HASH.fullmatch(h) for h in build["confinement"].values()),
-        "pin reviewed source confinement inputs in bundle.json",
-    )
+    confinement_profile(build["confinement"])
     targets, names = set(), set()
     plugin_ids = {p if isinstance(p, str) else p["id"] for p in spec["plugins"]}
     for ref in preset_refs:

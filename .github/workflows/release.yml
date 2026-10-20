@@ -108,7 +108,7 @@ jobs:
         run: |
           corepack pnpm install --frozen-lockfile --ignore-scripts
           bash scripts/ci/setup-tools.sh k3d
-          bash .github/actions/run-ci-lane/codex-sandbox.sh load
+          python3 "$GITHUB_WORKSPACE/scripts/stock.py" --selection "$GITHUB_WORKSPACE/.work/resolved/candidate.json" apparmor --source "$GITHUB_WORKSPACE/.work/resolved/source" load
       - name: Test exact exports with confinement and no skips
         env:
           ARCH: ${{ matrix.arch }}
@@ -120,7 +120,7 @@ jobs:
         run: |
           if test -f .work/resolved/source/scripts/ci/cleanup.mjs; then
             node .work/resolved/source/scripts/ci/cleanup.mjs --state "$RUNNER_TEMP/bundle-runtime-$ARCH.json"
-            bash .work/resolved/source/.github/actions/run-ci-lane/codex-sandbox.sh unload
+            python3 scripts/stock.py --selection .work/resolved/candidate.json apparmor --source .work/resolved/source unload
           fi
           rm -f "$RUNNER_TEMP/bundle-registry/config.json"
       - name: Retain failed native diagnostics in private CI only

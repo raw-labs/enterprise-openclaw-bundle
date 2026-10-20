@@ -1,0 +1,58 @@
+--- a/deploy/runtime/Dockerfile
++++ b/deploy/runtime/Dockerfile
+@@ -191,7 +191,7 @@
+     node --import ./scripts/tsx.mjs scripts/test-projects.mts src/gateway/server.required-placement-scopes.test.ts
+ # Follow the pinned upstream Docker assembly; plugin-local dependencies remain
+ # separate when a plugin and core require different versions.
+-RUN OPENCLAW_INTERNAL_DOCKER_BUILD_PLUGIN_IDS=codex,slack,msteams \
++RUN OPENCLAW_INTERNAL_DOCKER_BUILD_PLUGIN_IDS=codex,slack,msteams,browser \
+     OPENCLAW_RUN_NODE_SKIP_DTS_BUILD=1 pnpm_config_verify_deps_before_run=false \
+     pnpm build:docker \
+     && pnpm_config_verify_deps_before_run=false pnpm ui:build
+@@ -220,7 +220,7 @@
+ FROM openclaw-production-deps AS openclaw-runtime-assets
+ COPY --from=openclaw-build-output /source/ ./
+ RUN node scripts/postinstall-bundled-plugins.mjs \
+-    && OPENCLAW_EXTENSIONS=codex,slack,msteams node scripts/prune-docker-plugin-dist.mjs \
++    && OPENCLAW_EXTENSIONS=codex,slack,msteams,browser node scripts/prune-docker-plugin-dist.mjs \
+     && find dist -type f \( -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.map' \) -delete \
+     && if [ -L node_modules/@openclaw/ai ]; then \
+       target="$(readlink -f node_modules/@openclaw/ai)"; \
+@@ -238,7 +238,7 @@
+ RUN node --input-type=module <<'NODE'
+ import { existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync } from "node:fs";
+ import { dirname, relative, resolve } from "node:path";
+-for (const plugin of ["codex", "slack", "msteams"]) {
++for (const plugin of ["codex", "slack", "msteams", "browser"]) {
+   const root = resolve("dist/extensions", plugin);
+   const manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+   for (const name of Object.keys(manifest.dependencies ?? {})) {
+@@ -270,7 +270,7 @@
+ 
+ RUN node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major !== 24 || minor < 16) throw new Error(`OpenClaw Enterprise runtime images require Node.js 24.16+; found ${process.version}.`);'
+ 
+-RUN apt-get update && apt-get install -y --no-install-recommends tini git ca-certificates curl openssh-client libstdc++6 libgomp1 python3 procps && rm -rf /var/lib/apt/lists/*
++RUN apt-get update && apt-get install -y --no-install-recommends tini git ca-certificates curl openssh-client libstdc++6 libgomp1 python3 procps chromium fonts-liberation && rm -rf /var/lib/apt/lists/*
+ # Version checks use throwaway state directories: gh writes a random device ID
+ # and Codex a randomly named arg0 directory, which would otherwise ship.
+ # --retry rides out GitHub's transient release-download errors (HTTP 408, 429,
+--- a/scripts/build-runtime-assets.mjs
++++ b/scripts/build-runtime-assets.mjs
+@@ -175,7 +175,7 @@
+     [
+       join(root, "scripts/lib/docker-plugin-selection.mjs"),
+       join(root, "extensions"),
+-      "codex,slack,msteams",
++      "codex,slack,msteams,browser",
+       "--required-bundled",
+       join(root, "package.json"),
+     ],
+@@ -309,7 +309,7 @@
+         packageManager: pkg.packageManager,
+         platform: process.platform,
+         architecture: process.arch,
+-        plugins: ["codex", "slack", "msteams"],
++        plugins: ["codex", "slack", "msteams", "browser"],
+       },
+       null,
+       2,
