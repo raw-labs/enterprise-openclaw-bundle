@@ -52,7 +52,7 @@
       },
       {
         "path": "bundles/v0.1.0-alpha.16/assistant-browser.patch",
-        "sha256": "767cfe1b2dac50aabbaa9f6f52f9f380329ce8be0563e1975b800ab5547cf5a7"
+        "sha256": "b651fd2cfb4c8500e87a4effab9c846ae85bf8bdddb9693fbd080491b67bd9b1"
       },
       {
         "path": "bundles/v0.1.0-alpha.16/native-probe-apparmor.patch",
