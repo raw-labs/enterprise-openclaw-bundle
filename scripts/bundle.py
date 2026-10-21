@@ -3,6 +3,7 @@
 
 import argparse
 import gzip
+import importlib.util
 import io
 import json
 import posixpath
@@ -32,6 +33,22 @@ HANDOFF_DOCUMENTS = {
     "SUPPORT.md": ROOT / "docs/support.md",
     "SECURITY.md": ROOT / "SECURITY.md",
 }
+
+
+def preparation_tool(artifact):
+    """Load the extracted renderer without creating unlisted Python cache files."""
+    artifact = Path(artifact)
+    spec = importlib.util.spec_from_file_location("delivered_prepare", artifact / "lib/prepare.py")
+    module = importlib.util.module_from_spec(spec)
+    bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, str(artifact / "lib"))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
+        sys.dont_write_bytecode = bytecode
+    return module
 
 
 def handoff_document(document, release, files):

@@ -19,7 +19,7 @@ SELECTION = Path(
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "delivery"))
 import prepare as installer  # noqa: E402
-from bundle import BUNDLE_LICENSE_FILES, cli_files  # noqa: E402
+from bundle import BUNDLE_LICENSE_FILES, cli_files, preparation_tool  # noqa: E402
 from common import (  # noqa: E402
     digest,
     helm_values,
@@ -298,6 +298,19 @@ class StockArtifact(unittest.TestCase):
             self.assertFalse(destination.exists())
         finally:
             extra.unlink()
+
+    def test_in_process_renderer_keeps_the_package_inventory_clean(self):
+        prior = sys.dont_write_bytecode
+        try:
+            sys.dont_write_bytecode = False
+            renderer = preparation_tool(self.artifact)
+            self.assertEqual(renderer.ROOT, self.artifact.resolve())
+            self.assertFalse(sys.dont_write_bytecode)
+            self.assertFalse(list(self.artifact.rglob("__pycache__")))
+            subprocess.run([self.artifact / "bin/prepare", "verify"], check=True,
+                           stdout=subprocess.DEVNULL)
+        finally:
+            sys.dont_write_bytecode = prior
 
     def test_delivered_upstream_cli_launcher_and_inventory(self):
         cli = load(self.artifact / "metadata/release.json")["operatorCli"]

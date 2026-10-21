@@ -4,7 +4,6 @@
 import argparse
 import base64
 import hashlib
-import importlib.util
 import io
 import os
 import re
@@ -17,7 +16,13 @@ import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
-from bundle import BUNDLE_LICENSE_FILES, HANDOFF_DOCUMENTS, package, verify_source
+from bundle import (
+    BUNDLE_LICENSE_FILES,
+    HANDOFF_DOCUMENTS,
+    package,
+    preparation_tool,
+    verify_source,
+)
 from common import (
     CODEX_VERSION,
     HASH,
@@ -580,26 +585,18 @@ def verify_handoff(archive, published=True):
                         )
                     else:
                         # A dry-run exercises the exact renderer without granting installation admission.
-                        spec = importlib.util.spec_from_file_location(
-                            "delivered_prepare", artifact / "lib/prepare.py"
+                        prepare = preparation_tool(artifact)
+                        prepare.render(
+                            SimpleNamespace(
+                                input=example,
+                                profile=profile,
+                                architecture="linux/" + arch,
+                                output=dest,
+                                mirrors=None,
+                            ),
+                            load(artifact / "metadata/release.json"),
+                            admit=False,
                         )
-                        prepare = importlib.util.module_from_spec(spec)
-                        sys.path.insert(0, str(artifact / "lib"))
-                        try:
-                            spec.loader.exec_module(prepare)
-                            prepare.render(
-                                SimpleNamespace(
-                                    input=example,
-                                    profile=profile,
-                                    architecture="linux/" + arch,
-                                    output=dest,
-                                    mirrors=None,
-                                ),
-                                load(artifact / "metadata/release.json"),
-                                admit=False,
-                            )
-                        finally:
-                            sys.path.pop(0)
                     next_steps = load(dest / "preflight.json")["nextSteps"]
                     require(
                         any(
