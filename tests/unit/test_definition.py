@@ -128,9 +128,81 @@ class DefinitionInputs(unittest.TestCase):
 
 
 class ReleaseDestination(unittest.TestCase):
+    def test_visibility_mismatch_rejected_before_any_publication_work(self):
+        for actual, expected, selected in (
+            (True, "public", "public"),
+            (False, "private", "private"),
+            (True, "private", "public"),
+            (False, "public", "private"),
+            (True, "internal", "private"),
+        ):
+            release = candidate()
+            release["distribution"]["visibility"] = selected
+            with (
+                self.subTest(actual=actual, expected=expected, selected=selected),
+                patch.dict("os.environ", {
+                    "GITHUB_REPOSITORY": "raw-labs/enterprise-openclaw-bundle",
+                    "GITHUB_REF": "refs/heads/main",
+                    "BUNDLE_DISTRIBUTION_VISIBILITY": expected,
+                }),
+                patch("stock.github_json", return_value={"private": actual}),
+                patch("stock.inspect_oci") as inspect,
+                patch("stock.run") as registry_write,
+            ):
+                with self.assertRaises(ValueError):
+                    publish(SimpleNamespace(command="publish"), release)
+                inspect.assert_not_called()
+                registry_write.assert_not_called()
+
+    def test_preflight_accepts_both_visibilities_but_rejects_destination_changes(self):
+        sha = "1" * 40
+        for visibility in ("private", "public"):
+            repo = {"full_name": "raw-labs/enterprise-openclaw-bundle",
+                    "private": visibility == "private", "default_branch": "main"}
+            run = {"head_sha": sha, "actor": {"login": "publisher"},
+                   "triggering_actor": {"login": "publisher"}}
+            head = {"object": {"sha": sha}}
+
+            def github(endpoint):
+                if endpoint.endswith("actions/runs/42"):
+                    return run
+                if endpoint.endswith("heads/main"):
+                    return head
+                if "/tags/" in endpoint:
+                    return None
+                return repo
+
+            with (
+                patch.dict("os.environ", {
+                    "GITHUB_REPOSITORY": repo["full_name"], "GITHUB_REF": "refs/heads/main",
+                    "GITHUB_ACTOR": "publisher", "GITHUB_RUN_ID": "42",
+                    "BUNDLE_DISTRIBUTION_VISIBILITY": visibility,
+                }),
+                patch("release.github_json", side_effect=github),
+                patch("release.subprocess.check_output",
+                      return_value="https://github.com/raw-labs/enterprise-openclaw-bundle.git\n") as origin,
+            ):
+                preflight("v0.1.0-alpha.99", sha)
+                repo["private"] = not repo["private"]
+                with self.assertRaisesRegex(ValueError, "visibility"):
+                    preflight("v0.1.0-alpha.99", sha)
+                repo["private"] = not repo["private"]
+                head["object"]["sha"] = "2" * 40
+                with self.assertRaisesRegex(ValueError, "remote main changed"):
+                    preflight("v0.1.0-alpha.99", sha)
+                head["object"]["sha"] = sha
+                run["actor"]["login"] = run["triggering_actor"]["login"] = "someone-else"
+                with self.assertRaisesRegex(ValueError, "identity mismatch"):
+                    preflight("v0.1.0-alpha.99", sha)
+                run["actor"]["login"] = "publisher"
+                origin.return_value = "https://github.com/someone/else.git\n"
+                with self.assertRaisesRegex(ValueError, "unexpected origin"):
+                    preflight("v0.1.0-alpha.99", sha)
+
     def test_existing_tag_or_changed_remote_head_rejected_before_build(self):
         sha = "1" * 40
         env = {
+            "BUNDLE_DISTRIBUTION_VISIBILITY": "private",
             "GITHUB_REPOSITORY": "raw-labs/enterprise-openclaw-bundle",
             "GITHUB_REF": "refs/heads/main",
             "GITHUB_ACTOR": "publisher",

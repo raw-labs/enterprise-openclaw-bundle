@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve one bundle definition; finish the private release after native checks."""
+"""Resolve one bundle definition; finish the release after native checks."""
 
 import argparse
 import base64
@@ -31,12 +31,14 @@ from common import (
     SHA,
     confinement_profile,
     digest,
+    distribution_visibility,
     load,
     read_release,
     require,
     run,
     safe_path,
     save,
+    verify_repository_visibility,
 )
 from ingredients import plugin_selections, resolve_plugins
 from stock import LICENSE_LAYER, github_json
@@ -209,8 +211,8 @@ def resolve_baseline(version, output):
     """Retain an immutable published package as a qualification input, never a payload."""
     repo = github_json(f"repos/{REPOSITORY}")
     release = github_json(f"repos/{REPOSITORY}/releases/tags/{version}")
-    require(repo and repo["private"] is True and release and not release["draft"]
-            and release["tag_name"] == version, "upgrade baseline must be a private published release")
+    require(repo and repo["full_name"] == REPOSITORY and release and not release["draft"]
+            and release["tag_name"] == version, "upgrade baseline must be a canonical published release")
     directory = output / "baseline"
     directory.mkdir()
     run(["gh", "release", "download", version, "--repo", REPOSITORY,
@@ -460,7 +462,7 @@ def resolve(args):
         "distribution": {
             "registry": "ghcr.io",
             "namespace": REPOSITORY,
-            "visibility": "private",
+            "visibility": distribution_visibility(),
             "productVersion": spec["version"],
         },
         "qualification": {"status": "unqualified", "customerQualified": False},
@@ -484,10 +486,10 @@ def preflight(version, expected_sha):
         "release only from bundle main Action",
     )
     repo = github_json("repos/" + REPOSITORY)
+    verify_repository_visibility(repo)
     require(
         repo
         and repo["full_name"] == REPOSITORY
-        and repo["private"] is True
         and repo["default_branch"] == "main",
         "unexpected release destination",
     )
@@ -634,7 +636,7 @@ def finish(args):
     publication = load(selection.parent / "publication.json")
     require(
         publication["status"]
-        in ("published-private-unqualified", "checked-unpublished")
+        in (f"published-{release['distribution']['visibility']}-unqualified", "checked-unpublished")
         and publication["roles"] == release["images"],
         "shipping publication incomplete",
     )
@@ -643,7 +645,7 @@ def finish(args):
         set(release["qualification"].get("nativeReceipts", {})) == {"amd64", "arm64"},
         "both native receipts required",
     )
-    published = publication["status"] == "published-private-unqualified"
+    published = publication["status"] != "checked-unpublished"
     release["distribution"]["published"] = published
     release["kind"] = "release"
     release["qualification"].update(status="native-verified", customerQualified=False)
@@ -823,7 +825,7 @@ def publish_release(args):
         "Download **bundle.tar.gz** and **bundle.tar.gz.sha256** to install; "
         "extract it and start with **INSTALL.md**. The archive includes the OCE chart, "
         "input preparation tool, upstream installation/upgrade helpers, presets and matched occ "
-        "for macOS/Linux AMD64/ARM64. Container images are pulled separately from private GHCR. "
+        "for macOS/Linux AMD64/ARM64. Container images are pulled separately from GHCR. "
         "The remaining assets are generated provenance and verification records.\n\n"
         "Native AMD64 and ARM64 shipping artifacts passed all build and confinement checks. "
         "The archive passed inventory verification, reproducibility and real chart rendering. "

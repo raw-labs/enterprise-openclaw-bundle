@@ -22,8 +22,9 @@ network, credentials, Helm, Go, Docker or prepared `.work/` directory. Synthetic
 validator inputs never qualify a shipping artifact.
 
 Pull requests use this credential-free check on GitHub-hosted runners. Credentialed
-packaging checks are restricted to pushes to the private canonical main branch;
-forks and public-repository runs do not receive package credentials or paid runners.
+packaging checks run only on canonical main pushes; fork pull requests never
+receive package credentials or paid runners. Maintainers may run reviewed native
+builds manually as described in the [release procedure](docs/release.md).
 
 ## Packaging integration
 
@@ -33,6 +34,11 @@ Python dependencies are standard-library only. Public release-asset selections
 download without credentials. A selection using GitHub's npm registry instead
 requires `GH_TOKEN` with package read access; supply it through protected credential
 tooling, never source or shell transcripts.
+
+Local resolution defaults to private distribution metadata. To exercise the
+public format without publishing anything, export
+`BUNDLE_DISTRIBUTION_VISIBILITY=public` before resolving. CI sets this from actual
+repository visibility; publication rejects mismatched repository or package visibility.
 
 Choose an empty output directory. The resolver exports exact committed OCE source,
 applies pinned patches and verifies package downloads; it does not build images or

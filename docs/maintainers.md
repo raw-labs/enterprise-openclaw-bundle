@@ -19,7 +19,7 @@ expertise when needed. Branch rules are configured separately in GitHub.
   extra files, links, source/image mismatches and unintended output contents.
 - Documentation changes: verify repository links and the delivered links and
   commands. Keep site identities and current qualification claims out of prose.
-- Release changes: inspect workflow permissions, private destinations, attachment
+- Release changes: inspect workflow permissions, authorized destinations and visibility, attachment
   allowlists and provenance binding. Keep raw diagnostics and build inputs out of
   customer assets.
 
@@ -29,7 +29,7 @@ archives. Local fixtures do not substitute for native runtime qualification.
 
 ## Review a release
 
-Follow the [release procedure](release.md). Confirm identity, private repository,
+Follow the [release procedure](release.md). Confirm identity, authorized repository visibility,
 origin and expected remote head before pushing or publishing. Stop on an
 unexpected destination or head. Native AMD64 and ARM64 evidence must match the
 selected inputs and exact shipping artifacts, with reviewed confinement and no

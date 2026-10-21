@@ -1,51 +1,60 @@
-# Prepare the public transition
+# Publish source, releases and images
 
-Repository visibility and distribution are separate decisions. Keep this repository
-private until an owner explicitly authorizes the transition. Do not dispatch CI,
-commit, push, publish or rewrite history while the preparation hold is in effect.
+The intended distribution is one public source repository with public GitHub
+release downloads and public GHCR images. Keep all three private until the owner
+explicitly authorizes the visibility change. Preparation, reviews and non-publishing
+checks may proceed. Do not change a live installation as part of publication.
 
-## Execution and repository controls
+## Prepare while private
 
-Public pull requests run only offline contributor checks, with a read-only token
-on GitHub-hosted runners. Credentialed integration and release jobs require the
-private canonical repository; their raw logs and diagnostic artifacts may contain
-sensitive data. A `private-` artifact name grants no access control. Moving source
-to a public repository disables these jobs. Establish a separate private qualification
-execution/storage boundary before resuming them, preserving exact commit, source,
-image, workflow-run and destination checks. Keep generated customer assets subject
-to the release allowlist.
+- Review the source tree, retained Git refs, releases, Actions logs/artifacts and
+  image contents for credentials or customer data. Investigate scanner findings;
+  revoke an exposed credential before targeted cleanup. Non-secret historical
+  registry identifiers alone do not require rewriting history.
+- Preserve upstream notices, immutable tags, release assets and image digests.
+  Retain historical private distribution records as evidence of how they were
+  built; do not rewrite them when access changes.
+- Run contributor and prepared-source packaging checks. Exercise workflow guards
+  for both repository visibilities, including fork/PR rejection and destination
+  visibility mismatches. New builds still require native evidence.
+- Review live branch/tag protections against `.github/policies/`. Keep secret
+  scanning, push protection and read-only default workflow permissions enabled.
 
-The human-authored policies in `.github/policies/` define read-only workflow
-defaults, pull-request and contributor-check requirements for main, and protection
-against updates/deletion of release tags. Check their actual enforcement in GitHub;
-source files do not apply settings by themselves. The contributor check must run
-on the new workflow before a change can satisfy branch protection. History cleanup
-requires a separately authorized, controlled exception to ref protection.
+## Owner-authorized visibility change
 
-Keep secret scanning and push protection enabled. Before public access, verify
-fork-run approval settings, and enable **Security → Report a vulnerability** as part
-of the visibility transition; GitHub offers that reporting feature for public
-repositories. Confirm maintainers can receive private reports. Follow
-[the reporting policy](../SECURITY.md).
+Recheck identity, canonical origin, expected main head and the clearance inventory
+immediately before proceeding. Changing repository visibility also exposes retained
+release downloads and Actions logs/artifacts; there is no separate private setting
+for a published release inside a public repository. See [GitHub visibility
+consequences](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility).
 
-## Final clearance
+Change the three existing GHCR packages to public and the repository to public
+within the authorized transition. Package visibility is independent of repository
+visibility; [making a package public cannot be reversed](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility). Preserve every digest and
+tag. Avoid dispatching a publishing workflow while repository/package visibility
+is mixed: its checks deliberately reject that state.
 
-- Verify Connections source and its exact selected package are accessible without
-  RAW credentials. Public source alone does not change package-registry access.
-  Update and test the resolver against the chosen public artifact channel.
-- Review the intended publication tree and all retained Git refs with a secret
-  scanner. Inspect releases, attachments, Actions runs/logs/artifacts and other
-  repository metadata separately. Remove or sanitize unapproved historical material
-  only after the owner authorizes that cleanup; deleting working files is insufficient.
-- Retain required upstream copyright/license notices and confirm redistributable
-  component contents. Apache-2.0 applies to RAW's original work.
-- Commit and validate the reviewed tree only when the preparation hold is lifted.
-  Check fresh-checkout contributor tests, anonymous dependency resolution and the
-  intended public CI behavior. New distribution builds still need real native
-  qualification and any selected upgrade proof.
-- Recheck destination, privacy, identity and head immediately before the authorized
-  transition. Source publication does not require publishing a new distribution version.
+Enable private vulnerability reporting and verify maintainers can receive reports.
+Require approval for workflows from all outside collaborators, then confirm the
+branch/tag protections, secret scanning and token defaults still apply. Verify
+anonymous source access, release downloads and all image indexes/platform
+manifests against retained checksums and digests. Publication needs no new version,
+new repository, history rewrite or live installation update.
 
-Current local resolved inputs may predate changed templates or examples. Do not
-edit their inventories or reuse old receipts to qualify new inputs. Resolve a fresh
-snapshot after the hold is lifted; preserve old snapshots only as private scratch.
+## Public CI
+
+Fork pull requests run offline contributor checks on GitHub-hosted runners without
+package credentials. Integration runs only on canonical main pushes. Native builds
+run only on canonical manual dispatches: main, or reviewed `codex/` branches with
+publication disabled. Only main can publish. Paid runners never execute fork PR
+code, and `pull_request_target` is not used.
+
+CI derives distribution visibility from the actual repository and verifies it
+again through the API before publishing. Every existing image package must match;
+a public destination must already exist. CI never changes visibility settings.
+Public Actions logs and ordinary build artifacts are public material. Raw failure
+diagnostics are uploaded only while the repository is private; after publication,
+reproduce failures in a protected maintainer environment when those logs are
+needed. Customer inputs, credentials and live installation state must never enter
+release CI. See [release](release.md), [distribution](distribution.md) and
+[security reporting](../SECURITY.md).

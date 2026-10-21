@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -21,6 +22,20 @@ APPARMOR_PROFILES = {
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def distribution_visibility():
+    """CI binds this to repository visibility; local resolution defaults private."""
+    visibility = os.environ.get("BUNDLE_DISTRIBUTION_VISIBILITY", "private")
+    require(visibility in ("private", "public"), "invalid distribution visibility")
+    return visibility
+
+
+def verify_repository_visibility(repo):
+    visibility = distribution_visibility()
+    require(repo is not None and repo.get("private") is (visibility == "private"),
+            "repository visibility differs from distribution visibility")
+    return visibility
 
 
 def digest(data):
@@ -311,7 +326,7 @@ def validate_stock(release):
             )
     require(
         release["distribution"]["registry"] == "ghcr.io"
-        and release["distribution"]["visibility"] == "private"
+        and release["distribution"]["visibility"] in ("private", "public")
         and release["distribution"]["namespace"]
         == "raw-labs/enterprise-openclaw-bundle",
         "unexpected distribution destination",

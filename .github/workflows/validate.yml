@@ -3,6 +3,8 @@ on:
   pull_request:
   push:
     branches: [main]
+env:
+  BUNDLE_DISTRIBUTION_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
 permissions:
   contents: read
 jobs:
@@ -21,8 +23,8 @@ jobs:
         run: python3 scripts/check.py
   validate:
     needs: contributor
-    # Private credentials and paid runners never execute pull request code.
-    if: github.event.repository.private && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Credentials and paid runners never execute pull request code.
+    if: github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-8
     permissions:
       contents: read
