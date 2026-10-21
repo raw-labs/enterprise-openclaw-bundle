@@ -33,7 +33,8 @@ def distribution_visibility():
 
 def verify_repository_visibility(repo):
     visibility = distribution_visibility()
-    require(repo is not None and repo.get("private") is (visibility == "private"),
+    require(repo is not None and repo.get("private") is (visibility == "private")
+            and repo.get("visibility") == visibility,
             "repository visibility differs from distribution visibility")
     return visibility
 
