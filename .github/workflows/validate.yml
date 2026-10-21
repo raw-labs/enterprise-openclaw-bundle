@@ -5,10 +5,28 @@ on:
     branches: [main]
 permissions:
   contents: read
-  packages: read
 jobs:
+  contributor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.16.0'
+      - name: Run offline contributor checks without package credentials
+        run: python3 scripts/check.py
   validate:
+    needs: contributor
+    # Private credentials and paid runners never execute pull request code.
+    if: github.event.repository.private && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-8
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -35,4 +53,4 @@ jobs:
       - name: Test selected source confinement preparation
         run: env -u OCC_TEST_CODEX_APPARMOR_PROFILE node --test .work/resolved/source/tests/conformance/codex-seccomp-profile.test.mjs
       - name: Check rejection paths, provenance, reproducibility and actual chart rendering
-        run: python3 -m unittest discover -s tests -v
+        run: python3 scripts/check.py --integration

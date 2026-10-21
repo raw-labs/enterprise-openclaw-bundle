@@ -161,6 +161,11 @@ test("Connections loads in the native Gateway and retains state across Kubernete
         saveConfig(); start();
         if (config.plugins.entries["openclaw-connections"]?.enabled === true) {
           assert.deepEqual(call("connections.status"), {configured:false,userId:null});
+          // Exercise the documented operator opt-in without weakening the template.
+          assert.equal(config.gateway.controlUi.experimental.customPlugins, false);
+          stop();
+          config.gateway.controlUi.experimental.customPlugins = true;
+          saveConfig(); start();
           uiAvailable();
         } else {
           assert.throws(() => call("connections.status"), /unknown method|not found|not registered/i);

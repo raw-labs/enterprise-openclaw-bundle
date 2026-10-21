@@ -17,7 +17,7 @@ import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
-from bundle import HANDOFF_DOCUMENTS, package, verify_source
+from bundle import BUNDLE_LICENSE_FILES, HANDOFF_DOCUMENTS, package, verify_source
 from common import (
     CODEX_VERSION,
     HASH,
@@ -33,8 +33,10 @@ from common import (
     safe_path,
     save,
 )
-from stock import LICENSE_LAYER, github_json
 from ingredients import plugin_selections, resolve_plugins
+from stock import LICENSE_LAYER, github_json
+
+from presets import reviewed_preset
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "raw-labs/enterprise-openclaw-bundle"
@@ -132,6 +134,7 @@ def definition(path):
         source = pinned_file(ref)
         require(source.name.endswith("-preset.json"), "preset must be a JSON template")
         preset = load(source)
+        reviewed_preset(preset)
         require(isinstance(preset.get("name"), str) and preset["name"].strip() and preset["name"] not in names, "preset names must be nonempty and unique")
         names.add(preset["name"])
         require(
@@ -351,6 +354,8 @@ def resolve(args):
     )
     payload = {} if spec["schemaVersion"] >= 3 else {"defaults/" + Path(ref["path"]).name: ref for ref in preset_refs}
     payload["defaults/codex-profile.json"] = spec["codexProfile"]
+    for name in BUNDLE_LICENSE_FILES:
+        payload["notices/" + name] = {"path": name, "sha256": digest((ROOT / name).read_bytes())}
     examples = sorted((ROOT / "docs/examples/installations").glob("*.json"))
     require(examples, "installation documentation examples missing")
     for example in examples:
@@ -619,6 +624,9 @@ def verify_handoff(archive, published=True):
 
 
 def finish(args):
+    out = Path(args.output).absolute()
+    require(not out.exists() and not out.is_symlink(),
+            "handoff output must be a new directory")
     selection = Path(args.selection).resolve()
     release = read_release(selection, ROOT)
     from bundle import cli_files
@@ -645,8 +653,7 @@ def finish(args):
     save(selection.parent / "release.json", release)
     final = selection.parent / "release.json"
     read_release(final, ROOT)
-    out = Path(args.output).resolve()
-    out.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True)
     archive = out / "bundle.tar.gz"
     package_args = SimpleNamespace(
         release=final,
@@ -670,8 +677,10 @@ def finish(args):
         "resolved.json",
     ):
         shutil.copyfile(selection.parent / name, out / name)
-    for receipt in release["qualification"]["nativeReceipts"].values():
-        shutil.copyfile(selection.parent / receipt["path"], out / receipt["path"])
+    for arch, receipt in release["qualification"]["nativeReceipts"].items():
+        name = release["id"] + "-native-" + arch + "-receipt.json"
+        require(receipt["path"] == name, "unexpected native receipt filename")
+        shutil.copyfile(selection.parent / name, out / name)
     save(
         out / "provenance.json",
         {
@@ -684,20 +693,59 @@ def finish(args):
             "published": published,
             "customerQualified": False,
             "files": {
-                p.name: digest(p.read_bytes())
-                for p in sorted(out.iterdir())
-                if p.is_file()
+                name: digest((out / name).read_bytes())
+                for name in sorted(release_assets(release["id"]) - {"provenance.json"})
             },
         },
     )
+    verify_release_assets(out)
     print(
         "Handoff verified: deterministic archive, complete inventory and real chart renders"
     )
 
 
+def release_assets(version, *, installation=False):
+    """The only permitted release attachments; no directory discovery or globs."""
+    require(isinstance(version, str) and SEMVER.fullmatch(version),
+            "invalid release asset version")
+    names = {
+        "bundle.tar.gz", "bundle.tar.gz.sha256", "bundle.json", "release.json",
+        "publication.json", "source-files.json", "resolved.json", "provenance.json",
+        version + "-native-amd64-receipt.json",
+        version + "-native-arm64-receipt.json",
+    }
+    if installation:
+        names.add("installation-receipt.json")
+    return names
+
+
+def verify_release_assets(output, *, installation=False):
+    """Reject extra assets even when they were added to provenance's inventory."""
+    out = Path(output)
+    proof = out / "provenance.json"
+    require(not proof.is_symlink() and proof.is_file(),
+            "release provenance must be a regular file")
+    provenance = load(proof)
+    expected = release_assets(provenance["version"], installation=installation)
+    paths = list(out.iterdir())
+    require({p.name for p in paths} == expected, "release asset allowlist mismatch")
+    require(all(not p.is_symlink() and p.is_file() for p in paths),
+            "release assets must be regular files")
+    files = provenance["files"]
+    require(isinstance(files, dict) and set(files) == expected - {"provenance.json"},
+            "release provenance inventory mismatch")
+    for name, checksum in files.items():
+        require(isinstance(checksum, str) and HASH.fullmatch(checksum)
+                and digest((out / name).read_bytes()) == checksum,
+                "handoff changed after verification")
+    require(provenance["artifactSha256"] == files["bundle.tar.gz"],
+            "handoff archive checksum mismatch")
+    return provenance
+
+
 def verify_installation(args):
     out = Path(args.output).resolve()
-    provenance = load(out / "provenance.json")
+    provenance = verify_release_assets(out)
     archive = out / "bundle.tar.gz"
     require(
         digest(archive.read_bytes()) == provenance["artifactSha256"],
@@ -755,11 +803,12 @@ def verify_installation(args):
     save(receipt, proof)
     provenance["files"][receipt.name] = digest(receipt.read_bytes())
     save(out / "provenance.json", provenance)
+    verify_release_assets(out, installation=True)
 
 
 def publish_release(args):
     out = Path(args.output).resolve()
-    provenance = load(out / "provenance.json")
+    provenance = verify_release_assets(out, installation=True)
     require(provenance["published"] is True, "cannot publish a dry-run handoff")
     require(
         "installation-receipt.json" in provenance["files"],
@@ -772,14 +821,8 @@ def publish_release(args):
         and provenance["workflowRun"] == os.environ.get("GITHUB_RUN_ID"),
         "handoff belongs to another build",
     )
-    for name, expected in provenance["files"].items():
-        require(
-            digest(safe_path(out, name).read_bytes()) == expected,
-            "handoff changed after verification",
-        )
     preflight(version, sha)
-    notes = out / "release-notes.txt"
-    notes.write_text(
+    notes_text = (
         "Download **bundle.tar.gz** and **bundle.tar.gz.sha256** to install; "
         "extract it and start with **INSTALL.md**. The archive includes the OCE chart, "
         "input preparation tool, upstream installation/upgrade helpers, presets and matched occ "
@@ -792,8 +835,10 @@ def publish_release(args):
         "Exact ingredients and evidence are in the attached bundle definition and provenance.\n"
     )
     # Draft holds every asset until the entire upload succeeds. Never replace an existing tag/asset.
-    run(
-        [
+    with tempfile.TemporaryDirectory(prefix="bundle-release-notes-") as temporary:
+        notes = Path(temporary) / "release-notes.txt"
+        notes.write_text(notes_text)
+        run([
             "gh",
             "release",
             "create",
@@ -808,9 +853,8 @@ def publish_release(args):
             "--draft",
             "--notes-file",
             notes,
-            *[p for p in sorted(out.iterdir()) if p.is_file() and p != notes],
-        ]
-    )
+            *[out / name for name in sorted(release_assets(version, installation=True))],
+        ])
     run(["gh", "release", "edit", version, "--repo", REPOSITORY, "--draft=false"])
 
 

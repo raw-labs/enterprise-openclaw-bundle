@@ -6,3 +6,5 @@ __pycache__/
 *.tfstate*
 *.tfplan
 .env*
+.ruff_cache/
+.venv/

@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from bundle import source_files, verify_source
+from bundle import BUNDLE_LICENSE_FILES, source_files, verify_source
 from common import (
     ROLES,
     confinement_profile,
@@ -42,8 +42,10 @@ LICENSE_LAYER = b"""
 FROM __UPSTREAM_TARGET__ AS bundle-notices
 USER root
 COPY LICENSE /usr/share/licenses/openclaw-enterprise/LICENSE
+COPY --from=bundle-licenses / /usr/share/licenses/enterprise-openclaw-bundle/
 RUN chmod 0755 /usr/share/licenses /usr/share/licenses/openclaw-enterprise \\
-    && chmod 0444 /usr/share/licenses/openclaw-enterprise/LICENSE
+    && chmod 0444 /usr/share/licenses/openclaw-enterprise/LICENSE \\
+    && chmod -R a+rX /usr/share/licenses/enterprise-openclaw-bundle
 USER node
 """
 
@@ -323,9 +325,23 @@ def inspect_oci(directory, platform, source_sha):
     }
 
 
+def license_context(release, selection):
+    """Use only inventoried notice snapshots as the Docker licensing context."""
+    directory = Path(selection).resolve().parent / "notices"
+    require(directory.is_dir() and not directory.is_symlink(), "bundle license context missing or linked")
+    paths = list(directory.rglob("*"))
+    require(not any(path.is_symlink() for path in paths), "bundle license context links rejected")
+    expected = {name: release["payloadFiles"]["notices/" + name] for name in BUNDLE_LICENSE_FILES}
+    require({str(path.relative_to(directory)) for path in paths if path.is_file()} == set(expected),
+            "bundle license context inventory mismatch")
+    verify_files(directory, expected)
+    return directory
+
+
 def build(args, release):
     native_arch(args.arch)
     verify_source(release, args.selection, Path(args.source))
+    notices = license_context(release, args.selection)
     require(
         (os.cpu_count() or 0) >= 4
         and os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") >= 12 * 1024**3,
@@ -350,6 +366,8 @@ def build(args, release):
             "--platform",
             record["platform"],
             "--provenance=false",
+            "--build-context",
+            "bundle-licenses=" + str(notices),
             "--output",
             f"type=oci,dest={out / role},tar=false,rewrite-timestamp=true",
             "--metadata-file",
@@ -447,20 +465,9 @@ def tests(command, source, env, log):
         )
     output = log.read_text()
     if result.returncode:
-        # Expose test names, never private assertion values or raw source-test logs.
-        for name in re.findall(r"(?m)^\s*not ok \d+ - ([^\n]+)$", output):
-            print(f"Failed native subtest: {name[:240]}", file=sys.stderr)
-        # Only these factory tests use fresh state and fixed, synthetic credentials.
-        # Other source-test diagnostics remain in the private log.
-        public_tests = {
-            "selected RAW presets are image-resident and accepted by OCE's real loader",
-            "packaged native extensions and their inventory match the selected release",
-            "Connections loads in the native Gateway and retains state across Kubernetes Pod replacement",
-        }
-        for block in re.split(r"(?m)(?=^# Subtest: )", output):
-            failure = re.match(r"^# Subtest: ([^\n]+)\nnot ok [^\n]+\n  ---\n.*?\n  \.\.\.(?:\n|$)", block, re.DOTALL)
-            if failure and failure[1] in public_tests:
-                print(failure[0][:16384], file=sys.stderr)
+        # Test names and assertion values can both contain runtime secrets.
+        print(f"Native test process failed (exit {result.returncode}); inspect private diagnostics.",
+              file=sys.stderr)
     require(result.returncode == 0, f"native lane failed; private diagnostics: {log}")
     return tap_counts(output)
 
@@ -612,6 +619,17 @@ def check(args, release):
                 digest(notice) == source_files(release, args.selection)["LICENSE"],
                 "shipping upstream notice mismatch",
             )
+            for name in BUNDLE_LICENSE_FILES:
+                command = [
+                    "docker", "run", "--rm", "--network", "none", "--read-only",
+                    "--user", "1000:1000", "--cap-drop", "ALL",
+                    "--security-opt", "no-new-privileges", "--entrypoint", "node",
+                    info["Id"], "-e",
+                    'process.stdout.write(require("node:fs").readFileSync(process.argv[1]))',
+                    "/usr/share/licenses/enterprise-openclaw-bundle/" + name,
+                ]
+                require(digest(subprocess.check_output(command)) == release["payloadFiles"]["notices/" + name],
+                        "shipping bundle notice mismatch: " + name)
         log = logs / "upgrade-probe.json"
         command = ["node", source / "scripts/upgrade-repository-image-probe.mjs",
                    staged["controller"], staged["repositoryCredentials"], record["platform"]]

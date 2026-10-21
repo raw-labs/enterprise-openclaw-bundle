@@ -29,6 +29,9 @@ A file reference has exactly `path` and `sha256`: a repository-relative path and
 the lowercase SHA-256 of its exact bytes. References cannot escape the repository. Commit the
 referenced files with the definition. Preset contents and installation profiles
 use OCE's formats; `bundle.json` selects them rather than defining their schemas.
+Agent templates live in `presets/`, installation profiles in `profiles/`, and
+release-specific patches beside their definition. These source paths do not change
+the delivered controller preset paths or installation-profile layout.
 
 Mandatory license handling belongs in build code. Installation examples belong in
 `docs/examples/installations/`; they are included and rendered during packaging.
@@ -38,17 +41,20 @@ Customer settings and credentials belong in the customer's private installation.
 ## Native plugins and presets
 
 A string in `plugins` selects an extension already built by the OCE runtime recipe.
-For an additional RAW package, use a version `3`–`5` package object with exactly:
+For an additional RAW package, use a version `3`–`5` package object with:
 
 - `id`: native OpenClaw plugin ID.
 - `package`: scoped `@raw-labs/...` npm package name.
 - `version`: exact package version.
 - `sha256`: SHA-256 of the published tarball.
 - `source`: `repository` HTTPS Git URL and full `commit` used to publish it.
+- Optional `url`: anonymous GitHub release asset at the source repository's
+  `releases/download/v<version>/<scope>-<package>-<version>.tgz` path.
 
-The Action downloads the package from GitHub's private npm registry using its
-job token. Grant the factory repository **Read** in the package's **Manage Actions
-access** settings. Resolution rejects changed bytes, wrong package identities,
+With `url`, downloads are anonymous, accept only GitHub's release/CDN redirect
+hosts and reject changed checksums. Without it, the Action uses GitHub's npm registry
+and its job token; grant the factory repository **Read** in the package's **Manage
+Actions access** settings. Resolution rejects changed bytes, wrong package identities,
 missing notices, links and unsafe archive paths. Native builds embed the compiled
 package without fetching dependencies at runtime, check its identity and declared
 OpenClaw API compatibility (or exact SDK version when no range is declared), and

@@ -4,6 +4,8 @@ For maintainers. Each `bundles/<version>/bundle.json` is the human-authored rele
 selection. Its version is independent of the OCE chart version. Retain hash-pinned
 ingredients used by maintained definitions; add a new file when changing one.
 Published source and definitions remain available at their immutable Git tags.
+The working branch contains maintained definitions only. A draft definition is not
+a published release; local validation does not create a tag, release or image publication.
 
 See the [bundle schema](bundle-schema.md) for supported fields, source compatibility
 checks and adding native plugins. Selected presets are installed through OCE's
@@ -15,7 +17,7 @@ with the documentation and checked by the renderer. Customer settings belong in 
 
 Commit the definition and ingredients, then run **Release bundle** on main and
 select its definition path. The Action runs on demand; pushing a commit or tag does
-not start a release. Publication defaults to enabled. Set `BUNDLE_DEFINITION` to
+not start a release. Publication defaults to disabled. Set `BUNDLE_DEFINITION` to
 the chosen `bundles/<version>/bundle.json` path, then run:
 
 ```bash
@@ -58,10 +60,18 @@ The GitHub release has eleven attachments:
 - `installation-receipt.json`: extracted-package installation and authenticated CLI check on disposable k3d infrastructure.
 - `provenance.json`: build commit/run, definition hash and output checksums.
 
-The archive starts with `INSTALL.md`, `UPDATE.md`, `OPERATE.md` and a short operator-facing
-`AGENTS.md`. Its commands are `bin/occ` and `bin/prepare`; packaged OCE files are
+The archive starts with `INSTALL.md`, `UPDATE.md`, `OPERATE.md`, `SUPPORT.md`,
+`SECURITY.md` and a short operator-facing `AGENTS.md`.
+Its commands are `bin/occ` and `bin/prepare`; packaged OCE files are
 under `oce/`, with supporting code under `lib/` and release metadata under
 `metadata/`. Native receipts remain separate release assets.
+
+The factory requires a new handoff directory and enforces this exact attachment
+allowlist. Before installation checks it expects ten files; the installation
+receipt brings the final set to eleven. Extra, missing, linked or non-regular
+assets are rejected, even if an extra file is added to provenance. Publication
+uploads explicit allowed filenames; release notes are created outside the asset
+directory. Asset checks verify inventory consistency, not a signature or attestation.
 
 Actions also retains four temporary artifact collections: resolved build inputs,
 native AMD64 exports, native ARM64 exports and release outputs. No generated records
@@ -69,17 +79,26 @@ are committed to the source repository.
 
 ## Checks and retries
 
+Credentialed integration checks run only after a push to this private repository's
+main branch. Pull requests run the offline contributor check. Native release jobs
+also require the private canonical repository. Publishing requires main; changing visibility
+disables them. Before public operation, establish a private qualification repository
+or equivalent private execution/storage boundary and review its exact source,
+identity, registry and evidence bindings. Do not remove visibility guards to make
+a public release workflow run. See [public transition](public-readiness.md).
+
+Maintainers may manually dispatch `release.yml` at a reviewed `codex/` branch with
+`publish=false` to test unmerged factory changes. This runs both native targets and
+a separate handoff-review job with read-only repository/package permissions. It
+uploads private review artifacts and creates no registry publication, tag or release.
+The publishing handoff job remains restricted to main. Review branch changes and
+check the exact remote head and repository privacy before dispatch.
+
 Set `publish=false` for the same native build and packaging checks without registry
 writes or a tag/release. Its review archive is marked unpublished and installation
-admission rejects it. Local packaging checks can resolve without native builds:
-use the Go toolchain pinned in the Release Action for the CLI build.
-
-```bash
-python3 scripts/release.py resolve --definition "$BUNDLE_DEFINITION" --output .work/resolved
-python3 scripts/cli.py build --selection .work/resolved/candidate.json \
-  --source .work/resolved/source --output .work/resolved/cli
-python3 -m unittest discover -s tests -v
-```
+admission rejects it. Local packaging checks can resolve without native builds. Follow
+[contributor setup](../CONTRIBUTING.md) for prerequisites, package authentication,
+the selected Go toolchain, fast checks and prepared-source integration checks.
 
 A published version cannot be rebuilt or replaced. For a failed publishing job,
 use GitHub's **Re-run failed jobs** while its original resolved inputs and native

@@ -23,12 +23,43 @@ from common import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+BUNDLE_LICENSE_FILES = ("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md", "LICENSES/OCE-MIT.txt")
 HANDOFF_DOCUMENTS = {
     "AGENTS.md": ROOT / "delivery/AGENTS.md",
     "INSTALL.md": ROOT / "docs/install.md",
     "UPDATE.md": ROOT / "docs/update.md",
     "OPERATE.md": ROOT / "docs/operate.md",
+    "SUPPORT.md": ROOT / "docs/support.md",
+    "SECURITY.md": ROOT / "SECURITY.md",
 }
+
+
+def handoff_document(document, release, files):
+    """Adapt repository links to the selected, immutable installation kit."""
+    documents = {str(path.relative_to(ROOT)): name for name, path in HANDOFF_DOCUMENTS.items()}
+    oce_repository = release["sources"]["oce"]["repository"].removesuffix(".git")
+    oce_source = oce_repository + "/blob/" + release["sources"]["oce"]["commit"] + "/"
+
+    def link(match):
+        target = match[1]
+        path, marker, anchor = target.partition("#")
+        suffix = marker + anchor
+        upstream = "https://github.com/raw-labs/openclaw-enterprise/blob/main/"
+        if path.startswith(upstream):
+            relative = path.removeprefix(upstream)
+            delivered = "oce/" + relative
+            return "](" + (delivered if delivered in files else oce_source + relative) + suffix + ")"
+        if "://" not in path and path:
+            source_path = posixpath.normpath(str(document.parent.relative_to(ROOT)) + "/" + path)
+            if source_path in documents:
+                return "](" + documents[source_path] + suffix + ")"
+        for plugin in release.get("pluginPackages", []):
+            repository = plugin["source"]["repository"].removesuffix(".git")
+            if path in (repository, repository + "/"):
+                return "](" + repository + "/blob/" + plugin["source"]["commit"] + "/README.md" + suffix + ")"
+        return match[0]
+
+    return re.sub(r"\]\(([^)]+)\)", link, document.read_text()).encode()
 
 
 def source_files(release, selection):
@@ -305,7 +336,7 @@ def package(args, release):
         payload = release_file(args.release, ROOT, name)
         files[name] = (payload.read_bytes(), 0o644)
     for name, document in HANDOFF_DOCUMENTS.items():
-        files[name] = (document.read_bytes(), 0o644)
+        files[name] = (handoff_document(document, release, files), 0o644)
     # Runtime build inputs are deliberately excluded.
     copy = json.loads(json.dumps(release))
     copy["operatorCli"] = cli

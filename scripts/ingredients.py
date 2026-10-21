@@ -1,4 +1,4 @@
-"""Resolve checksum-pinned native plugin packages from GitHub's npm registry."""
+"""Resolve checksum-pinned native plugins from public releases or GitHub npm."""
 
 import base64
 import hashlib
@@ -28,8 +28,9 @@ def plugin_selections(plugins, schema):
         else:
             require(schema in (3, 4, 5) and isinstance(plugin, dict), "unsupported plugin selection")
             require(
-                set(plugin) == {"id", "package", "version", "sha256", "source"},
-                "plugin package requires id, package, version, sha256 and source",
+                {"id", "package", "version", "sha256", "source"} <= set(plugin)
+                <= {"id", "package", "version", "sha256", "source", "url"},
+                "plugin package requires id, package, version, sha256 and source; url is optional",
             )
             identity = plugin["id"]
             require(isinstance(identity, str) and PLUGIN_ID.fullmatch(identity), "invalid native plugin ID")
@@ -46,6 +47,8 @@ def plugin_selections(plugins, schema):
                 and isinstance(source["commit"], str) and SHA.fullmatch(source["commit"]),
                 "plugin source requires an exact RAW repository commit",
             )
+            if "url" in plugin:
+                release_url(plugin)
             packages.append(plugin)
         require(identity not in ids, "duplicate native plugin ID")
         ids.append(identity)
@@ -62,7 +65,34 @@ class RegistryRedirect(urllib.request.HTTPRedirectHandler):
         return redirected
 
 
+def release_url(plugin):
+    filename = plugin["package"].removeprefix("@").replace("/", "-") + "-" + plugin["version"] + ".tgz"
+    expected = (plugin["source"]["repository"].removesuffix(".git")
+                + "/releases/download/v" + plugin["version"] + "/" + filename)
+    require(plugin["url"] == expected, "public plugin URL must match its source, version and package")
+    return expected
+
+
+class ReleaseRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, message, headers, url):
+        destination = urllib.parse.urlsplit(url)
+        require(destination.scheme == "https" and destination.netloc in (
+            "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com"),
+            "public release redirect rejected")
+        redirected = super().redirect_request(request, fp, code, message, headers, url)
+        redirected.remove_header("Authorization")
+        return redirected
+
+
 def download_package(plugin):
+    if "url" in plugin:
+        request = urllib.request.Request(release_url(plugin))
+        opener = urllib.request.build_opener(ReleaseRedirect())
+        with opener.open(request, timeout=60) as response:
+            data = response.read(32 * 1024 * 1024 + 1)
+        require(len(data) <= 32 * 1024 * 1024, "plugin package exceeds size limit")
+        require(digest(data) == plugin["sha256"], "plugin package checksum mismatch")
+        return data
     token = os.environ.get("GH_TOKEN")
     require(token, "GH_TOKEN with private package read access is required")
     opener = urllib.request.build_opener(RegistryRedirect())
