@@ -129,23 +129,26 @@ class DefinitionInputs(unittest.TestCase):
 
 class ReleaseDestination(unittest.TestCase):
     def test_visibility_mismatch_rejected_before_any_publication_work(self):
-        for actual, expected, selected in (
-            (True, "public", "public"),
-            (False, "private", "private"),
-            (True, "private", "public"),
-            (False, "public", "private"),
-            (True, "internal", "private"),
+        for actual, api_visibility, expected, selected in (
+            (True, "private", "public", "public"),
+            (False, "public", "private", "private"),
+            (True, "private", "private", "public"),
+            (False, "public", "public", "private"),
+            (True, "private", "internal", "private"),
+            (True, "internal", "private", "private"),
+            (False, "internal", "public", "public"),
+            (True, None, "private", "private"),
         ):
             release = candidate()
             release["distribution"]["visibility"] = selected
             with (
-                self.subTest(actual=actual, expected=expected, selected=selected),
+                self.subTest(actual=actual, api_visibility=api_visibility, expected=expected, selected=selected),
                 patch.dict("os.environ", {
                     "GITHUB_REPOSITORY": "raw-labs/enterprise-openclaw-bundle",
                     "GITHUB_REF": "refs/heads/main",
                     "BUNDLE_DISTRIBUTION_VISIBILITY": expected,
                 }),
-                patch("stock.github_json", return_value={"private": actual}),
+                patch("stock.github_json", return_value={"private": actual, "visibility": api_visibility}),
                 patch("stock.inspect_oci") as inspect,
                 patch("stock.run") as registry_write,
             ):
@@ -158,7 +161,8 @@ class ReleaseDestination(unittest.TestCase):
         sha = "1" * 40
         for visibility in ("private", "public"):
             repo = {"full_name": "raw-labs/enterprise-openclaw-bundle",
-                    "private": visibility == "private", "default_branch": "main"}
+                    "private": visibility == "private", "visibility": visibility,
+                    "default_branch": "main"}
             run = {"head_sha": sha, "actor": {"login": "publisher"},
                    "triggering_actor": {"login": "publisher"}}
             head = {"object": {"sha": sha}}
@@ -223,6 +227,7 @@ class ReleaseDestination(unittest.TestCase):
             return {
                 "full_name": "raw-labs/enterprise-openclaw-bundle",
                 "private": True,
+                "visibility": "private",
                 "default_branch": "main",
             }
 
