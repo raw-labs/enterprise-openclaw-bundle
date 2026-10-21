@@ -1,6 +1,6 @@
 # RAW Labs Enterprise OpenClaw bundle
 
-Private OCE curation and release factory.
+OCE curation and release factory.
 
 - [Install a release](https://github.com/raw-labs/enterprise-openclaw-bundle/releases): download the archive and checksum, then start with its `INSTALL.md`.
 - [Installation procedure](docs/install.md): installers.
