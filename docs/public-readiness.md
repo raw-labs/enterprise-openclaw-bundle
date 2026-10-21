@@ -37,6 +37,11 @@ is mixed: its checks deliberately reject that state.
 Enable private vulnerability reporting and verify maintainers can receive reports.
 Require approval for workflows from all outside collaborators, then confirm the
 branch/tag protections, secret scanning and token defaults still apply. Verify
+the Depot Actions runner group permits this repository and has **Allow public
+repositories** enabled; retain its existing repository restrictions rather than
+granting unrelated repositories access. This requires organization-owner access;
+see [Depot's public repository permissions](https://depot.dev/docs/github-actions/quickstart#public-repository-permissions).
+Run a non-publishing build to verify public runner and package access. Verify
 anonymous source access, release downloads and all image indexes/platform
 manifests against retained checksums and digests. Publication needs no new version,
 new repository, history rewrite or live installation update.
