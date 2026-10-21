@@ -31,6 +31,9 @@ Mocked checks and pilot receipts never qualify new builds or customer installati
 Never commit credentials, customer account IDs, domains, state, plans, Secret
 exports or raw credential-bearing test logs. Keep build inputs
 out of SE archives; preserve upstream license notices in charts and runtime images.
-Distribute through private releases/registries or authorized customer mirrors.
-Before pushing, verify identity, repository privacy, origin and expected remote head.
+The intended distribution is public source, GitHub releases and GHCR images, or
+authorized customer mirrors. Keep the repository, releases and images private until
+the owner explicitly authorizes the visibility change. Do not change visibility as
+part of preparation or release automation. Keep customer state and credentials private.
+Before pushing, verify identity, authorized repository visibility, origin and expected remote head.
 Preserve published history. Stop on an unexpected destination or head.

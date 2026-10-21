@@ -14,13 +14,13 @@ OCE curation and release factory.
 - [Installation procedure](docs/install.md): installers.
 - [Update procedure](docs/update.md): existing installations.
 - [Operations procedure](docs/operate.md): installation owners.
-- [Download, access and mirrors](docs/distribution.md): release retrieval and private distribution.
+- [Download, access and mirrors](docs/distribution.md): release retrieval, image access and mirrors.
 
 - [Bundle definitions](bundles/): versioned ingredients.
 - [Bundle schema](docs/bundle-schema.md): supported fields and how to extend them.
 - [Agent presets](presets/) and [installation profiles](profiles/): selectable source ingredients.
 - [Installation examples](docs/examples/installations/): editable examples for installers.
-- [Release Action](.github/workflows/release.yml): native Depot builds through private publication.
+- [Release Action](.github/workflows/release.yml): native Depot builds and checked publication.
 - [Validation Action](.github/workflows/validate.yml): definition and packaging checks.
 - [GitHub releases](https://github.com/raw-labs/enterprise-openclaw-bundle/releases): generated delivery artifacts and provenance.
 - [Release procedure](docs/release.md): maintainers.

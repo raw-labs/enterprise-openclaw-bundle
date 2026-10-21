@@ -17,6 +17,7 @@ from release import (  # noqa: E402
     verify_installation,
     verify_release_assets,
 )
+from tests.unit.support import candidate  # noqa: E402
 
 VERSION = "v0.0.0-alpha.1"
 ASSETS = {
@@ -155,6 +156,28 @@ class ReleaseAssets(unittest.TestCase):
         empty.mkdir()
         with self.assertRaisesRegex(ValueError, "new directory"):
             finish(SimpleNamespace(output=empty))
+
+    def test_finish_binds_publication_status_to_selected_visibility(self):
+        for visibility in ("private", "public"):
+            release = candidate()
+            release["distribution"]["visibility"] = visibility
+            for status in ("published-private-unqualified", "published-public-unqualified",
+                           "checked-unpublished", "incomplete"):
+                publication = {"status": status, "roles": release["images"]}
+                accepted = status in (f"published-{visibility}-unqualified", "checked-unpublished")
+                with (
+                    self.subTest(visibility=visibility, status=status),
+                    patch("release.read_release", return_value=release),
+                    patch("bundle.cli_files", return_value=({}, {})),
+                    patch("release.load", return_value=publication),
+                    patch("release.package") as package,
+                ):
+                    # Valid status still needs genuine native receipts; no fixtures qualify it.
+                    with self.assertRaisesRegex(ValueError, "both native receipts" if accepted
+                                                else "shipping publication incomplete"):
+                        finish(SimpleNamespace(output=self.root / "new", selection=self.root / "candidate.json",
+                                               dependencies=self.root / "dependencies"))
+                    package.assert_not_called()
 
     def test_publish_command_uploads_only_explicit_assets_and_external_notes(self):
         captured = []

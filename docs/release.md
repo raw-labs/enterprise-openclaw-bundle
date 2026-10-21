@@ -37,10 +37,12 @@ runtime; the installation check installs the previous package, preserves its
 edited presets and upgrades the controller/database through the packaged OCE
 helper. These checks do not prove a running Agent fleet rollout or provider access.
 The Action assembles the tested manifests
-and verifies the archive and real chart renders before publishing private GHCR indexes, checks
+and verifies the archive and real chart renders before publishing GHCR indexes, checks
 the published handoff again, installs the extracted package on disposable k3d
 with PostgreSQL TLS and checks authenticated `occ` access, then creates the
-immutable tag and private prerelease. Raw installation logs remain private.
+immutable tag and prerelease. Repository visibility controls release access; image
+packages must match that visibility. CI never changes either setting. Raw failure
+diagnostics are uploaded only while the repository is private.
 
 ## Generated outputs
 
@@ -79,20 +81,20 @@ are committed to the source repository.
 
 ## Checks and retries
 
-Credentialed integration checks run only after a push to this private repository's
-main branch. Pull requests run the offline contributor check. Native release jobs
-also require the private canonical repository. Publishing requires main; changing visibility
-disables them. Before public operation, establish a private qualification repository
-or equivalent private execution/storage boundary and review its exact source,
-identity, registry and evidence bindings. Do not remove visibility guards to make
-a public release workflow run. See [public transition](public-readiness.md).
+Integration checks run only after canonical main pushes. Pull requests run the
+offline contributor check without package credentials. Native release jobs require
+manual dispatch in the canonical repository; publishing requires main. These
+boundaries apply with either private or public visibility. CI sets
+`BUNDLE_DISTRIBUTION_VISIBILITY` from repository visibility and rejects a mismatched
+live destination or image package. Public packages must already exist. Visibility
+changes require the owner's separate [public transition](public-readiness.md).
 
 Maintainers may manually dispatch `release.yml` at a reviewed `codex/` branch with
 `publish=false` to test unmerged factory changes. This runs both native targets and
 a separate handoff-review job with read-only repository/package permissions. It
-uploads private review artifacts and creates no registry publication, tag or release.
+uploads review artifacts (visible to repository readers) and creates no registry publication, tag or release.
 The publishing handoff job remains restricted to main. Review branch changes and
-check the exact remote head and repository privacy before dispatch.
+check the exact remote head and expected repository visibility before dispatch.
 
 Set `publish=false` for the same native build and packaging checks without registry
 writes or a tag/release. Its review archive is marked unpublished and installation
@@ -110,4 +112,4 @@ version. Stable promotion remains a separate release-owner decision.
 Native artifact checks do not qualify provider access or a customer installation.
 Operators follow the delivered installation and acceptance procedures. Build inputs,
 OCI exports and private raw test logs stay out of the customer configuration archive.
-See [distribution](distribution.md) for private access and mirror policy.
+See [distribution](distribution.md) for access and mirror policy.

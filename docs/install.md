@@ -21,7 +21,8 @@ control/runtime node pools, enforced NetworkPolicies, cert-manager and Envoy
 Gateway as specified by the packaged OCE production guide. Infrastructure,
 ingress access and credentials belong to the installation owner.
 
-Authorize private image pulls or arrange a digest-preserving registry mirror.
+Public bundle images need no pull credentials. For private packages, authorize
+image pulls or arrange a digest-preserving registry mirror.
 Images are pulled separately; this archive is not an offline image package.
 
 Before starting, record the reviewed cluster context, release name, namespace,

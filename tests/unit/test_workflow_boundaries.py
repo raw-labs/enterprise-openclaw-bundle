@@ -16,7 +16,7 @@ def job_block(document, name):
 
 
 class WorkflowBoundaries(unittest.TestCase):
-    def test_public_forks_and_pull_requests_cannot_enter_private_jobs(self):
+    def test_forks_and_pull_requests_cannot_enter_trusted_jobs(self):
         validation = (ROOT / ".github/workflows/validate.yml").read_text()
         release = (ROOT / ".github/workflows/release.yml").read_text()
         cases = []
@@ -44,8 +44,7 @@ class WorkflowBoundaries(unittest.TestCase):
                         ):
                             for publish in (False, True):
                                 trusted = (
-                                    private
-                                    and repository == REPOSITORY
+                                    repository == REPOSITORY
                                     and event
                                     == (
                                         "push"
@@ -134,3 +133,13 @@ class WorkflowBoundaries(unittest.TestCase):
             "gh release",
         ):
             self.assertNotIn(forbidden, review)
+
+    def test_raw_diagnostics_are_never_uploaded_from_public_ci(self):
+        document = (ROOT / ".github/workflows/release.yml").read_text()
+        for name in ("native", "review", "handoff"):
+            block = job_block(document, name)
+            diagnostic = re.search(r"(?ms)^      - name: Retain failed .*?(?=^      - |\Z)", block)[0]
+            self.assertIn("if: failure() && github.event.repository.private", diagnostic)
+        for name in ("validate.yml", "release.yml"):
+            document = (ROOT / ".github/workflows" / name).read_text()
+            self.assertIn("BUNDLE_DISTRIBUTION_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}", document)

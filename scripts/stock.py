@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stock multi-platform build/export and private candidate publication; no deployment."""
+"""Stock multi-platform build/export and candidate publication; no deployment."""
 
 import argparse
 import base64
@@ -31,6 +31,7 @@ from common import (
     save,
     validate,
     verify_files,
+    verify_repository_visibility,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -859,13 +860,16 @@ def github_json(path):
         raise ValueError("GitHub publication access check failed") from None
 
 
-def private_package(name):
+def distribution_package(name, visibility):
     from urllib.parse import quote
 
+    require(visibility in ("private", "public"), "invalid package visibility")
     package = github_json("orgs/raw-labs/packages/container/" + quote(name, safe=""))
+    require(package is not None or visibility == "private",
+            "public destination package must already exist and be public")
     if package is not None:
         require(
-            package["visibility"] == "private"
+            package["visibility"] == visibility
             and package["name"] == name
             and package["package_type"] == "container"
             and package["owner"]["login"] == "raw-labs",
@@ -908,11 +912,14 @@ def publish(args, release):
         require(
             os.environ.get("GITHUB_REPOSITORY") == "raw-labs/enterprise-openclaw-bundle"
             and os.environ.get("GITHUB_REF") == "refs/heads/main",
-            "publication only from private bundle main workflow",
+            "publication only from bundle main workflow",
         )
         repo = github_json("repos/raw-labs/enterprise-openclaw-bundle")
+        visibility = verify_repository_visibility(repo)
+        require(release["distribution"]["visibility"] == visibility,
+                "candidate and destination visibility mismatch")
         require(
-            repo and repo["private"] is True and repo["default_branch"] == "main",
+            repo and repo["default_branch"] == "main",
             "publication repository mismatch",
         )
         require(
@@ -988,7 +995,7 @@ def publish(args, release):
             + ROLE_NAMES.get(role, role)
         )
         if publishing:
-            private_package(name)
+            distribution_package(name, visibility)
         ref = "ghcr.io/raw-labs/" + name + ":" + release["id"]
         exists = False
         if publishing:
@@ -1007,7 +1014,7 @@ def publish(args, release):
             exists = identical_tag(result, dg)
             if exists:
                 require(
-                    private_package(name) is not None,
+                    distribution_package(name, visibility) is not None,
                     "existing package is unverifiable",
                 )
         destinations[role] = (name, ref, dg, exists)
@@ -1045,7 +1052,7 @@ def publish(args, release):
                     "sha256:" + digest(actual) == dg, "published index digest changed"
                 )
                 require(
-                    private_package(name) is not None,
+                    distribution_package(name, visibility) is not None,
                     "published package access could not be verified",
                 )
             candidate["images"][role].update(
@@ -1088,7 +1095,7 @@ def publish(args, release):
         )
         snapshot_inputs(release, args.selection, out)
         publication["status"] = (
-            "published-private-unqualified" if publishing else "checked-unpublished"
+            f"published-{visibility}-unqualified" if publishing else "checked-unpublished"
         )
     finally:
         save(out / "publication.json", publication)

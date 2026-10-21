@@ -27,7 +27,7 @@ from stock import (  # noqa: E402
     assemble_index,
     identical_tag,
     inspect_oci,
-    private_package,
+    distribution_package,
     stage_archive,
     staged_tag,
     tap_counts,
@@ -121,7 +121,7 @@ class StockInputs(unittest.TestCase):
         self.reject(
             lambda r: r["distribution"].update(namespace="someone-else/package")
         )
-        self.reject(lambda r: r["distribution"].update(visibility="public"))
+        self.reject(lambda r: r["distribution"].update(visibility="internal"))
 
     def test_test_counts_reject_skips_and_empty_runs(self):
         for values in ([1, 0, 0, 1, 0], [0, 0, 0, 0, 0]):
@@ -197,26 +197,35 @@ not ok 2 - upstream test private-in-test-name
 
 
 class RegistryInputs(unittest.TestCase):
-    def test_private_package_checks_documented_owner_and_optional_repository(self):
+    def test_package_visibility_owner_and_repository_are_checked_in_both_modes(self):
         name = "enterprise-openclaw-bundle/controller"
-        package = {
-            "name": name,
-            "package_type": "container",
-            "visibility": "private",
-            "owner": {"login": "raw-labs"},
-        }
-        with patch("stock.github_json", return_value=package):
-            self.assertEqual(private_package(name), package)
-        for field, wrong in (
-            ("visibility", "public"),
-            ("name", "unrelated/controller"),
-            ("owner", {"login": "someone-else"}),
-            ("repository", {"full_name": "raw-labs/other-repository"}),
-        ):
-            changed = package | {field: wrong}
-            with patch("stock.github_json", return_value=changed):
-                with self.assertRaises(ValueError):
-                    private_package(name)
+        for visibility in ("private", "public"):
+            package = {
+                "name": name,
+                "package_type": "container",
+                "visibility": visibility,
+                "owner": {"login": "raw-labs"},
+            }
+            with patch("stock.github_json", return_value=package):
+                self.assertEqual(distribution_package(name, visibility), package)
+            for field, wrong in (
+                ("visibility", "private" if visibility == "public" else "public"),
+                ("name", "unrelated/controller"),
+                ("owner", {"login": "someone-else"}),
+                ("repository", {"full_name": "raw-labs/other-repository"}),
+            ):
+                with self.subTest(visibility=visibility, field=field):
+                    with patch("stock.github_json", return_value=package | {field: wrong}):
+                        with self.assertRaises(ValueError):
+                            distribution_package(name, visibility)
+
+    def test_missing_public_package_rejected_before_registry_writes(self):
+        with patch("stock.github_json", return_value=None):
+            self.assertIsNone(distribution_package("new-package", "private"))
+            with self.assertRaisesRegex(ValueError, "must already exist"):
+                distribution_package("new-package", "public")
+            with self.assertRaisesRegex(ValueError, "invalid package visibility"):
+                distribution_package("new-package", "internal")
 
     def test_retry_requires_identical_index_and_fails_on_unknown_authentication(self):
         index = '{"schemaVersion":2,"manifests":[]}\n'

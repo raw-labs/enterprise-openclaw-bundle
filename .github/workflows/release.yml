@@ -7,10 +7,12 @@ on:
         required: true
         type: string
       publish:
-        description: Publish private images, tag and GitHub prerelease after all checks
+        description: Publish images, tag and GitHub prerelease after all checks
         required: true
         default: false
         type: boolean
+env:
+  BUNDLE_DISTRIBUTION_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
 permissions:
   contents: read
   actions: read
@@ -20,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   resolve:
-    if: github.event_name == 'workflow_dispatch' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event.repository.private && (github.ref == 'refs/heads/main' || (!inputs.publish && startsWith(github.ref, 'refs/heads/codex/')))
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && (github.ref == 'refs/heads/main' || (!inputs.publish && startsWith(github.ref, 'refs/heads/codex/')))
     runs-on: depot-ubuntu-24.04-8
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -60,7 +62,7 @@ jobs:
           if-no-files-found: error
   native:
     needs: resolve
-    if: github.event_name == 'workflow_dispatch' && github.event.repository.private && github.repository == 'raw-labs/enterprise-openclaw-bundle' && (github.ref == 'refs/heads/main' || (!inputs.publish && startsWith(github.ref, 'refs/heads/codex/')))
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && (github.ref == 'refs/heads/main' || (!inputs.publish && startsWith(github.ref, 'refs/heads/codex/')))
     name: Native ${{ matrix.arch }} build and checks
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 100
@@ -81,7 +83,7 @@ jobs:
           node-version: '24.16.0'
       - name: Prepare Docker for OCE's immutable image probe
         run: bash scripts/setup-docker.sh
-      - name: Read private baseline images for retained-state checks
+      - name: Authenticate baseline image access for retained-state checks
         env:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -125,7 +127,7 @@ jobs:
           fi
           rm -f "$RUNNER_TEMP/bundle-registry/config.json"
       - name: Retain failed native diagnostics in private CI only
-        if: failure()
+        if: failure() && github.event.repository.private
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: private-native-diagnostics-${{ matrix.arch }}
@@ -142,7 +144,7 @@ jobs:
           if-no-files-found: error
   review:
     needs: [resolve, native]
-    if: github.event_name == 'workflow_dispatch' && github.event.repository.private && github.repository == 'raw-labs/enterprise-openclaw-bundle' && !inputs.publish && startsWith(github.ref, 'refs/heads/codex/')
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && !inputs.publish && startsWith(github.ref, 'refs/heads/codex/')
     runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 60
     permissions:
@@ -197,7 +199,7 @@ jobs:
           retention-days: 14
           if-no-files-found: error
       - name: Retain failed review diagnostics in private CI only
-        if: failure()
+        if: failure() && github.event.repository.private
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: private-review-diagnostics
@@ -210,7 +212,7 @@ jobs:
         run: rm -f "$RUNNER_TEMP/registry-auth/auth.json"
   handoff:
     needs: [resolve, native]
-    if: github.event_name == 'workflow_dispatch' && github.event.repository.private && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 60
     permissions:
@@ -277,7 +279,7 @@ jobs:
       - name: Test the extracted package on disposable reference infrastructure
         if: inputs.publish
         run: python3 scripts/release.py verify-installation --output dist --controller .work/assembled/oci/controller --baseline .work/resolved/baseline/bundle.tar.gz --logs .work/private-installation.log
-      - name: Create immutable tag and private prerelease with generated evidence
+      - name: Create immutable tag and prerelease with generated evidence
         if: inputs.publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -294,7 +296,7 @@ jobs:
           retention-days: 14
           if-no-files-found: error
       - name: Retain failed installation diagnostics in private CI only
-        if: failure()
+        if: failure() && github.event.repository.private
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: private-installation-diagnostics
