@@ -8,10 +8,10 @@ Agents. See the [component map](overview.md).
 
 ## Review a change
 
-Have a maintainer review changes before merging. For security, confinement,
-licensing or release changes, involve a reviewer with the relevant expertise.
-These are review responsibilities; branch rules and required approvals are
-configured separately in GitHub.
+A maintainer reviews changes before merging. A sole maintainer may review and
+merge their own changes; no second approver is required. Review security,
+confinement, licensing and release changes with particular care, seeking relevant
+expertise when needed. Branch rules are configured separately in GitHub.
 
 - Selection changes: inspect exact commits, package identities, hashes, patches
   and license notices. New ingredients and changed templates start unqualified.
