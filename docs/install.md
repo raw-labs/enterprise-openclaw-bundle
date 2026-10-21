@@ -1,5 +1,9 @@
 # Install a bundle
 
+Use the `INSTALL.md` inside the selected release archive for an installation.
+This repository page describes that archive workflow; packaging adapts its links
+to shipped files or the selected immutable upstream source.
+
 For operators installing OCE into prepared Kubernetes infrastructure.
 Start in the extracted package root. Commands and relative links below apply
 to that directory. The preparation tool reads the bundle version and image
@@ -20,6 +24,12 @@ ingress access and credentials belong to the installation owner.
 Authorize private image pulls or arrange a digest-preserving registry mirror.
 Images are pulled separately; this archive is not an offline image package.
 
+Before starting, record the reviewed cluster context, release name, namespace,
+node selectors, storage classes, ingress endpoints and registry access in the
+installation owner's protected workspace. The example CIDRs, labels and domains
+are placeholders. A successful render does not prove those resources exist or
+that node confinement has been provisioned.
+
 ## Prepare OCE inputs
 
 Run from the extracted bundle root. Keep site settings, generated files and
@@ -39,7 +49,7 @@ occ --version
 cp examples/installations/site.json "$SITE/site.json"
 ```
 
-Edit `site.json` using OCE's [installation input format](oce/docs/guides/deploy/installation-profiles.md).
+Edit `site.json` using OCE's [installation input format](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/installation-profiles.md).
 Select `openclaw` or `codex` and the target `linux/amd64` or `linux/arm64`:
 
 ```bash
@@ -64,7 +74,7 @@ The delivered seccomp policies are under `security/seccomp/`.
 ## Install and bootstrap
 
 Change to `oce/` and follow the packaged
-[production installation procedure](oce/docs/guides/deploy/production-installation.md#shared-bootstrap-pvc-and-configuration-checks)
+[production installation procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-installation.md#shared-bootstrap-pvc-and-configuration-checks)
 from **Shared bootstrap PVC and configuration checks** onward. Use absolute paths:
 
 ```bash
@@ -89,30 +99,41 @@ namespace and an available protected storage class; bootstrap and runtime
 storage classes may differ.
 
 OCE owns authentication, tenant permissions and Agent setup. Continue with
-[production Agents](oce/docs/guides/deploy/production-agents.md) and, when enabled,
-[repository access](oce/docs/guides/repository-credentials/installation.md).
+[production Agents](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-agents.md) and, when enabled,
+[repository access](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/repository-credentials/installation.md).
 Use the selected release images instead of upstream image-build steps.
 The definition selects preset files and whether to seed OCE's additional defaults.
 Preparation applies that selection; OCE seeds missing copies automatically.
 Presets can enable Connections without a provider key; an installation
 owner configures the key and outbound access in OCE as described in
-[OPERATE.md](OPERATE.md#connections). Existing same-name presets are preserved.
+[OPERATE.md](operate.md#connections). Existing same-name presets are preserved.
 Selected files are available under `oce/deploy/presets/raw/` for inspection.
-The supplied site example enables managed Gateway outbound and
-`channels.experimentalEmbeddedChannels` for embedded Slack/Teams testing.
-Review its denied infrastructure CIDRs for your cluster. This experimental mode
-shares channel and model credentials in the Agent workload; disable the option
-outside trusted evaluation. Configure provider credentials through OCE and follow
-its [embedded channel procedure](oce/docs/guides/integrations/embedded-channel-trial.md).
+The supplied site example enables managed Gateway outbound and disables
+`channels.experimentalEmbeddedChannels`. Review its denied infrastructure CIDRs
+for your cluster. Slack and Teams are disabled in the Assistant template. To trial
+them, an installation owner must explicitly enable the selected channel plugin
+and the installation's experimental channel option. This mode shares channel and
+model credentials in the Agent workload; restrict it to trusted evaluation.
+Configure provider credentials through OCE and follow
+its [embedded channel procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/integrations/embedded-channel-trial.md).
 Teams also requires the public callback listener described there.
 
-Assistant includes the native browser plugin and headless Chromium. Chromium's
-internal sandbox is disabled for container compatibility; the Agent retains OCE's
-pod restrictions. Coding keeps browser disabled.
+Both templates disable browser access and experimental plugin UI. Chromium and
+the browser plugin remain build ingredients for a separately reviewed operator
+opt-in; the templates do not request `noSandbox`. Verify Chromium sandbox support
+and OCE confinement on the actual target before enabling it.
+
+Coding requests human approval, workspace confinement and the limited managed
+network proxy, with exact source/package hosts in its template. Cached search is
+enabled and direct web fetch is disabled. The limited proxy can reject Git HTTPS
+POST requests; review any required policy change rather than granting all hosts.
+Template settings are editable defaults, not a Pod-wide firewall or proof that the
+running Harness enforced them. Follow OCE's
+[policy verification procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/topics/standard-codex-preset.md#verify-before-use).
 
 Human sign-in and Agent setup use OCE's APIs and Console.
 Packaged `occ` supports remote administration;
 `occ dev` requires an OCE source checkout.
 
-Follow [OPERATE.md](OPERATE.md) for acceptance and [UPDATE.md](UPDATE.md) for later updates. Each installation
+Follow [OPERATE.md](operate.md) for acceptance and [UPDATE.md](update.md) for later updates. Each installation
 uses its own OCE inputs; the same immutable bundle can serve multiple clusters.

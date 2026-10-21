@@ -15,14 +15,14 @@ from integrity import (
     load,
     require,
     save,
-    verify_files,
+    verify_package,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def artifact():
-    verify_files(ROOT, load(ROOT / "metadata/manifest.json"))
+    verify_package(ROOT)
     return load(ROOT / "metadata/release.json")
 
 

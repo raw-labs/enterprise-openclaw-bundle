@@ -6,8 +6,9 @@ live Agents. Native plugin packages are selected and verified as build ingredien
 provider credentials and account setup belong to installation owners.
 
 `bundles/<version>/bundle.json` owns human-authored ingredient selection,
-optional source patches and reviewed confinement inputs. `defaults/` owns selectable
-templates. `scripts/` owns factory mechanics; `delivery/` owns the small payload
+optional source patches and reviewed confinement inputs. `presets/` owns Agent
+templates; `profiles/` owns installation profiles. `scripts/` owns factory mechanics;
+`delivery/` owns the small payload
 for package verification and OCE input preparation. Product operations belong to
 OCE; infrastructure and installation settings belong to installation owners.
 The release Action generates inventories, native receipts, image indexes, archives
@@ -16,6 +17,9 @@ static procedures and installation examples. README is navigation only.
 Preserve published source and evidence at immutable Git tags and release assets.
 Do not duplicate current pins, fleet identities or qualification claims in prose.
 Keep documentation short and static; use Git history for ordinary chronology.
+Keep only maintained definitions and their ingredients on the working branch;
+reproduce retired releases from their original tags. Source layout changes need
+a new unqualified definition, never edits to a published definition.
 
 Use exact source commits, digest images and verified file inventories. Never alter
 historical evidence or apply an untracked qualification replacement. New builds

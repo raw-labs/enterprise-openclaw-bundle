@@ -9,7 +9,7 @@ on:
       publish:
         description: Publish private images, tag and GitHub prerelease after all checks
         required: true
-        default: true
+        default: false
         type: boolean
 permissions:
   contents: read
@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   resolve:
-    if: github.ref == 'refs/heads/main' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event.repository.private
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.event.repository.private && (github.ref == 'refs/heads/main' || (!inputs.publish && startsWith(github.ref, 'refs/heads/codex/')))
     runs-on: depot-ubuntu-24.04-8
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -60,6 +60,7 @@ jobs:
           if-no-files-found: error
   native:
     needs: resolve
+    if: github.event_name == 'workflow_dispatch' && github.event.repository.private && github.repository == 'raw-labs/enterprise-openclaw-bundle' && (github.ref == 'refs/heads/main' || (!inputs.publish && startsWith(github.ref, 'refs/heads/codex/')))
     name: Native ${{ matrix.arch }} build and checks
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 100
@@ -128,6 +129,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: private-native-diagnostics-${{ matrix.arch }}
+          include-hidden-files: true
           path: .work/private-check-logs
           retention-days: 1
           if-no-files-found: ignore
@@ -138,8 +140,77 @@ jobs:
           compression-level: 0
           retention-days: 7
           if-no-files-found: error
+  review:
+    needs: [resolve, native]
+    if: github.event_name == 'workflow_dispatch' && github.event.repository.private && github.repository == 'raw-labs/enterprise-openclaw-bundle' && !inputs.publish && startsWith(github.ref, 'refs/heads/codex/')
+    runs-on: depot-ubuntu-24.04-8
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.16.0'
+      - name: Prepare Docker for the packaged OCE upgrade helper
+        run: bash scripts/setup-docker.sh
+      - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+        with:
+          version: v3.21.3
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: resolved-inputs
+          path: .work
+      - run: tar -xzf .work/resolved.tar.gz -C .work
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: native-*
+          path: .work/inputs
+      - name: Check packaging, rejection paths and real chart rendering
+        run: python3 scripts/check.py --integration
+      - name: Assemble exact native exports without registry publication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/stock.py --selection .work/resolved/candidate.json assemble --inputs .work/inputs --output .work/assembled
+      - name: Verify reproducibility and the extracted handoff
+        run: python3 scripts/release.py finish --selection .work/assembled/candidate.json --source .work/resolved/source --dependencies .work/resolved/dependencies --output .work/checked-handoff
+      - name: Prepare disposable installation test prerequisites
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .work/resolved/source/scripts/ci/setup-tools.sh k3d
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install --no-install-recommends -y skopeo
+          mkdir -m 700 "$RUNNER_TEMP/registry-auth"
+          printf '%s' "$REGISTRY_TOKEN" | skopeo login --authfile "$RUNNER_TEMP/registry-auth/auth.json" --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+          echo "REGISTRY_AUTH_FILE=$RUNNER_TEMP/registry-auth/auth.json" >> "$GITHUB_ENV"
+      - name: Test the checked package on disposable reference infrastructure
+        run: python3 scripts/release.py verify-installation --output .work/checked-handoff --controller .work/assembled/oci/controller --baseline .work/resolved/baseline/bundle.tar.gz --logs .work/private-installation-review.log
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: review-artifacts
+          path: .work/checked-handoff
+          retention-days: 14
+          if-no-files-found: error
+      - name: Retain failed review diagnostics in private CI only
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: private-review-diagnostics
+          include-hidden-files: true
+          path: .work/private-installation-review.log*
+          retention-days: 1
+          if-no-files-found: ignore
+      - name: Remove job credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/registry-auth/auth.json"
   handoff:
     needs: [resolve, native]
+    if: github.event_name == 'workflow_dispatch' && github.event.repository.private && github.repository == 'raw-labs/enterprise-openclaw-bundle' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 60
     permissions:
@@ -227,6 +298,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: private-installation-diagnostics
+          include-hidden-files: true
           path: .work/private-installation*.log
           retention-days: 1
           if-no-files-found: ignore

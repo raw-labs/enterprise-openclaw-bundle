@@ -2,7 +2,6 @@
 """Exercise the extracted package on an owned, disposable k3d cluster."""
 
 import argparse
-import importlib.util
 import io
 import json
 import os
@@ -20,6 +19,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "delivery"))
 from integrity import digest, helm_values, load, require, save  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from bundle import preparation_tool  # noqa: E402
 
 # Infrastructure pins from the selected OCE CI fixtures; these are test prerequisites.
 K3S = "docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc"
@@ -437,11 +439,7 @@ def exercise(args):
                     ]
                 )
             else:
-                spec = importlib.util.spec_from_file_location(
-                    "package_prepare", artifact / "lib/prepare.py"
-                )
-                prepare = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(prepare)
+                prepare = preparation_tool(artifact)
                 prepare.render(
                     argparse.Namespace(
                         input=path,

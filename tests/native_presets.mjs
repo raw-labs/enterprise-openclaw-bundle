@@ -35,7 +35,7 @@ test("selected RAW presets are image-resident and accepted by OCE's real loader"
         const {values, secretBindings} = preset.template.configuration;
         assert.deepEqual(secretBindings, {});
         assert.deepEqual(preset.template.agent.plugins, {});
-        assert.equal(values.gateway.controlUi.experimental.customPlugins, true);
+        assert.equal(values.gateway.controlUi.experimental.customPlugins, false);
         const connections = values.plugins.entries['openclaw-connections'];
         if (connections.enabled) {
           assert.deepEqual(connections.config, {});
@@ -51,22 +51,26 @@ test("selected RAW presets are image-resident and accepted by OCE's real loader"
           assert.equal(values.browser.enabled, false);
           assert.equal(values.plugins.entries.codex.enabled, true);
           const appServer = values.plugins.entries.codex.config.appServer;
-          assert.equal(appServer.approvalPolicy, 'never');
+          assert.equal(appServer.approvalPolicy, 'on-request');
+          assert.equal(appServer.approvalsReviewer, 'user');
           assert.equal(appServer.sandbox, 'workspace-write');
-          assert.equal(appServer.networkProxy.mode, 'full');
-          assert.deepEqual(appServer.networkProxy.domains, {'*':'allow'});
+          assert.equal(appServer.networkProxy.mode, 'limited');
+          assert.deepEqual(Object.keys(appServer.networkProxy.domains).sort(), [
+            'codeload.github.com', 'dl.google.com', 'github.com', 'go.dev', 'nodejs.org',
+            'proxy.golang.org', 'registry.npmjs.org', 'storage.googleapis.com', 'sum.golang.org',
+          ]);
+          assert.ok(Object.values(appServer.networkProxy.domains).every(value => value === 'allow'));
+          assert.equal(values.tools.web.fetch.enabled, false);
           assert.equal(values.agents.defaults.models[values.agents.defaults.model].agentRuntime.id, 'codex');
         } else {
           assert.equal(preset.template.agent.executionMode, 'embedded');
-          assert.equal(values.browser.enabled, true);
-          assert.equal(values.browser.headless, true);
-          assert.equal(values.browser.executablePath, '/usr/bin/chromium');
-          assert.equal(values.plugins.entries.browser.enabled, true);
-          assert.ok(values.tools.alsoAllow.includes('browser'));
-          for (const channel of ['slack', 'msteams']) assert.equal(values.plugins.entries[channel].enabled, true);
+          assert.deepEqual(values.browser, {enabled: false});
+          assert.equal(values.plugins.entries.browser.enabled, false);
+          assert.ok(!values.tools.alsoAllow.includes('browser'));
+          for (const channel of ['slack', 'msteams']) assert.equal(values.plugins.entries[channel].enabled, false);
+          assert.equal(values.tools.web.fetch.enabled, true);
           assert.equal(values.agents.defaults.models[values.agents.defaults.model].agentRuntime.id, 'openclaw');
         }
-        assert.equal(values.tools.web.fetch.enabled, true);
         const driver = Object.create(KubernetesComputeDriver.prototype);
         driver.options = {gatewayRouting: {hostname: 'agents.example.invalid'},
           network: {gatewayPort: 18789, gatewayTrustedProxyCidrs: ['127.0.0.1/32']}};

@@ -23,20 +23,27 @@ bundle templates do not automatically replace them.
 
 Inspect the selected preset files for plugin and skill defaults. Connections
 requires provider setup and Gateway outbound access even when enabled in a preset.
+Optional channels, browser access and experimental plugin UI are disabled by the
+curated templates. Installation owners review and explicitly enable any needed
+capability in their copied Configuration.
 The default shortcut chooses a readable `default-codex` if retained; otherwise it
 chooses the first readable preset alphabetically. A fresh two-preset installation
 therefore starts with Assistant. **Reset template** uses OCE's generic starter;
 choose a preset again to restore its curated settings.
 
 Other selected native plugins are already in the runtime image. Enable them through
-OCE's [native Configuration values and Secret bindings](oce/docs/reference/configuration/secrets.md).
+OCE's [native Configuration values and Secret bindings](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/reference/configuration/secrets.md).
 Configure `plugins.entries`; if an existing `plugins.allow` restricts loading, add
 the plugin ID to that list.
 
 ## Connections
 
 Without a project key, Connections reports configuration required and exposes no
-tools. Native UI consent and administrator authentication still apply. Follow the
+tools. To use its provider-management page, an installation owner must review and
+enable `gateway.controlUi.experimental.customPlugins` in the Agent's Configuration.
+That option exposes installed plugin UI surfaces generally; enable it only for
+reviewed installed plugins. Native UI consent and administrator authentication
+still apply. Follow the
 [plugin's provider setup](https://github.com/raw-labs/openclaw-connections#install-and-configure);
 skip its package-install step. The Console's model password input cannot configure
 plugin credentials.
@@ -52,12 +59,16 @@ For each Namespace, an installation owner:
 1. Creates an OCE Secret from a protected JSON file with `occ secret create --file FILE`.
 2. Grants each intended Agent creator exact `operate` permission on that Secret,
    using a Namespace Role and exact-resource AccessBinding. Preset read access
-   does not grant Secret access. See OCE's [IAM procedure](oce/docs/guides/topics/iam.md).
+   does not grant Secret access. See OCE's [IAM procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/topics/iam.md).
 3. Gets the intended installed preset with `occ preset get ID -o json`, preserves its
    template, and merges the following native configuration. Submit `{ "template":
    MODIFIED_TEMPLATE }` to `PATCH /namespaces/NAMESPACE_ID/presets/PRESET_ID` through
-   the [authenticated HTTP API](oce/docs/guides/http-api.md). This requires exact
+   the [authenticated HTTP API](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/http-api.md). This requires exact
    preset `update`; the CLI does not implement preset updates.
+
+The provider-management UI opt-in is separate from the Secret binding below.
+Review it in the copied Configuration before deployment; existing presets and
+Agents keep their previous settings until an owner explicitly updates them.
 
 ```json
 {
@@ -111,9 +122,30 @@ From the bundle root, run `bin/prepare verify` and
 `bin/prepare check --directory "$SITE/rendered"`.
 These check local files and chart rendering. Use OCE's procedures and ordinary
 kubectl/Helm commands for cluster health; retain diagnostic logs privately.
+Verification rejects changed, missing or extra files, links and special files,
+including unexpected empty directories. Keep generated files outside the package;
+restore a clean extraction rather than changing its manifest. The manifest is
+not signed: verification checks package consistency, not publisher authenticity.
+Obtain the archive and outer checksum through the authorized distribution route.
+
+| Symptom | First check |
+| --- | --- |
+| Package verification fails | Retain the failing package and retrieve the selected archive/checksum again; do not edit its inventory. |
+| Rendering reports an image or confinement mismatch | Check the selected release, architecture and mirror map; regenerate inputs from site settings. |
+| Pods cannot pull images | Check installation-owned pull identities and mirror digests on the actual node pools. |
+| Agent startup or sandbox checks fail | Check node selectors, mounted seccomp files and the packaged OCE confinement procedure. |
+| A preset has not changed after an update | Existing same-name presets are preserved; follow the update guide's reviewed merge procedure. |
+| Connections has no usable tools | Check provider configuration, exact Secret permissions, outbound access and per-Agent consent. |
+
+When reporting a factory problem, include the bundle version, architecture, failing
+command and a sanitized error. Keep site files, kubeconfigs, service keys, provider
+credentials and raw workload logs in the installation owner's protected support
+channel. Report product behavior to OCE and provider-specific behavior to the plugin
+owner, with the selected source identity from `metadata/release.json`.
+See [support and lifecycle](support.md) and the [private security procedure](../SECURITY.md).
 
 ## Upgrade and recover
 
-Start with [UPDATE.md](UPDATE.md). For an interrupted update, retain its evidence
+Start with [UPDATE.md](update.md). For an interrupted update, retain its evidence
 and maintenance restrictions and follow OCE's
-[recovery procedure](oce/docs/guides/deploy/production-upgrade-recovery.md).
+[recovery procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-upgrade-recovery.md).

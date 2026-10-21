@@ -40,13 +40,13 @@ export RELEASE_SOURCE_SHA CONTROLLER_IMAGE RUNTIME_IMAGE BROKER_IMAGE
 For registry mirrors, use authorized references retaining those exact digests.
 Review differences in sources, patches, plugins and presets between the bundles'
 `metadata/release.json`, and complete OCE's
-[upgrade checklist](oce/docs/guides/deploy/upgrade-checklist.md) and
-[baseline and backup procedure](oce/docs/guides/deploy/upgrade-baseline.md).
+[upgrade checklist](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/upgrade-checklist.md) and
+[baseline and backup procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/upgrade-baseline.md).
 
 ## Follow OCE's upgrade procedure
 
 Run from the candidate's `oce/` and follow its
-[production image upgrade procedure](oce/docs/guides/deploy/production-upgrade.md).
+[production image upgrade procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-upgrade.md).
 This directory replaces the release source checkout in that guide; skip its Git
 checkout and CLI build steps. Use `--occ occ`, your actual release/namespace and
 protected site paths, and the variables above for its source and image arguments.
@@ -56,7 +56,7 @@ Retain the live values and Installation as the baseline. An image update preserv
 existing Installation settings; rerendered inputs are comparison material, not a
 replacement baseline. The helper supports only the candidate setting changes
 listed in OCE's guide. Apply other Installation changes separately with its
-[documented procedure](oce/docs/guides/deploy/production-installation-changes.md).
+[documented procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-installation-changes.md).
 Use the bundle matching the currently installed controller for that step.
 
 In particular, newly selected preset files require adding their image paths to
@@ -67,7 +67,7 @@ file, remove that seed reference separately while the old controller still runs;
 otherwise the image helper refuses before stopping OCC. Removing a seed reference
 preserves stored presets. Existing same-name presets, including
 edits, are preserved. Adopt plugin settings and Secret bindings as described in
-[OPERATE.md](OPERATE.md#presets-and-native-plugins). Review plugin state compatibility
+[OPERATE.md](operate.md#presets-and-native-plugins). Review plugin state compatibility
 and verify provider access after the runtime update.
 
 To adopt changed preset templates, first read and retain the installed copies
@@ -87,8 +87,8 @@ interruption window and backups; Helm rollback does not reverse database changes
 ## Verify or recover
 
 Follow OCE's workload checks and the acceptance checks in
-[OPERATE.md](OPERATE.md#accept-and-retain). Retain the previous bundle, site baseline,
+[OPERATE.md](operate.md#accept-and-retain). Retain the previous bundle, site baseline,
 backups and private upgrade evidence. For a partial failure, follow the packaged
-[recovery procedure](oce/docs/guides/deploy/production-upgrade-recovery.md) before
+[recovery procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-upgrade-recovery.md) before
 attempting another update. Optional source-level diagnostics in that guide require
 an OCE checkout.
