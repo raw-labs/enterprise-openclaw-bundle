@@ -28,6 +28,9 @@ release downloads and Actions logs/artifacts; there is no separate private setti
 for a published release inside a public repository. See [GitHub visibility
 consequences](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility).
 
+Let active workflows finish, then pause new Actions runs during the visibility and
+approval-setting changes below. Resume Actions after those controls are verified.
+
 Change the three existing GHCR packages to public and the repository to public
 within the authorized transition. Package visibility is independent of repository
 visibility; [making a package public cannot be reversed](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility). Preserve every digest and
