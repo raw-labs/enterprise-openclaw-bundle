@@ -16,7 +16,7 @@ image, workflow-run and destination checks. Keep generated customer assets subje
 to the release allowlist.
 
 The human-authored policies in `.github/policies/` define read-only workflow
-defaults, review and contributor-check requirements for main, and protection
+defaults, pull-request and contributor-check requirements for main, and protection
 against updates/deletion of release tags. Check their actual enforcement in GitHub;
 source files do not apply settings by themselves. The contributor check must run
 on the new workflow before a change can satisfy branch protection. History cleanup
