@@ -224,6 +224,8 @@ Execution tool source digests: `dbb2a393f3d665272b3ef40bb4ff80ac8a82d8a867dfd9b0
 
 ## Publication
 
-{}
+{
+  "candidate_branch": "codex/maintain/101843d9c7cb48f5bc50677566447e60"
+}
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
