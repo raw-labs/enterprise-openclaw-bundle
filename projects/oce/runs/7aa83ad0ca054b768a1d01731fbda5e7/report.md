@@ -232,6 +232,20 @@ No concrete benefit from changing the supplied composition order was established
 - Migration collisions do not establish dependency or direction. Roles and outbound independently append journal index 65 after upstream, modifying different capabilities. Previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c has a different 62-entry journal prefix. Final composition must preserve that published SQL/journal history and append evolution; changing feature order cannot resolve this requirement.
 - Verification was read-only source, interface, SQL and test inspection. Tests and hosted CI were not executed or qualified; no merge simulation was performed. Compatibility findings are not standalone source-defect claims. No files, Git objects, refs or remote state were changed; the checkout remains clean at frozen upstream. No permanent ordering policy is proposed.
 
+### attempt-1-compose
+
+Bounded composition work completed. Strengthened the existing embedded-channel regression, repaired documentation, and removed tracked cache artifacts. The candidate still requires hosted qualification.
+- Reviewed candidate e58f9e251e346b7336d22091831ad447b886c52b against frozen upstream and refs/maintain/previous, including prior compatibility decisions and cleanly merged interactions.
+- Persistence: all 62 published journal entries and SQL files remain identical. All 67 manifest SQL hashes match actual files. Five upstream evolutions are appended; credential-proxy admission retains outbound/embedded snapshot constraints. Unmeasured catalog hashes remain null and the production guard remains intact.
+- Integration adaptations retained: exact person/Agent runtime authority, role-aware first-deployment preparation, assigning-session protection, aggregated Slack/Teams managed outbound, nested embedded opt-in, serving callback authority and fenced cleanup.
+- Extended the existing real API/worker/Kubernetes provisioning scenario to distinguish model-specific NO_PROXY projection from generic loopback bypass and ensure channel destinations remain proxied. All three provisioning scenarios and both provider cutovers remain registered.
+- Generic feature repairs retained separately: runtime-access.ts rejects invalid scope-header values; requireTeamsConfiguration accepts supported bound string Secret references while enforcing deployment IDs; configured-harness.ts avoids duplicating inherited model selections. No additional generic runtime defect was confirmed during this pass.
+- Upstream changes retained: credential authority/custody evolution, managed Gateway mode, current runtime source pins and native verification jobs. Retired runtime patches, shared Slack proxy, legacy proxy configuration and engine-only selection tracking were not restored.
+- CI adaptations retain approved runner/AppArmor setup, Docker archive import and containment/receipt checks. Executing the actual Node-base selection step confirmed checked-in pin selection despite a stale environment value and refusal of mutable input.
+- Removed three tracked .pnpm-store database artifacts; repaired a history link and flow provenance while preserving Manual Notes and unique RFC identities.
+- Passed: syntax checks for 147 changed code files and the edited regression; canonical suite audit covering 471 files; migration byte/hash audit; native patch hash audit; affected full-flow validation; local file-link checks across 91 authored pages; git diff --check.
+- Qualification gaps: runtime regression and fail-before/pass-after proof were not executed. Workspace checks lack prettier; documentation checks lack @sindresorhus/slugify. Typecheck, lint, formatting, PostgreSQL, browser, cluster and native-image qualification remain pending. No dependencies were installed, pnpm invoked, commits created, refs rewritten or remote writes performed.
+
 Execution tool source digests: `1c276273c4b4d5b1a9dc596e588f58abd6805bc9b321db3e68b9693db1ec25b0`, `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
