@@ -223,10 +223,26 @@ The embedded Slack/Teams trial remains useful and is not absorbed by frozen upst
 
 Execution tool source digests: `dbb2a393f3d665272b3ef40bb4ff80ac8a82d8a867dfd9b09124faf1424a6656`
 
+Failed check source-ci at `c088d3c7435ef786d070788fb8b2aee9414a71df`: Command failed (1): python3
+
+### Failure diagnosis: hosted-1
+
+The frozen qualification check requires a nonexistent test filename. Hosted CI passed; this failure is a check-policy mismatch, not an established feature defect or environment failure. No files or remote state were changed.
+- Candidate HEAD is c088d3c7435ef786d070788fb8b2aee9414a71df. Saved run records confirm CI 40850958154, CodeQL 40850977761 and Console Storybook 40850996696 succeeded at that exact SHA.
+- checks/hosted-1-0-source-ci.log reports: Required authority/upgrade file missing or skipped: native-admin-session.test.mjs. The saved canonical-aggregate.json records all 20 CI lanes passed with no issues.
+- curation/oce/checks/hosted.py:159–172 requires the exact basename native-admin-session.test.mjs. Its bytes match the frozen snapshot; SHA256 is d3d2a4540277af771c80c1788ed23117ddff3f0e5199703343c71b68d4f03c9f.
+- That filename is absent from candidate c088d3c7435ef786d070788fb8b2aee9414a71df, upstream 8e20e2019fb4d067e0876fb10e59231dd70c5761 and previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c. Each contains native-admin-session-postgres.test.mjs.
+- scripts/ci/test-suites/postgres-auth.json:10,34 selects native-admin-session-postgres.test.mjs. The exact-candidate results/postgres-auth.json:21 records 12 passed, zero failed/skipped/todo, including role revocation across replicas and assigning-session retention until commit.
+- Exact-candidate receipts also record native-admin-access: 25 passed; native-admin-upgrade-reset: 25 passed; postgres-migration-compatibility: 205 passed, all without skips. These receipts do not independently establish complete native-runtime qualification.
+
 ## Publication
 
 {
   "candidate_branch": "codex/maintain/101843d9c7cb48f5bc50677566447e60"
 }
+
+## Current issue
+
+The frozen qualification check requires a nonexistent test filename. Hosted CI passed; this failure is a check-policy mismatch, not an established feature defect or environment failure. No files or remote state were changed.
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
