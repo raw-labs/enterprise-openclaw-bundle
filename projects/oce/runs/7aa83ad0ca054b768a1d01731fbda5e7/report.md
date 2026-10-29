@@ -172,6 +172,16 @@ Reviewed the prepared plugins refresh at 5521c0280 against frozen upstream. No a
 - Agent-creation flow validation reports a pre-existing upstream changelog-format failure.
 - Migration history and upstream’s deleted breaking-changes page remain unchanged. Working tree is clean; no Git or remote writes occurred.
 
+### profiles-adapt
+
+Reviewed the prepared profiles refresh and extended custom-starter authorization regression coverage. No design decision or combination-specific changes were needed.
+- Candidate already preserves upstream safeguards and includes the profile-file cleanup fix with alias collision coverage.
+- Extended the existing browser denial test to cover custom starters, asserting HTTP 403, no Agent form, and no mutation requests after access revocation.
+- Suite registration audit, syntax checks, both owning flow validators, and git diff --check passed.
+- Browser and renderer tests failed during dependency loading; behavioral assertions did not run.
+- Documentation and workspace checks were blocked by missing dependencies. PostgreSQL and Storybook prerequisites are unavailable; lint, formatting, and visual proof remain unverified.
+- Only tests/browser/console-agent-presets.test.ts was edited. No Git mutations, remote writes, dependency installation, migration changes, or frozen check-policy changes occurred.
+
 Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
