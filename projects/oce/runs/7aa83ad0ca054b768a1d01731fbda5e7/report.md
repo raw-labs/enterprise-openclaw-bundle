@@ -36,6 +36,7 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 - profiles-checks / source-audit: passed at `89ba3c69e1c8251278cb40971f6166a00f832de6`; log SHA-256 `7358c112aa6b300f3587dd0f9c56b1b4cfeef975cf047022f9505a6b281b0e78`
 - roles-checks / source-audit: passed at `489576d57120f1f83da371c0dd5a22bc7c7fddf8`; log SHA-256 `488f3e70ceca574217d5190cce68549bb26b2b13fc33087fc3ef72cc0f59c74a`
 - secrets-checks / source-audit: passed at `b8510e379cfc9ea301406d4092ba05b09ef1126e`; log SHA-256 `760ec357281181432aa8828d54521125683effa2321ba1bb505b4e288376b1d0`
+- teams-checks / source-audit: passed at `0a52d37243653170f8924ff1b679bef3239ab695`; log SHA-256 `641e076dd450df60af18aeef649c472a4454218a4e86834a739f814320514917`
 
 ### embedded-assess
 
