@@ -5,7 +5,7 @@ Status: **qualified**
 Recipe: `69eb32360c6b4abc687505f4824154b2e5212684`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
 
-Candidate: `ba4c143d1d46967c921c15a552b1f87ed2b26e49`
+Candidate: `63ae3115d415dde276085398befd40220ed7d47b`
 Tool: `0.1.0`, source digest `48c0b71d35c1b755a91327cd6dab1c9096675621f648dd1dcde388bca57018b5`
 Worker: `codex`, requested model `gpt-6-astra`, effort `high`
 
@@ -59,7 +59,7 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 - revalidation-integration-checks / migration-catalog: passed at `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; log SHA-256 `4bbf603037d56f8c016592e7ff5db359a8e735bafa01bb96afb8e172cd6412ca`
 - hosted-1-local-checks / combined-invariants: passed at `63ae3115d415dde276085398befd40220ed7d47b`; log SHA-256 `4cc87fa601efff7a1d7332f4dd809e058cc6f85721bf5dbaa6fb42ad0701737a`
 - hosted-1-local-checks / migration-catalog: passed at `63ae3115d415dde276085398befd40220ed7d47b`; log SHA-256 `4bbf603037d56f8c016592e7ff5db359a8e735bafa01bb96afb8e172cd6412ca`
-- Hosted attempt 1: `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; checking-local
+- Hosted attempt 1: `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; repaired
 
 ### profiles-assess
 
