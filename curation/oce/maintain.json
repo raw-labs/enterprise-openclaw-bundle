@@ -74,7 +74,8 @@
     "conflict": "prompts/compose.md",
     "repair": "prompts/repair.md",
     "refresh": "prompts/refresh.md",
-    "order": "prompts/order.md"
+    "order": "prompts/order.md",
+    "assess": "prompts/assess.md"
   },
   "adapters": [
     {

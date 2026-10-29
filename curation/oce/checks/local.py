@@ -54,12 +54,10 @@ def main():
     subprocess.run(
         ["git", "diff", "--check", inputs["upstream_sha"] + "...HEAD"], check=True
     )
-    for script, *args in [
-        ("scripts/verify-workspace-boundary.mjs",),
-        ("scripts/ci/run-tests.mjs", "audit"),
-    ]:
-        subprocess.run(["node", script, *args], check=True)
-    details = {"scope": "Source and suite structure only; no runtime execution claimed"}
+    subprocess.run(["node", "scripts/ci/run-tests.mjs", "audit"], check=True)
+    details = {
+        "scope": "Diff and canonical suite-registration audit only. Dependency-backed workspace/static and runtime checks are required in hosted CI."
+    }
     if stage == "integration" and inputs["starting_integration"]:
         details["migration_prefix"] = check_prefix(inputs["starting_integration"])
     destination = Path(os.environ["MAINTAIN_CHECK_STATE_DIR"]) / "receipt.json"

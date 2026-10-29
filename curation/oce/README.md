@@ -32,8 +32,9 @@ check receipts. Ignored `.maintain/` contains local SQLite, workspaces and raw l
 local construction and `qualify` continues hosted qualification. Retained object
 branches and a run-specific candidate live in the OCE fork. Source PRs stay intact.
 
-Local checks prove source/suite structure and published migration-prefix integrity;
-they are not runtime qualification. Hosted source checks dispatch CI and CodeQL
+Local checks prove diff/suite-registration structure and published migration-prefix integrity;
+they are not runtime qualification. Dependency-backed workspace, formatting and
+static checks remain mandatory in canonical hosted CI. Hosted source checks dispatch CI and CodeQL
 once per exact candidate, validate the full canonical CI aggregate and small lane
 receipts, and require the named combined scenarios without skips. Native checks
 then dispatch only `container-check.yml`, require all four native image jobs and
