@@ -1,0 +1,1632 @@
+{
+  "version": 1,
+  "generation": 3,
+  "run": {
+    "id": "d9b3d8259b38496ca8da5d7150db0c67",
+    "project": "oce",
+    "status": "cancelled",
+    "created": "2026-10-29T03:27:13.153714+00:00",
+    "updated": "2026-10-29T03:35:44.166399+00:00",
+    "snapshot": {
+      "version": 2,
+      "name": "oce",
+      "fork": "https://github.com/raw-labs/openclaw-enterprise.git",
+      "upstream": "https://github.com/openclaw/openclaw-enterprise.git",
+      "upstream_branch": "main",
+      "integration_branch": "codex/raw-integration",
+      "owner": "miguelbranco80",
+      "protected_branches": [
+        "main",
+        "master"
+      ],
+      "allow_feature_push": false,
+      "worker": {
+        "provider": "codex",
+        "options": {
+          "executable": "codex",
+          "model": "gpt-6-astra",
+          "thinking": "high",
+          "timeout_seconds": 3600,
+          "attempts": 2
+        }
+      },
+      "persistence": {
+        "remote": "https://github.com/raw-labs/enterprise-openclaw-bundle.git",
+        "branch": "codex/maintain-records"
+      },
+      "composition_attempts": 3,
+      "guidance": "This is an isolated OCE integration candidate. Keep all source PR heads, bases, states and auto-merge settings unchanged. Keep fork main and codex/raw-integration unchanged. Never publish releases, tags, images or deployments. The engine alone may retain objects and publish its candidate. Keep the latest upstream improvements. Preserve all published migration SQL bytes and journal entries from the previous integration; append required evolution. Source PR16 and PR19 are closed and supplied by upstream; do not reintroduce their obsolete partial implementations. Follow the target repository instructions. No dependency installation or reconciliation as a verification side effect; use the configured local audits and hosted CI for missing dependencies. npm_config_verify_deps_before_run=false for all pnpm invocations. Generic feature defects and their exact upstream-facing fixes must be identified separately from combination adaptations. No source-PR writes are authorized.",
+      "features": [
+        {
+          "id": "profiles",
+          "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/11",
+          "intent": "Support trusted custom Installation profiles, explicit Preset seeding, and readable custom starters.",
+          "prompt_texts": {}
+        },
+        {
+          "id": "secrets",
+          "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/13",
+          "intent": "Grant exact Agent access to every accepted Configuration Secret through the regular save workflow.",
+          "prompt_texts": {}
+        },
+        {
+          "id": "plugins",
+          "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/15",
+          "intent": "Preserve native plugin permission and admission across Harness selection and changes.",
+          "prompt_texts": {}
+        },
+        {
+          "id": "roles",
+          "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/1",
+          "intent": "Give each person an exact configured native OpenClaw role, independent from OCE administration, with admission and revocation.",
+          "prompt_texts": {}
+        },
+        {
+          "id": "first-admin",
+          "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/12",
+          "intent": "Prepare native administration on first Agent deployment while keeping exact runtime access authority.",
+          "prompt_texts": {}
+        },
+        {
+          "id": "outbound",
+          "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/18",
+          "intent": "Manage revision-owned Gateway HTTPS egress with exact per-Agent policy, lifecycle withdrawal, and immutable admission.",
+          "prompt_texts": {}
+        },
+        {
+          "id": "teams",
+          "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/2",
+          "intent": "Support Microsoft Teams alongside Slack, including editor, directory, exact callback ownership and guarded native media.",
+          "prompt_texts": {}
+        },
+        {
+          "id": "embedded",
+          "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/17",
+          "intent": "Support the explicitly enabled embedded Slack and Teams trial using the managed channel-derived outbound path.",
+          "prompt_texts": {}
+        }
+      ],
+      "prompts": {
+        "compose": "prompts/compose.md",
+        "conflict": "prompts/compose.md",
+        "repair": "prompts/repair.md",
+        "refresh": "prompts/refresh.md",
+        "order": "prompts/order.md"
+      },
+      "adapters": [
+        {
+          "id": "native-role-first-admission",
+          "features": [
+            "roles",
+            "first-admin"
+          ],
+          "guidance": "Preserve exact per-person configured role and Agent use authority alongside first-deployment preparation and upstream assigning-session protection. Administration alone must not grant runtime use."
+        },
+        {
+          "id": "managed-channels",
+          "features": [
+            "teams",
+            "outbound"
+          ],
+          "guidance": "Aggregate Slack and Teams gateway/control-plane requirements through the generic revision-owned managed proxy. Retain native media URL, redirect, token and TLS guards. Do not restore the retired shared Slack proxy, legacy proxy URLs or installation-wide Teams host lists. User proxy/trust-marker overrides are reserved; dedicated Harnesses receive neither Gateway credentials nor its trust marker."
+        },
+        {
+          "id": "embedded-channels",
+          "features": [
+            "teams",
+            "outbound",
+            "embedded"
+          ],
+          "guidance": "Support both Slack and Teams in embedded and dedicated modes. Embedded trial defaults off, uses runtime.channels.experimentalEmbeddedChannels, requires managed outbound and only channel-derived destinations. Additional approved hosts remain dedicated-only. Preserve callback exact owner/revision/UID/resourceVersion fencing, serving annotation authority, provider cutovers and full cleanup."
+        },
+        {
+          "id": "embedded-profile",
+          "features": [
+            "profiles",
+            "embedded",
+            "outbound"
+          ],
+          "guidance": "Render trusted embedded opt-in only in the existing nested runtime.channels.experimentalEmbeddedChannels. Retain paired API/worker checksums and shared-credentials warning; opt-in requires enabled managed outbound."
+        }
+      ],
+      "preserve_paths": [
+        "migrations/*.sql"
+      ],
+      "checks": [
+        {
+          "name": "source-audit",
+          "stage": "feature",
+          "argv": [
+            "python3",
+            "{project}/checks/local.py"
+          ],
+          "timeout_seconds": 900
+        },
+        {
+          "name": "combined-invariants",
+          "stage": "integration",
+          "argv": [
+            "python3",
+            "{project}/checks/local.py"
+          ],
+          "timeout_seconds": 900
+        },
+        {
+          "name": "source-ci",
+          "stage": "hosted",
+          "argv": [
+            "python3",
+            "{project}/checks/hosted.py",
+            "source"
+          ],
+          "timeout_seconds": 10800
+        },
+        {
+          "name": "native-images",
+          "stage": "hosted",
+          "argv": [
+            "python3",
+            "{project}/checks/hosted.py",
+            "native"
+          ],
+          "timeout_seconds": 10800
+        }
+      ],
+      "required_github_checks": [
+        "CI Required",
+        "First Agent Smoke",
+        "CodeQL (javascript-typescript)",
+        "CodeQL (actions)",
+        "Prepare controller (amd64)",
+        "Prepare controller (arm64)",
+        "Prepare runtime (amd64)",
+        "Prepare runtime (arm64)"
+      ],
+      "effective_worker": {
+        "provider": "codex",
+        "options": {
+          "executable": "codex",
+          "model": "gpt-6-astra",
+          "thinking": "high",
+          "timeout_seconds": 3600,
+          "attempts": 2
+        }
+      },
+      "effective_feature_workers": {
+        "profiles": {
+          "provider": "codex",
+          "options": {
+            "executable": "codex",
+            "model": "gpt-6-astra",
+            "thinking": "high",
+            "timeout_seconds": 3600,
+            "attempts": 2
+          }
+        },
+        "secrets": {
+          "provider": "codex",
+          "options": {
+            "executable": "codex",
+            "model": "gpt-6-astra",
+            "thinking": "high",
+            "timeout_seconds": 3600,
+            "attempts": 2
+          }
+        },
+        "plugins": {
+          "provider": "codex",
+          "options": {
+            "executable": "codex",
+            "model": "gpt-6-astra",
+            "thinking": "high",
+            "timeout_seconds": 3600,
+            "attempts": 2
+          }
+        },
+        "roles": {
+          "provider": "codex",
+          "options": {
+            "executable": "codex",
+            "model": "gpt-6-astra",
+            "thinking": "high",
+            "timeout_seconds": 3600,
+            "attempts": 2
+          }
+        },
+        "first-admin": {
+          "provider": "codex",
+          "options": {
+            "executable": "codex",
+            "model": "gpt-6-astra",
+            "thinking": "high",
+            "timeout_seconds": 3600,
+            "attempts": 2
+          }
+        },
+        "outbound": {
+          "provider": "codex",
+          "options": {
+            "executable": "codex",
+            "model": "gpt-6-astra",
+            "thinking": "high",
+            "timeout_seconds": 3600,
+            "attempts": 2
+          }
+        },
+        "teams": {
+          "provider": "codex",
+          "options": {
+            "executable": "codex",
+            "model": "gpt-6-astra",
+            "thinking": "high",
+            "timeout_seconds": 3600,
+            "attempts": 2
+          }
+        },
+        "embedded": {
+          "provider": "codex",
+          "options": {
+            "executable": "codex",
+            "model": "gpt-6-astra",
+            "thinking": "high",
+            "timeout_seconds": 3600,
+            "attempts": 2
+          }
+        }
+      },
+      "recipe": {
+        "commit": "01bfefbf7417c9832b8e8865a9806a6177e8a418",
+        "path": "curation/oce/",
+        "files": {
+          "README.md": {
+            "content": "IyBNYWludGFpbiB0aGUgT0NFIGNhbmRpZGF0ZQoKVGhpcyBwcm9qZWN0IG93bnMgdGhlIE9DRSBjb21wb3NpdGlvbiByZWNpcGUgYW5kIHZlcmlmaWNhdGlvbiBwb2xpY3kuIE9DRSBvd25zCnByb2R1Y3QgY29kZSwgY29tYmluZWQgdGVzdHMgYW5kIGNhbmRpZGF0ZSBjb21taXRzLiBCdW5kbGUgZGVmaW5pdGlvbnMgYW5kIHJlbGVhc2UKcXVhbGlmaWNhdGlvbiByZW1haW4gc2VwYXJhdGU7IHRoaXMgcHJvamVjdCBuZXZlciBzZWxlY3RzIGEgYnVuZGxlIHZlcnNpb24uCgpJbnN0YWxsIHRoZSBQeXRob24gTWFpbnRhaW4gQ0xJIGFuZCBhdXRoZW50aWNhdGVkIENvZGV4IGFuZCBHaXRIdWIgQ0xJcy4gVXNlIE5vZGUKMjQrIGFuZCBQeXRob24gMy4xMSsuIFJldmlldyBhbmQgY29tbWl0IHJlY2lwZSBjaGFuZ2VzIG9uIGEgYnVuZGxlIGJyYW5jaCBiZWZvcmUKcGxhbm5pbmcuIFJ1biBmcm9tIHRoaXMgZGlyZWN0b3J5OgoKYGBgc2gKbWFpbnRhaW4gdmFsaWRhdGUKbWFpbnRhaW4gcGxhbgptYWludGFpbiBidWlsZCBSVU5fSUQKbWFpbnRhaW4gcmVwb3J0IFJVTl9JRAptYWludGFpbiBwdWJsaXNoLWNhbmRpZGF0ZSBSVU5fSUQKbWFpbnRhaW4gcXVhbGlmeSBSVU5fSUQKbWFpbnRhaW4gcmVwb3J0IFJVTl9JRApgYGAKClRoZSBjdXJyZW50IHBpbG90IGVuZHMgYWZ0ZXIgcXVhbGlmaWNhdGlvbjogKipubyBwcm9tb3Rpb24sIHRhZ3Mgb3IgcmVsZWFzZXMqKi4KRmVhdHVyZSBwdWJsaWNhdGlvbiBpcyBkaXNhYmxlZC4gVGhlIHB1Ymxpc2hlZCBpbnRlZ3JhdGlvbiBhbmQgbWFpbiBhcmUgcHJvdGVjdGVkCmJ5IGV4YWN0IGZyb3plbi1yZWYgY2hlY2tzLiBBZGRpbmcgYSBmZWF0dXJlIHVzZXMgYG1haW50YWluIGZlYXR1cmUgYWRkIElEIC0tcHIgVVJMCi0taW50ZW50IFRFWFRgLCBmb2xsb3dlZCBieSByZWNpcGUgcmV2aWV3L2NvbW1pdCBhbmQgYSBuZXcgcGxhbi4gSURzIGlkZW50aWZ5CmZlYXR1cmVzIGluIGNvbnN0cmFpbnRzIGFuZCByZXBvcnRzLiBFeHBsaWNpdCBgcmVxdWlyZXNgL2BhZnRlcmAgY29uc3RyYWluIG9yZGVyOwpvdGhlcndpc2UgTWFpbnRhaW4gaW5zcGVjdHMgaW50ZXJhY3Rpb25zIGFuZCByZWNvcmRzIGl0cyBwcm9wb3NlZCBvcmRlci4KClRoZSBjb250cm9sIGxlZGdlciBpcyBgY29kZXgvbWFpbnRhaW4tcmVjb3Jkc2AgaW4gdGhpcyByZXBvc2l0b3J5LiBJdCByZWNvcmRzCnJlY2lwZSBjb21taXQsIGV4YWN0IGlucHV0cywgYWN0dWFsIGdlbmVyYXRlZCBjb2RlIHJlZnMsIGRlY2lzaW9ucywgb3JkZXIgYW5kCmNoZWNrIHJlY2VpcHRzLiBJZ25vcmVkIGAubWFpbnRhaW4vYCBjb250YWlucyBsb2NhbCBTUUxpdGUsIHdvcmtzcGFjZXMgYW5kIHJhdyBsb2dzLgpgbWFpbnRhaW4gcmVjb3ZlciBSVU5fSURgIHJlc3RvcmVzIGEgcmVtb3RlbHkgY2hlY2twb2ludGVkIHJ1bjsgYHJlc3VtZWAgY29udGludWVzCmxvY2FsIGNvbnN0cnVjdGlvbiBhbmQgYHF1YWxpZnlgIGNvbnRpbnVlcyBob3N0ZWQgcXVhbGlmaWNhdGlvbi4gUmV0YWluZWQgb2JqZWN0CmJyYW5jaGVzIGFuZCBhIHJ1bi1zcGVjaWZpYyBjYW5kaWRhdGUgbGl2ZSBpbiB0aGUgT0NFIGZvcmsuIFNvdXJjZSBQUnMgc3RheSBpbnRhY3QuCgpMb2NhbCBjaGVja3MgcHJvdmUgc291cmNlL3N1aXRlIHN0cnVjdHVyZSBhbmQgcHVibGlzaGVkIG1pZ3JhdGlvbi1wcmVmaXggaW50ZWdyaXR5Owp0aGV5IGFyZSBub3QgcnVudGltZSBxdWFsaWZpY2F0aW9uLiBIb3N0ZWQgc291cmNlIGNoZWNrcyBkaXNwYXRjaCBDSSBhbmQgQ29kZVFMCm9uY2UgcGVyIGV4YWN0IGNhbmRpZGF0ZSwgdmFsaWRhdGUgdGhlIGZ1bGwgY2Fub25pY2FsIENJIGFnZ3JlZ2F0ZSBhbmQgc21hbGwgbGFuZQpyZWNlaXB0cywgYW5kIHJlcXVpcmUgdGhlIG5hbWVkIGNvbWJpbmVkIHNjZW5hcmlvcyB3aXRob3V0IHNraXBzLiBOYXRpdmUgY2hlY2tzCnRoZW4gZGlzcGF0Y2ggb25seSBgY29udGFpbmVyLWNoZWNrLnltbGAsIHJlcXVpcmUgYWxsIGZvdXIgbmF0aXZlIGltYWdlIGpvYnMgYW5kCnJlYWQgYm91bmRlZCBgcGxhdGZvcm0uanNvbmAgZW50cmllcyBmcm9tIHRoZWlyIE9DSSBhcnRpZmFjdHMuIE5vIGltYWdlcyBhcmUKcHVibGlzaGVkLiBEaXNwYXRjaCBpbnRlbnRpb25zIHN1cnZpdmUgbG9jYWwgaW50ZXJydXB0aW9uOyB1bmNlcnRhaW4gcmVzcG9uc2VzIGFyZQpyZWNvbmNpbGVkIGFnYWluc3QgZXhhY3QtU0hBIHJlbW90ZSBydW5zIGJlZm9yZSBhbm90aGVyIGFjdGlvbi4gRmFpbHVyZSBsb2dzIHN0YXkKbG9jYWwgYW5kIHJlcG9ydHMgY29udGFpbiBzYWZlIGlkZW50aXRpZXMsIGNvdW50cywgVVJMcyBhbmQgcmVjZWlwdCBkaWdlc3RzLgoKR2VuZXJpYyByZWdyZXNzaW9ucyBiZWxvbmcgaW4gdGhlaXIgT0NFIGZlYXR1cmU7IGNvbWJpbmF0aW9uIHJlZ3Jlc3Npb25zIGJlbG9uZyBpbgp0aGUgT0NFIGNhbmRpZGF0ZSBhbmQgZXhpc3Rpbmcgc3VpdGUgbWFuaWZlc3RzLiBgcHJvbXB0cy9gIG93bnMgY29udGV4dHVhbCB3b3JrZXIKZ3VpZGFuY2UuIGBjaGVja3MvYCBvd25zIG9yY2hlc3RyYXRpb24gYW5kIGV2aWRlbmNlIHZhbGlkYXRpb24sIG5vdCBwcm9kdWN0IGJlaGF2aW9yLgpOb25lIG9mIHRoaXMgcHJvdmVzIGxpdmUgU2xhY2svVGVhbXMgbWVzc2FnZXMsIHB1YmxpYyBUZWFtcyBpbmdyZXNzLCBtb2RlbCB0dXJucywKY3VzdG9tZXIgaW5zdGFsbGF0aW9ucyBvciBhIHNoaXBwaW5nIGJ1bmRsZS4K",
+            "executable": false
+          },
+          "checks/hosted.py": {
+            "content": "IiIiUXVhbGlmeSBhbiBPQ0UgY2FuZGlkYXRlIHVzaW5nIGV4YWN0LXNvdXJjZSBDSSBhbmQgYm91bmRlZCBuYXRpdmUgcmVjZWlwdHMuIiIiCgppbXBvcnQgaGFzaGxpYgppbXBvcnQganNvbgppbXBvcnQgb3MKaW1wb3J0IHJlCmltcG9ydCBzeXMKZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpmcm9tIG9jZV9ldmlkZW5jZSBpbXBvcnQgKAogICAgUkVQT1NJVE9SWSwKICAgIGFwaSwKICAgIGFydGlmYWN0X2pzb24sCiAgICBjb21tYW5kLAogICAgcGFnZXMsCiAgICBzYXZlLAogICAgd2FpdF9ydW5zLAogICAgd29ya2Zsb3dfcnVuLAopCgoKZGVmIHJlcXVpcmVfam9icyhydW5faWQsIG5hbWVzKToKICAgIGpvYnMgPSBwYWdlcyhmInJlcG9zL3tSRVBPU0lUT1JZfS9hY3Rpb25zL3J1bnMve3J1bl9pZH0vam9icz9maWx0ZXI9bGF0ZXN0IiwgImpvYnMiKQogICAgZm9yIG5hbWUgaW4gbmFtZXM6CiAgICAgICAgbWF0Y2hlcyA9IFtqb2IgZm9yIGpvYiBpbiBqb2JzIGlmIGpvYlsibmFtZSJdID09IG5hbWVdCiAgICAgICAgaWYgbGVuKG1hdGNoZXMpICE9IDEgb3IgbWF0Y2hlc1swXVsiY29uY2x1c2lvbiJdICE9ICJzdWNjZXNzIjoKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJNaXNzaW5nIHN1Y2Nlc3NmdWwgZXhhY3Qtc291cmNlIGpvYjogIiArIG5hbWUpCiAgICByZXR1cm4gWwogICAgICAgIHsiaWQiOiBqb2JbImlkIl0sICJuYW1lIjogam9iWyJuYW1lIl0sICJjb25jbHVzaW9uIjogam9iWyJjb25jbHVzaW9uIl19CiAgICAgICAgZm9yIGpvYiBpbiBqb2JzCiAgICBdCgoKZGVmIHZhbGlkYXRlX2xhbmUoc3VtbWFyeSwgc2hhLCB6ZXJvX3NraXBzPUZhbHNlKToKICAgIGlmICgKICAgICAgICBzdW1tYXJ5LmdldCgic291cmNlU2hhIikgIT0gc2hhCiAgICAgICAgb3Igc3VtbWFyeS5nZXQoInN0YXR1cyIpICE9ICJwYXNzZWQiCiAgICAgICAgb3Igc3VtbWFyeS5nZXQoImV4aXRDb2RlIikgIT0gMAogICAgICAgIG9yIHN1bW1hcnkuZ2V0KCJpc3N1ZXMiKQogICAgKToKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoCiAgICAgICAgICAgICJJbnZhbGlkIHNhbWUtc291cmNlIGxhbmUgZXZpZGVuY2U6ICIgKyBzdHIoc3VtbWFyeS5nZXQoImxhbmUiKSkKICAgICAgICApCiAgICBpZiB6ZXJvX3NraXBzIGFuZCAoc3VtbWFyeVsiY291bnRzIl1bInNraXBwZWQiXSBvciBzdW1tYXJ5WyJjb3VudHMiXVsidG9kbyJdKToKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIlJlcXVpcmVkIGxhbmUgY29udGFpbnMgc2tpcHBlZCBwcm9vZjogIiArIHN1bW1hcnlbImxhbmUiXSkKICAgIGZvciBmaWxlIGluIHN1bW1hcnkuZ2V0KCJmaWxlcyIsIFtdKToKICAgICAgICBpZiAoCiAgICAgICAgICAgIGZpbGVbInN0YXR1cyJdICE9ICJwYXNzZWQiCiAgICAgICAgICAgIG9yIGZpbGUuZ2V0KCJpc3N1ZXMiKQogICAgICAgICAgICBvciBmaWxlLmdldCgiY2xlYW51cCIpCiAgICAgICAgICAgIGFuZCBmaWxlWyJjbGVhbnVwIl1bInN0YXR1cyJdICE9ICJwYXNzZWQiCiAgICAgICAgKToKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJGaWxlIGZhaWxlZCBvciBkaWQgbm90IGNsZWFuIHVwOiAiICsgZmlsZVsicGF0aCJdKQoKCmRlZiByZXF1aXJlX2Nhc2Uoc3VtbWFyaWVzLCBwYXR0ZXJuKToKICAgIG1hdGNoZXMgPSBbCiAgICAgICAgY2FzZQogICAgICAgIGZvciBzdW1tYXJ5IGluIHN1bW1hcmllcy52YWx1ZXMoKQogICAgICAgIGZvciBmaWxlIGluIHN1bW1hcnkuZ2V0KCJmaWxlcyIsIFtdKQogICAgICAgIGZvciBjYXNlIGluIGZpbGUuZ2V0KCJ0ZXN0cyIsIFtdKQogICAgICAgIGlmIHJlLnNlYXJjaChwYXR0ZXJuLCBjYXNlWyJuYW1lIl0sIHJlLklHTk9SRUNBU0UpCiAgICBdCiAgICBpZiBub3QgbWF0Y2hlcyBvciBhbnkoY2FzZVsic3RhdHVzIl0gIT0gInBhc3NlZCIgZm9yIGNhc2UgaW4gbWF0Y2hlcyk6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJSZXF1aXJlZCBzY2VuYXJpbyBtaXNzaW5nIG9yIGRpZCBub3QgcGFzczogIiArIHBhdHRlcm4pCiAgICByZXR1cm4gW2Nhc2VbIm5hbWUiXSBmb3IgY2FzZSBpbiBtYXRjaGVzXQoKCmRlZiBzb3VyY2Uoc2hhLCBicmFuY2gsIHN0YXRlKToKICAgIHJ1bnMgPSBbCiAgICAgICAgd29ya2Zsb3dfcnVuKHdvcmtmbG93LCBzaGEsIGJyYW5jaCwgc3RhdGUpCiAgICAgICAgZm9yIHdvcmtmbG93IGluICgiY2kueW1sIiwgImNvZGVxbC55bWwiKQogICAgXQogICAgcnVucyA9IHdhaXRfcnVucyhydW5zLCBzaGEsIHN0YXRlKQogICAgY2ksIGNvZGVxbCA9IHJ1bnMKICAgIGpvYnMgPSByZXF1aXJlX2pvYnMoY2lbImlkIl0sIFsiQ0kgUmVxdWlyZWQiLCAiRmlyc3QgQWdlbnQgU21va2UiXSkKICAgIHJlcXVpcmVfam9icyhjb2RlcWxbImlkIl0sIFsiQ29kZVFMIChqYXZhc2NyaXB0LXR5cGVzY3JpcHQpIiwgIkNvZGVRTCAoYWN0aW9ucykiXSkKICAgIG1hbmlmZXN0ID0ganNvbi5sb2FkcyhQYXRoKCJzY3JpcHRzL2NpL3Rlc3Qtc3VpdGVzLmpzb24iKS5yZWFkX3RleHQoKSkKICAgIGxhbmVzID0gbWFuaWZlc3RbImdyb3VwcyJdWyJjaSJdCiAgICBzdW1tYXJpZXMgPSB7fQogICAgcmVzdWx0cyA9IHN0YXRlIC8gInJlc3VsdHMiCiAgICByZXN1bHRzLm1rZGlyKGV4aXN0X29rPVRydWUpCiAgICBhcnRpZmFjdHMgPSBwYWdlcygKICAgICAgICBmInJlcG9zL3tSRVBPU0lUT1JZfS9hY3Rpb25zL3J1bnMve2NpWydpZCddfS9hcnRpZmFjdHMiLCAiYXJ0aWZhY3RzIgogICAgKQogICAgZm9yIGFydGlmYWN0IGluIGFydGlmYWN0czoKICAgICAgICBpZiBub3QgYXJ0aWZhY3RbIm5hbWUiXS5zdGFydHN3aXRoKCJjaS1yZXN1bHRzLSIpIG9yIGFydGlmYWN0WyJleHBpcmVkIl06CiAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgZm9yIF9maWxlbmFtZSwgc3VtbWFyeSBpbiBhcnRpZmFjdF9qc29uKAogICAgICAgICAgICBhcnRpZmFjdCwgbGFtYmRhIG5hbWU6IFBhdGgobmFtZSkubmFtZSBpbiB7bGFuZSArICIuanNvbiIgZm9yIGxhbmUgaW4gbGFuZXN9CiAgICAgICAgKToKICAgICAgICAgICAgbGFuZSA9IHN1bW1hcnkuZ2V0KCJsYW5lIikKICAgICAgICAgICAgaWYgbGFuZSBpbiBzdW1tYXJpZXM6CiAgICAgICAgICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIkFtYmlndW91cyBkdXBsaWNhdGUgbGFuZSBhcnRpZmFjdDogIiArIHN0cihsYW5lKSkKICAgICAgICAgICAgdmFsaWRhdGVfbGFuZSgKICAgICAgICAgICAgICAgIHN1bW1hcnksCiAgICAgICAgICAgICAgICBzaGEsCiAgICAgICAgICAgICAgICBsYW5lCiAgICAgICAgICAgICAgICBpbiB7CiAgICAgICAgICAgICAgICAgICAgInBvc3RncmVzIiwKICAgICAgICAgICAgICAgICAgICAicG9zdGdyZXMtYXV0aCIsCiAgICAgICAgICAgICAgICAgICAgImszZC1maXh0dXJlLXN0YXRlIiwKICAgICAgICAgICAgICAgICAgICAiaW1hZ2VzLXJ1bnRpbWUtc3RhcnR1cCIsCiAgICAgICAgICAgICAgICAgICAgImNoZWNrcy1icm93c2VyLTIiLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgKQogICAgICAgICAgICBzdW1tYXJpZXNbbGFuZV0gPSBzdW1tYXJ5CiAgICAgICAgICAgIHNhdmUocmVzdWx0cyAvIChsYW5lICsgIi5qc29uIiksIHN1bW1hcnkpCiAgICBpZiBzZXQoc3VtbWFyaWVzKSAhPSBzZXQobGFuZXMpOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigKICAgICAgICAgICAgIk1pc3NpbmcgY2Fub25pY2FsIGZ1bGwtbW9kZSBsYW5lIHJlY2VpcHRzOiAiCiAgICAgICAgICAgICsgc3RyKHNvcnRlZChzZXQobGFuZXMpIC0gc2V0KHN1bW1hcmllcykpKQogICAgICAgICkKICAgICMgUmV1c2UgdGhlIGFjdHVhbCBjYW5kaWRhdGUncyBjYW5vbmljYWwgYWdncmVnYXRpb24vY292ZXJhZ2UgdmFsaWRhdG9yLgogICAgYWdncmVnYXRlID0ganNvbi5sb2FkcygKICAgICAgICBjb21tYW5kKAogICAgICAgICAgICBbCiAgICAgICAgICAgICAgICAibm9kZSIsCiAgICAgICAgICAgICAgICAic2NyaXB0cy9jaS9ydW4tdGVzdHMubWpzIiwKICAgICAgICAgICAgICAgICJhZ2dyZWdhdGUiLAogICAgICAgICAgICAgICAgImNpIiwKICAgICAgICAgICAgICAgICItLXJlc3VsdHMtZGlyIiwKICAgICAgICAgICAgICAgIHN0cihyZXN1bHRzKSwKICAgICAgICAgICAgXSwKICAgICAgICAgICAgZW52PXsqKm9zLmVudmlyb24sICJHSVRIVUJfU0hBIjogc2hhfSwKICAgICAgICApCiAgICApCiAgICBpZiAoCiAgICAgICAgYWdncmVnYXRlWyJzb3VyY2VTaGEiXSAhPSBzaGEKICAgICAgICBvciBhZ2dyZWdhdGVbInN0YXR1cyJdICE9ICJwYXNzZWQiCiAgICAgICAgb3IgYWdncmVnYXRlWyJpc3N1ZXMiXQogICAgKToKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIkNhbm9uaWNhbCBhZ2dyZWdhdGUgZGlkIG5vdCBxdWFsaWZ5IHRoZSBjYW5kaWRhdGUiKQogICAgc2F2ZShzdGF0ZSAvICJjYW5vbmljYWwtYWdncmVnYXRlLmpzb24iLCBhZ2dyZWdhdGUpCiAgICByZXF1aXJlZCA9IFsKICAgICAgICByInJlYWwgS3ViZXJuZXRlcyBEcml2ZXJzIHNhZmVseSB1c2UgYW5kIHByZXNlcnZlIGFuIGV4dGVybmFsbHkgbWFuYWdlZCB0ZW5hbnQgbmFtZXNwYWNlIiwKICAgICAgICByInByb3Zpc2lvbmluZyBBUEkgcmV0YWlucyB0aGUgZmlyc3QgZGVwbG95bWVudCBvdXRjb21lIHdpdGggcmVhbCBLdWJlcm5ldGVzIGZpeHR1cmUgc3RvcmFnZSIsCiAgICAgICAgciJ0cnVzdGVkIGVtYmVkZGVkIGNoYW5uZWwgb3B0LWluIHByb2plY3RzIGV4YWN0IFNlY3JldHMgdGhyb3VnaCBBUEkgcHJvdmlzaW9uaW5nLCByZXZpc2lvbnMgYW5kIHN0b3AiLAogICAgICAgIHIiVGVhbXMgZGlyZWN0b3J5IHNlbGVjdHMgbmFtZXMuKlwoY2hyb21pdW1cKSIsCiAgICAgICAgciJUZWFtcyBkaXJlY3Rvcnkgc2VsZWN0cyBuYW1lcy4qXCh3ZWJraXRcKSIsCiAgICAgICAgciJydW50aW1lIGltYWdlIGRvd25sb2FkcyBuYXRpdmUgZ3VhcmRlZCBUZWFtcyBtZWRpYSB0aHJvdWdoIHRoZSBjaGFubmVsIHByb3h5IiwKICAgIF0KICAgIGNhc2VzID0ge3BhdHRlcm46IHJlcXVpcmVfY2FzZShzdW1tYXJpZXMsIHBhdHRlcm4pIGZvciBwYXR0ZXJuIGluIHJlcXVpcmVkfQogICAgZm9yIG5hbWUgaW4gKAogICAgICAgICJuYXRpdmUtYWRtaW4tc2Vzc2lvbi50ZXN0Lm1qcyIsCiAgICAgICAgInBvc3RncmVzLW1pZ3JhdGlvbi1jb21wYXRpYmlsaXR5LnRlc3QubWpzIiwKICAgICk6CiAgICAgICAgZmlsZXMgPSBbCiAgICAgICAgICAgIGZpbGUKICAgICAgICAgICAgZm9yIHN1bW1hcnkgaW4gc3VtbWFyaWVzLnZhbHVlcygpCiAgICAgICAgICAgIGZvciBmaWxlIGluIHN1bW1hcnkuZ2V0KCJmaWxlcyIsIFtdKQogICAgICAgICAgICBpZiBQYXRoKGZpbGVbInBhdGgiXSkubmFtZSA9PSBuYW1lCiAgICAgICAgXQogICAgICAgIGlmIG5vdCBmaWxlcyBvciBhbnkoCiAgICAgICAgICAgIGZpbGVbImNvdW50cyJdWyJza2lwcGVkIl0gb3IgZmlsZVsiY291bnRzIl1bInRvZG8iXSBmb3IgZmlsZSBpbiBmaWxlcwogICAgICAgICk6CiAgICAgICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigKICAgICAgICAgICAgICAgICJSZXF1aXJlZCBhdXRob3JpdHkvdXBncmFkZSBmaWxlIG1pc3Npbmcgb3Igc2tpcHBlZDogIiArIG5hbWUKICAgICAgICAgICAgKQogICAgcmV0dXJuIHsKICAgICAgICAicnVucyI6IFt7ImlkIjogcnVuWyJpZCJdLCAidXJsIjogcnVuWyJodG1sX3VybCJdfSBmb3IgcnVuIGluIHJ1bnNdLAogICAgICAgICJqb2JzIjogam9icywKICAgICAgICAibGFuZXMiOiB7bGFuZTogc3VtbWFyeVsiY291bnRzIl0gZm9yIGxhbmUsIHN1bW1hcnkgaW4gc3VtbWFyaWVzLml0ZW1zKCl9LAogICAgICAgICJyZXF1aXJlZF9jYXNlcyI6IGNhc2VzLAogICAgICAgICJhZ2dyZWdhdGVfc2hhMjU2IjogaGFzaGxpYi5zaGEyNTYoCiAgICAgICAgICAgIChzdGF0ZSAvICJjYW5vbmljYWwtYWdncmVnYXRlLmpzb24iKS5yZWFkX2J5dGVzKCkKICAgICAgICApLmhleGRpZ2VzdCgpLAogICAgfQoKCmRlZiB2YWxpZGF0ZV9wbGF0Zm9ybXMocmVjZWlwdHMsIHNoYSwgcnVuX2lkKToKICAgIGV4cGVjdGVkID0gewogICAgICAgIChpbWFnZSwgImxpbnV4LyIgKyBhcmNoKQogICAgICAgIGZvciBpbWFnZSBpbiAoImNvbnRyb2xsZXIiLCAicnVudGltZSIpCiAgICAgICAgZm9yIGFyY2ggaW4gKCJhbWQ2NCIsICJhcm02NCIpCiAgICB9CiAgICBvYnNlcnZlZCA9IHNldCgpCiAgICBmb3IgcmVjZWlwdCBpbiByZWNlaXB0czoKICAgICAgICBwYWlyID0gKHJlY2VpcHRbImltYWdlIl0sIHJlY2VpcHRbInBsYXRmb3JtIl0pCiAgICAgICAgaWYgcGFpciBpbiBvYnNlcnZlZCBvciBwYWlyIG5vdCBpbiBleHBlY3RlZDoKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJEdXBsaWNhdGUgb3IgdW5leHBlY3RlZCBuYXRpdmUgcGxhdGZvcm0gcmVjZWlwdCIpCiAgICAgICAgb2JzZXJ2ZWQuYWRkKHBhaXIpCiAgICAgICAgaWYgKAogICAgICAgICAgICByZWNlaXB0WyJzb3VyY2VTaGEiXSAhPSBzaGEKICAgICAgICAgICAgb3IgcmVjZWlwdFsid29ya2Zsb3dTaGEiXSAhPSBzaGEKICAgICAgICAgICAgb3Igc3RyKHJlY2VpcHRbInJ1bklkIl0pICE9IHN0cihydW5faWQpCiAgICAgICAgICAgIG9yIHJlY2VpcHRbIm5hdGl2ZSJdIGlzIG5vdCBUcnVlCiAgICAgICAgICAgIG9yIG5vdCByZS5mdWxsbWF0Y2gociJzaGEyNTY6W2EtZjAtOV17NjR9IiwgcmVjZWlwdFsiZGlnZXN0Il0pCiAgICAgICAgKToKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKAogICAgICAgICAgICAgICAgIk5hdGl2ZSByZWNlaXB0IHNvdXJjZS9ydW4vZGlnZXN0IGRvZXMgbm90IG1hdGNoIHF1YWxpZmljYXRpb24iCiAgICAgICAgICAgICkKICAgIGlmIG9ic2VydmVkICE9IGV4cGVjdGVkOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigiSW5jb21wbGV0ZSBuYXRpdmUgY29udHJvbGxlci9ydW50aW1lIHBsYXRmb3JtIHNldCIpCgoKZGVmIG5hdGl2ZShzaGEsIGJyYW5jaCwgc3RhdGUpOgogICAgcnVuID0gd29ya2Zsb3dfcnVuKCJjb250YWluZXItY2hlY2sueW1sIiwgc2hhLCBicmFuY2gsIHN0YXRlKQogICAgcnVuID0gd2FpdF9ydW5zKFtydW5dLCBzaGEsIHN0YXRlKVswXQogICAgbmFtZXMgPSBbCiAgICAgICAgZiJQcmVwYXJlIHtpbWFnZX0gKHthcmNofSkiCiAgICAgICAgZm9yIGltYWdlIGluICgiY29udHJvbGxlciIsICJydW50aW1lIikKICAgICAgICBmb3IgYXJjaCBpbiAoImFtZDY0IiwgImFybTY0IikKICAgIF0KICAgIGpvYnMgPSByZXF1aXJlX2pvYnMocnVuWyJpZCJdLCBuYW1lcykKICAgIHJlY2VpcHRzID0gW10KICAgIGZvciBhcnRpZmFjdCBpbiBwYWdlcygKICAgICAgICBmInJlcG9zL3tSRVBPU0lUT1JZfS9hY3Rpb25zL3J1bnMve3J1blsnaWQnXX0vYXJ0aWZhY3RzIiwgImFydGlmYWN0cyIKICAgICk6CiAgICAgICAgaWYgYXJ0aWZhY3RbIm5hbWUiXS5zdGFydHN3aXRoKCJwbGF0Zm9ybS0iKSBhbmQgbm90IGFydGlmYWN0WyJleHBpcmVkIl06CiAgICAgICAgICAgIGVudHJpZXMgPSBhcnRpZmFjdF9qc29uKAogICAgICAgICAgICAgICAgYXJ0aWZhY3QsIGxhbWJkYSBuYW1lOiBQYXRoKG5hbWUpLm5hbWUgPT0gInBsYXRmb3JtLmpzb24iCiAgICAgICAgICAgICkKICAgICAgICAgICAgaWYgbGVuKGVudHJpZXMpICE9IDE6CiAgICAgICAgICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIk5hdGl2ZSBhcnRpZmFjdCBsYWNrcyBvbmUgdW5pcXVlIHBsYXRmb3JtLmpzb24iKQogICAgICAgICAgICByZWNlaXB0cy5hcHBlbmQoZW50cmllc1swXVsxXSkKICAgIHZhbGlkYXRlX3BsYXRmb3JtcyhyZWNlaXB0cywgc2hhLCBydW5bImlkIl0pCiAgICBzYXZlKHN0YXRlIC8gInBsYXRmb3Jtcy5qc29uIiwgcmVjZWlwdHMpCiAgICByZXR1cm4gewogICAgICAgICJydW4iOiB7ImlkIjogcnVuWyJpZCJdLCAidXJsIjogcnVuWyJodG1sX3VybCJdfSwKICAgICAgICAiam9icyI6IGpvYnMsCiAgICAgICAgInBsYXRmb3JtcyI6IHJlY2VpcHRzLAogICAgfQoKCmRlZiBtYWluKCk6CiAgICBzaGEgPSBvcy5lbnZpcm9uWyJNQUlOVEFJTl9TT1VSQ0VfU0hBIl0KICAgIGlucHV0cyA9IGpzb24ubG9hZHMoUGF0aChvcy5lbnZpcm9uWyJNQUlOVEFJTl9JTlBVVFNfRklMRSJdKS5yZWFkX3RleHQoKSkKICAgIHN0YXRlID0gUGF0aChvcy5lbnZpcm9uWyJNQUlOVEFJTl9DSEVDS19TVEFURV9ESVIiXSkKICAgIGlmIGlucHV0c1siZm9yayJdICE9IGYiaHR0cHM6Ly9naXRodWIuY29tL3tSRVBPU0lUT1JZfS5naXQiOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigiVGhpcyByZWNpcGUgb25seSBkaXNwYXRjaGVzIHRvIGl0cyByZXZpZXdlZCBPQ0UgZm9yayIpCiAgICBhY3RvciA9IGFwaSgidXNlciIpWyJsb2dpbiJdCiAgICBpZiBhY3RvciAhPSAibWlndWVsYnJhbmNvODAiOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigiVW5leHBlY3RlZCBHaXRIdWIgaWRlbnRpdHkiKQogICAgZnVuY3Rpb24gPSB7InNvdXJjZSI6IHNvdXJjZSwgIm5hdGl2ZSI6IG5hdGl2ZX1bc3lzLmFyZ3ZbMV1dCiAgICBldmlkZW5jZSA9IGZ1bmN0aW9uKHNoYSwgaW5wdXRzWyJjYW5kaWRhdGVfYnJhbmNoIl0sIHN0YXRlKQogICAgc2F2ZShzdGF0ZSAvICJyZWNlaXB0Lmpzb24iLCB7InNvdXJjZV9zaGEiOiBzaGEsICJkZXRhaWxzIjogZXZpZGVuY2V9KQoKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICB0cnk6CiAgICAgICAgbWFpbigpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGVycm9yOgogICAgICAgICMgQXZvaWQgcmVuZGVyaW5nIHVybGxpYiByZXF1ZXN0IFVSTHMsIHdoaWNoIGNhbiBjb250YWluIHNpZ25lZCB0b2tlbnMuCiAgICAgICAgaWYgaXNpbnN0YW5jZShlcnJvciwgKE9TRXJyb3IsKSk6CiAgICAgICAgICAgIHByaW50KAogICAgICAgICAgICAgICAgZiJIb3N0ZWQgZXZpZGVuY2UgdHJhbnNwb3J0IGZhaWxlZCAoe3R5cGUoZXJyb3IpLl9fbmFtZV9ffSk7IHJlc3VtZSB0aGUgcmVjb3JkZWQgY2hlY2siLAogICAgICAgICAgICAgICAgZmlsZT1zeXMuc3RkZXJyLAogICAgICAgICAgICApCiAgICAgICAgZWxzZToKICAgICAgICAgICAgcHJpbnQoc3RyKGVycm9yKSwgZmlsZT1zeXMuc3RkZXJyKQogICAgICAgIHJhaXNlIFN5c3RlbUV4aXQoMSkgZnJvbSBOb25lCg==",
+            "executable": false
+          },
+          "checks/local.py": {
+            "content": "IiIiU3RydWN0dXJhbCBzb3VyY2UgYXVkaXQgYW5kIHB1Ymxpc2hlZCBtaWdyYXRpb24tcHJlZml4IGd1YXJkLCBub3QgcnVudGltZSBwcm9vZi4iIiIKCmltcG9ydCBoYXNobGliCmltcG9ydCBqc29uCmltcG9ydCBvcwppbXBvcnQgc3VicHJvY2Vzcwpmcm9tIHBhdGhsaWIgaW1wb3J0IFBhdGgKCgpkZWYgZ2l0KCphcmdzKToKICAgIHJldHVybiBzdWJwcm9jZXNzLmNoZWNrX291dHB1dChbImdpdCIsICphcmdzXSkKCgpkZWYgY2hlY2tfcHJlZml4KHByZXZpb3VzKToKICAgIHBhdGggPSAibWlncmF0aW9ucy9tZXRhL19qb3VybmFsLmpzb24iCiAgICBvbGQgPSBqc29uLmxvYWRzKGdpdCgic2hvdyIsIGYie3ByZXZpb3VzfTp7cGF0aH0iKSkKICAgIG5ldyA9IGpzb24ubG9hZHMoUGF0aChwYXRoKS5yZWFkX3RleHQoKSkKICAgIGlmIHtrOiB2IGZvciBrLCB2IGluIG9sZC5pdGVtcygpIGlmIGsgIT0gImVudHJpZXMifSAhPSB7CiAgICAgICAgazogdiBmb3IgaywgdiBpbiBuZXcuaXRlbXMoKSBpZiBrICE9ICJlbnRyaWVzIgogICAgfToKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIlB1Ymxpc2hlZCBtaWdyYXRpb24gam91cm5hbCBtZXRhZGF0YSBjaGFuZ2VkIikKICAgIHByZWZpeCA9IG9sZFsiZW50cmllcyJdCiAgICBpZiBuZXdbImVudHJpZXMiXVs6IGxlbihwcmVmaXgpXSAhPSBwcmVmaXg6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKAogICAgICAgICAgICAiUHVibGlzaGVkIG1pZ3JhdGlvbiBpZGVudGl0aWVzL29yZGVyL21ldGFkYXRhIHdlcmUgcmV3cml0dGVuIgogICAgICAgICkKICAgIGhhc2hlcyA9IHt9CiAgICBmb3IgZW50cnkgaW4gcHJlZml4OgogICAgICAgIHBhdGggPSBmIm1pZ3JhdGlvbnMve2VudHJ5Wyd0YWcnXX0uc3FsIgogICAgICAgIHB1Ymxpc2hlZCA9IGdpdCgic2hvdyIsIGYie3ByZXZpb3VzfTp7cGF0aH0iKQogICAgICAgIGlmIFBhdGgocGF0aCkucmVhZF9ieXRlcygpICE9IHB1Ymxpc2hlZDoKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJQdWJsaXNoZWQgbWlncmF0aW9uIFNRTCBjaGFuZ2VkOiAiICsgcGF0aCkKICAgICAgICBoYXNoZXNbcGF0aF0gPSBoYXNobGliLnNoYTI1NihwdWJsaXNoZWQpLmhleGRpZ2VzdCgpCiAgICB0YWdzID0gW2VudHJ5WyJ0YWciXSBmb3IgZW50cnkgaW4gbmV3WyJlbnRyaWVzIl1dCiAgICBpZiBsZW4oc2V0KHRhZ3MpKSAhPSBsZW4odGFncykgb3IgW2VbImlkeCJdIGZvciBlIGluIG5ld1siZW50cmllcyJdXSAhPSBsaXN0KAogICAgICAgIHJhbmdlKGxlbih0YWdzKSkKICAgICk6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKAogICAgICAgICAgICAiTWlncmF0aW9uIGpvdXJuYWwgaGFzIGR1cGxpY2F0ZSBpZGVudGl0aWVzIG9yIGludmFsaWQgaW5kaWNlcyIKICAgICAgICApCiAgICBpZiBzZXQodGFncykgIT0ge3BhdGguc3RlbSBmb3IgcGF0aCBpbiBQYXRoKCJtaWdyYXRpb25zIikuZ2xvYigiKi5zcWwiKX06CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJNaWdyYXRpb24gam91cm5hbCBhbmQgU1FMIGludmVudG9yeSBkaWZmZXIiKQogICAgcmV0dXJuIHsKICAgICAgICAicHVibGlzaGVkX2VudHJpZXMiOiBsZW4ocHJlZml4KSwKICAgICAgICAiY2FuZGlkYXRlX2VudHJpZXMiOiBsZW4odGFncyksCiAgICAgICAgInB1Ymxpc2hlZF9zcWxfc2hhMjU2IjogaGFzaGVzLAogICAgfQoKCmRlZiBtYWluKCk6CiAgICBpbnB1dHMgPSBqc29uLmxvYWRzKFBhdGgob3MuZW52aXJvblsiTUFJTlRBSU5fSU5QVVRTX0ZJTEUiXSkucmVhZF90ZXh0KCkpCiAgICBzdGFnZSA9IG9zLmVudmlyb25bIk1BSU5UQUlOX0NIRUNLX1NUQUdFIl0KICAgIHNoYSA9IG9zLmVudmlyb25bIk1BSU5UQUlOX1NPVVJDRV9TSEEiXQogICAgc3VicHJvY2Vzcy5ydW4oCiAgICAgICAgWyJnaXQiLCAiZGlmZiIsICItLWNoZWNrIiwgaW5wdXRzWyJ1cHN0cmVhbV9zaGEiXSArICIuLi5IRUFEIl0sIGNoZWNrPVRydWUKICAgICkKICAgIGZvciBzY3JpcHQsICphcmdzIGluIFsKICAgICAgICAoInNjcmlwdHMvdmVyaWZ5LXdvcmtzcGFjZS1ib3VuZGFyeS5tanMiLCksCiAgICAgICAgKCJzY3JpcHRzL2NpL3J1bi10ZXN0cy5tanMiLCAiYXVkaXQiKSwKICAgIF06CiAgICAgICAgc3VicHJvY2Vzcy5ydW4oWyJub2RlIiwgc2NyaXB0LCAqYXJnc10sIGNoZWNrPVRydWUpCiAgICBkZXRhaWxzID0geyJzY29wZSI6ICJTb3VyY2UgYW5kIHN1aXRlIHN0cnVjdHVyZSBvbmx5OyBubyBydW50aW1lIGV4ZWN1dGlvbiBjbGFpbWVkIn0KICAgIGlmIHN0YWdlID09ICJpbnRlZ3JhdGlvbiIgYW5kIGlucHV0c1sic3RhcnRpbmdfaW50ZWdyYXRpb24iXToKICAgICAgICBkZXRhaWxzWyJtaWdyYXRpb25fcHJlZml4Il0gPSBjaGVja19wcmVmaXgoaW5wdXRzWyJzdGFydGluZ19pbnRlZ3JhdGlvbiJdKQogICAgZGVzdGluYXRpb24gPSBQYXRoKG9zLmVudmlyb25bIk1BSU5UQUlOX0NIRUNLX1NUQVRFX0RJUiJdKSAvICJyZWNlaXB0Lmpzb24iCiAgICBkZXN0aW5hdGlvbi53cml0ZV90ZXh0KAogICAgICAgIGpzb24uZHVtcHMoeyJzb3VyY2Vfc2hhIjogc2hhLCAiZGV0YWlscyI6IGRldGFpbHN9LCBpbmRlbnQ9MikgKyAiXG4iCiAgICApCgoKaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjoKICAgIG1haW4oKQo=",
+            "executable": false
+          },
+          "checks/oce_evidence.py": {
+            "content": "IiIiU21hbGwsIGJvdW5kZWQgR2l0SHViIGV2aWRlbmNlIHJlYWRlci4gTmV2ZXIgd3JpdGUgY3JlZGVudGlhbHMgb3Igc2lnbmVkIFVSTHMuIiIiCgppbXBvcnQgaW8KaW1wb3J0IGpzb24KaW1wb3J0IHN1YnByb2Nlc3MKaW1wb3J0IHRpbWUKaW1wb3J0IHVybGxpYi5lcnJvcgppbXBvcnQgdXJsbGliLnJlcXVlc3QKaW1wb3J0IHppcGZpbGUKZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCmZyb20gdXJsbGliLnBhcnNlIGltcG9ydCB1cmxwYXJzZQoKUkVQT1NJVE9SWSA9ICJyYXctbGFicy9vcGVuY2xhdy1lbnRlcnByaXNlIgoKCmRlZiBjb21tYW5kKGFyZ3YsICosIGVudj1Ob25lKToKICAgIHJlc3VsdCA9IHN1YnByb2Nlc3MucnVuKGFyZ3YsIGVudj1lbnYsIHRleHQ9VHJ1ZSwgY2FwdHVyZV9vdXRwdXQ9VHJ1ZSwgY2hlY2s9RmFsc2UpCiAgICBpZiByZXN1bHQucmV0dXJuY29kZToKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoCiAgICAgICAgICAgIGYie2FyZ3ZbMF19IGZhaWxlZCAoe3Jlc3VsdC5yZXR1cm5jb2RlfSk6IHtyZXN1bHQuc3RkZXJyWy0zMDAwOl19e3Jlc3VsdC5zdGRvdXRbLTMwMDA6XX0iCiAgICAgICAgKQogICAgcmV0dXJuIHJlc3VsdC5zdGRvdXQKCgpkZWYgYXBpKHBhdGgpOgogICAgcmV0dXJuIGpzb24ubG9hZHMoY29tbWFuZChbImdoIiwgImFwaSIsIHBhdGhdKSkKCgpkZWYgcGFnZXMocGF0aCwga2V5KToKICAgIHJlc3VsdCA9IFtdCiAgICBmb3IgcGFnZSBpbiByYW5nZSgxLCAxMDEpOgogICAgICAgIGRhdGEgPSBhcGkocGF0aCArICgiJiIgaWYgIj8iIGluIHBhdGggZWxzZSAiPyIpICsgZiJwZXJfcGFnZT0xMDAmcGFnZT17cGFnZX0iKQogICAgICAgIGVudHJpZXMgPSBkYXRhW2tleV0KICAgICAgICByZXN1bHQuZXh0ZW5kKGVudHJpZXMpCiAgICAgICAgaWYgbGVuKGVudHJpZXMpIDwgMTAwOgogICAgICAgICAgICByZXR1cm4gcmVzdWx0CiAgICByYWlzZSBSdW50aW1lRXJyb3IoIkdpdEh1YiBwYWdpbmF0aW9uIGV4Y2VlZGVkIHRoZSBib3VuZGVkIHJlYWRlciIpCgoKZGVmIHNhdmUocGF0aCwgdmFsdWUpOgogICAgcGF0aCA9IFBhdGgocGF0aCkKICAgIHRlbXBvcmFyeSA9IHBhdGgud2l0aF9zdWZmaXgoIi5wZW5kaW5nIikKICAgIHRlbXBvcmFyeS53cml0ZV90ZXh0KGpzb24uZHVtcHModmFsdWUsIGluZGVudD0yKSArICJcbiIpCiAgICB0ZW1wb3JhcnkucmVwbGFjZShwYXRoKQoKCmNsYXNzIE5vUmVkaXJlY3QodXJsbGliLnJlcXVlc3QuSFRUUFJlZGlyZWN0SGFuZGxlcik6CiAgICBkZWYgcmVkaXJlY3RfcmVxdWVzdChzZWxmLCByZXF1ZXN0LCBmcCwgY29kZSwgbXNnLCBoZWFkZXJzLCBuZXdfdXJsKToKICAgICAgICByZXR1cm4gTm9uZQoKCmRlZiBhcnRpZmFjdF9sb2NhdGlvbihhcnRpZmFjdF9pZCk6CiAgICAjIEF1dGhlbnRpY2F0ZSBvbmx5IHRvIGFwaS5naXRodWIuY29tLiBUaGUgcmVkaXJlY3QgY29udGFpbnMgYSBzaG9ydC1saXZlZAogICAgIyBzaWduZWQgYXJ0aWZhY3QgVVJMLCB3aGljaCBpcyBuZXZlciBwcmludGVkLCBwZXJzaXN0ZWQgb3IgcGFzc2VkIHRvIGdoLgogICAgdG9rZW4gPSBjb21tYW5kKFsiZ2giLCAiYXV0aCIsICJ0b2tlbiJdKS5zdHJpcCgpCiAgICByZXF1ZXN0ID0gdXJsbGliLnJlcXVlc3QuUmVxdWVzdCgKICAgICAgICBmImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3Mve1JFUE9TSVRPUll9L2FjdGlvbnMvYXJ0aWZhY3RzL3thcnRpZmFjdF9pZH0vemlwIiwKICAgICAgICBoZWFkZXJzPXsKICAgICAgICAgICAgIkF1dGhvcml6YXRpb24iOiAiQmVhcmVyICIgKyB0b2tlbiwKICAgICAgICAgICAgIkFjY2VwdCI6ICJhcHBsaWNhdGlvbi92bmQuZ2l0aHViK2pzb24iLAogICAgICAgIH0sCiAgICApCiAgICB0cnk6CiAgICAgICAgdXJsbGliLnJlcXVlc3QuYnVpbGRfb3BlbmVyKE5vUmVkaXJlY3QpLm9wZW4ocmVxdWVzdCwgdGltZW91dD02MCkuY2xvc2UoKQogICAgZXhjZXB0IHVybGxpYi5lcnJvci5IVFRQRXJyb3IgYXMgZXJyb3I6CiAgICAgICAgaWYgZXJyb3IuY29kZSBub3QgaW4gKDMwMSwgMzAyLCAzMDMsIDMwNywgMzA4KToKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKAogICAgICAgICAgICAgICAgZiJBcnRpZmFjdCBkb3dubG9hZCBhdXRob3JpemF0aW9uIGZhaWxlZDogSFRUUCB7ZXJyb3IuY29kZX0iCiAgICAgICAgICAgICkgZnJvbSBOb25lCiAgICAgICAgbG9jYXRpb24gPSBlcnJvci5oZWFkZXJzWyJMb2NhdGlvbiJdCiAgICAgICAgaWYgdXJscGFyc2UobG9jYXRpb24pLnNjaGVtZSAhPSAiaHR0cHMiOgogICAgICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIkFydGlmYWN0IHJlZGlyZWN0IG11c3QgdXNlIEhUVFBTIikgZnJvbSBOb25lCiAgICAgICAgcmV0dXJuIGxvY2F0aW9uCiAgICByYWlzZSBSdW50aW1lRXJyb3IoIkFydGlmYWN0IHNlcnZpY2UgZGlkIG5vdCByZXR1cm4gYSBzaWduZWQgZG93bmxvYWQgcmVkaXJlY3QiKQoKCmNsYXNzIFJhbmdlRmlsZShpby5SYXdJT0Jhc2UpOgogICAgIiIiWmlwRmlsZS1jb21wYXRpYmxlIHJlYWRlcjsgcmVqZWN0cyBzZXJ2ZXJzIGlnbm9yaW5nIGJvdW5kZWQgYnl0ZSByYW5nZXMuIiIiCgogICAgZGVmIF9faW5pdF9fKHNlbGYsIHVybCk6CiAgICAgICAgc2VsZi51cmwgPSB1cmwKICAgICAgICBzZWxmLnBvc2l0aW9uID0gMAogICAgICAgIHJlcXVlc3QgPSB1cmxsaWIucmVxdWVzdC5SZXF1ZXN0KHVybCwgaGVhZGVycz17IlJhbmdlIjogImJ5dGVzPTAtMCJ9KQogICAgICAgIHdpdGggdXJsbGliLnJlcXVlc3QudXJsb3BlbihyZXF1ZXN0LCB0aW1lb3V0PTkwKSBhcyByZXNwb25zZToKICAgICAgICAgICAgaWYgcmVzcG9uc2Uuc3RhdHVzICE9IDIwNjoKICAgICAgICAgICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigiQXJ0aWZhY3Qgc2VydmVyIG11c3QgaG9ub3IgYnl0ZSByYW5nZXMiKQogICAgICAgICAgICBzZWxmLmxlbmd0aCA9IGludChyZXNwb25zZS5oZWFkZXJzWyJDb250ZW50LVJhbmdlIl0ucnNwbGl0KCIvIiwgMSlbMV0pCiAgICAgICAgICAgIGlmIGxlbihyZXNwb25zZS5yZWFkKDIpKSAhPSAxOgogICAgICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJJbnZhbGlkIGFydGlmYWN0IGJ5dGUtcmFuZ2UgcmVzcG9uc2UiKQoKICAgIGRlZiBzZWVrYWJsZShzZWxmKToKICAgICAgICByZXR1cm4gVHJ1ZQoKICAgIGRlZiB0ZWxsKHNlbGYpOgogICAgICAgIHJldHVybiBzZWxmLnBvc2l0aW9uCgogICAgZGVmIHNlZWsoc2VsZiwgb2Zmc2V0LCB3aGVuY2U9MCk6CiAgICAgICAgc2VsZi5wb3NpdGlvbiA9IG9mZnNldCArICgKICAgICAgICAgICAgc2VsZi5wb3NpdGlvbiBpZiB3aGVuY2UgPT0gMSBlbHNlIHNlbGYubGVuZ3RoIGlmIHdoZW5jZSA9PSAyIGVsc2UgMAogICAgICAgICkKICAgICAgICBpZiBzZWxmLnBvc2l0aW9uIDwgMDoKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJJbnZhbGlkIGFydGlmYWN0IHNlZWsiKQogICAgICAgIHJldHVybiBzZWxmLnBvc2l0aW9uCgogICAgZGVmIHJlYWQoc2VsZiwgc2l6ZT0tMSk6CiAgICAgICAgc2l6ZSA9IG1pbihzZWxmLmxlbmd0aCAtIHNlbGYucG9zaXRpb24sIHNpemUgaWYgc2l6ZSA+PSAwIGVsc2Ugc2VsZi5sZW5ndGgpCiAgICAgICAgaWYgc2l6ZSA8PSAwOgogICAgICAgICAgICByZXR1cm4gYiIiCiAgICAgICAgaWYgc2l6ZSA+IDJfMDAwXzAwMDoKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJBcnRpZmFjdCByZWFkIGV4Y2VlZHMgMiBNQiBib3VuZCIpCiAgICAgICAgc3RhcnQgPSBzZWxmLnBvc2l0aW9uCiAgICAgICAgcmVxdWVzdCA9IHVybGxpYi5yZXF1ZXN0LlJlcXVlc3QoCiAgICAgICAgICAgIHNlbGYudXJsLCBoZWFkZXJzPXsiUmFuZ2UiOiBmImJ5dGVzPXtzdGFydH0te3N0YXJ0ICsgc2l6ZSAtIDF9In0KICAgICAgICApCiAgICAgICAgd2l0aCB1cmxsaWIucmVxdWVzdC51cmxvcGVuKHJlcXVlc3QsIHRpbWVvdXQ9OTApIGFzIHJlc3BvbnNlOgogICAgICAgICAgICBpZiByZXNwb25zZS5zdGF0dXMgIT0gMjA2OgogICAgICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJBcnRpZmFjdCBzZXJ2ZXIgaWdub3JlZCBieXRlIHJhbmdlIikKICAgICAgICAgICAgaWYgKAogICAgICAgICAgICAgICAgcmVzcG9uc2UuaGVhZGVycy5nZXQoIkNvbnRlbnQtUmFuZ2UiKQogICAgICAgICAgICAgICAgIT0gZiJieXRlcyB7c3RhcnR9LXtzdGFydCArIHNpemUgLSAxfS97c2VsZi5sZW5ndGh9IgogICAgICAgICAgICApOgogICAgICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJBcnRpZmFjdCByZXR1cm5lZCBhbiB1bmV4cGVjdGVkIHJhbmdlIikKICAgICAgICAgICAgZGF0YSA9IHJlc3BvbnNlLnJlYWQoc2l6ZSArIDEpCiAgICAgICAgaWYgbGVuKGRhdGEpICE9IHNpemU6CiAgICAgICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigiVHJ1bmNhdGVkIGFydGlmYWN0IHJhbmdlIikKICAgICAgICBzZWxmLnBvc2l0aW9uICs9IHNpemUKICAgICAgICByZXR1cm4gZGF0YQoKCmRlZiBhcnRpZmFjdF9qc29uKGFydGlmYWN0LCBwcmVkaWNhdGUpOgogICAgcmVzdWx0ID0gW10KICAgIHdpdGggemlwZmlsZS5aaXBGaWxlKFJhbmdlRmlsZShhcnRpZmFjdF9sb2NhdGlvbihhcnRpZmFjdFsiaWQiXSkpKSBhcyBhcmNoaXZlOgogICAgICAgIGZvciBpdGVtIGluIGFyY2hpdmUuaW5mb2xpc3QoKToKICAgICAgICAgICAgaWYgbm90IHByZWRpY2F0ZShpdGVtLmZpbGVuYW1lKToKICAgICAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgICAgIGlmIGl0ZW0uZmlsZV9zaXplID4gMV8wMDBfMDAwIG9yIGl0ZW0uY29tcHJlc3Nfc2l6ZSA+IDFfMDAwXzAwMDoKICAgICAgICAgICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigiSlNPTiByZWNlaXB0IGV4Y2VlZHMgMSBNQiIpCiAgICAgICAgICAgIHJlc3VsdC5hcHBlbmQoKGl0ZW0uZmlsZW5hbWUsIGpzb24ubG9hZHMoYXJjaGl2ZS5yZWFkKGl0ZW0pKSkpCiAgICByZXR1cm4gcmVzdWx0CgoKZGVmIHdvcmtmbG93X3J1bih3b3JrZmxvdywgc2hhLCBicmFuY2gsIHN0YXRlKToKICAgIGRlZiBtYXRjaGluZygpOgogICAgICAgIHJ1bnMgPSBhcGkoCiAgICAgICAgICAgIGYicmVwb3Mve1JFUE9TSVRPUll9L2FjdGlvbnMvd29ya2Zsb3dzL3t3b3JrZmxvd30vcnVucz9oZWFkX3NoYT17c2hhfSZwZXJfcGFnZT0xMDAiCiAgICAgICAgKVsid29ya2Zsb3dfcnVucyJdCiAgICAgICAgcmV0dXJuIFsKICAgICAgICAgICAgcnVuCiAgICAgICAgICAgIGZvciBydW4gaW4gcnVucwogICAgICAgICAgICBpZiBydW5bImhlYWRfc2hhIl0gPT0gc2hhIGFuZCBydW5bImhlYWRfYnJhbmNoIl0gPT0gYnJhbmNoCiAgICAgICAgXQoKICAgIHBhdGggPSBzdGF0ZSAvICh3b3JrZmxvdyArICIuanNvbiIpCiAgICByZWNvcmQgPSBqc29uLmxvYWRzKHBhdGgucmVhZF90ZXh0KCkpIGlmIHBhdGguZXhpc3RzKCkgZWxzZSBOb25lCiAgICBpZiByZWNvcmQgYW5kIHJlY29yZC5nZXQoInJ1bl9pZCIpOgogICAgICAgIGZvdW5kID0gYXBpKGYicmVwb3Mve1JFUE9TSVRPUll9L2FjdGlvbnMvcnVucy97cmVjb3JkWydydW5faWQnXX0iKQogICAgICAgIGlmIGZvdW5kWyJoZWFkX3NoYSJdICE9IHNoYSBvciBmb3VuZFsiaGVhZF9icmFuY2giXSAhPSBicmFuY2g6CiAgICAgICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigiUmVjb3JkZWQgd29ya2Zsb3cgcnVuIGlkZW50aXR5IGNoYW5nZWQiKQogICAgICAgIHJldHVybiBmb3VuZAogICAgY2FuZGlkYXRlcyA9IG1hdGNoaW5nKCkKICAgIGlmIGxlbihjYW5kaWRhdGVzKSA+IDE6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKAogICAgICAgICAgICAiTXVsdGlwbGUgZXhhY3Qtc291cmNlIHdvcmtmbG93IHJ1bnMgbmVlZCBleHBsaWNpdCBpbnNwZWN0aW9uIgogICAgICAgICkKICAgIGlmIGNhbmRpZGF0ZXM6CiAgICAgICAgc2F2ZShwYXRoLCB7InNvdXJjZV9zaGEiOiBzaGEsICJydW5faWQiOiBjYW5kaWRhdGVzWzBdWyJpZCJdfSkKICAgICAgICByZXR1cm4gY2FuZGlkYXRlc1swXQogICAgaWYgcmVjb3JkOgogICAgICAgICMgQSBQT1NUIG1heSBoYXZlIHN1Y2NlZWRlZCB3aXRob3V0IGl0cyByZXNwb25zZS4gTmV2ZXIgcmVwZWF0IGl0IGJsaW5kbHkuCiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKAogICAgICAgICAgICAiVW5jZXJ0YWluIHdvcmtmbG93IGRpc3BhdGNoOiBubyBleGFjdC1zb3VyY2UgcnVuIHZpc2libGU7IGluc3BlY3QgR2l0SHViIGJlZm9yZSByZXRyeSIKICAgICAgICApCiAgICBpZiBhcGkoZiJyZXBvcy97UkVQT1NJVE9SWX0vZ2l0L3JlZi9oZWFkcy97YnJhbmNofSIpWyJvYmplY3QiXVsic2hhIl0gIT0gc2hhOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigiQ2FuZGlkYXRlIG1vdmVkIGJlZm9yZSBkaXNwYXRjaCIpCiAgICBzYXZlKHBhdGgsIHsic291cmNlX3NoYSI6IHNoYSwgImRpc3BhdGNoX2ludGVudCI6IFRydWV9KQogICAgY29tbWFuZChbImdoIiwgIndvcmtmbG93IiwgInJ1biIsIHdvcmtmbG93LCAiLS1yZXBvIiwgUkVQT1NJVE9SWSwgIi0tcmVmIiwgYnJhbmNoXSkKICAgIGRlYWRsaW5lID0gdGltZS5tb25vdG9uaWMoKSArIDE4MAogICAgd2hpbGUgdGltZS5tb25vdG9uaWMoKSA8IGRlYWRsaW5lOgogICAgICAgIGNhbmRpZGF0ZXMgPSBtYXRjaGluZygpCiAgICAgICAgaWYgbGVuKGNhbmRpZGF0ZXMpID09IDE6CiAgICAgICAgICAgIHNhdmUocGF0aCwgeyJzb3VyY2Vfc2hhIjogc2hhLCAicnVuX2lkIjogY2FuZGlkYXRlc1swXVsiaWQiXX0pCiAgICAgICAgICAgIHJldHVybiBjYW5kaWRhdGVzWzBdCiAgICAgICAgaWYgbGVuKGNhbmRpZGF0ZXMpID4gMToKICAgICAgICAgICAgYnJlYWsKICAgICAgICB0aW1lLnNsZWVwKDUpCiAgICByYWlzZSBSdW50aW1lRXJyb3IoCiAgICAgICAgIkRpc3BhdGNoIG91dGNvbWUgdW5jZXJ0YWluOyBzYXZlZCBpbnRlbnRpb24gcHJldmVudHMgZHVwbGljYXRlIHdvcmtmbG93IHJ1bnMiCiAgICApCgoKZGVmIHdhaXRfcnVucyhydW5zLCBzaGEsIHN0YXRlKToKICAgIHBlbmRpbmcgPSB7cnVuWyJpZCJdOiBydW4gZm9yIHJ1biBpbiBydW5zfQogICAgZGVhZGxpbmUgPSB0aW1lLm1vbm90b25pYygpICsgMTAwMDAKICAgIHdoaWxlIHBlbmRpbmc6CiAgICAgICAgaWYgdGltZS5tb25vdG9uaWMoKSA+PSBkZWFkbGluZToKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKAogICAgICAgICAgICAgICAgIkhvc3RlZCB3b3JrZmxvdyB3YWl0IHRpbWVkIG91dDsgcmVzdW1lIHdpbGwgb2JzZXJ2ZSB0aGUgZXhpc3RpbmcgcnVucyIKICAgICAgICAgICAgKQogICAgICAgIGZvciBydW5faWQgaW4gbGlzdChwZW5kaW5nKToKICAgICAgICAgICAgcnVuID0gYXBpKGYicmVwb3Mve1JFUE9TSVRPUll9L2FjdGlvbnMvcnVucy97cnVuX2lkfSIpCiAgICAgICAgICAgIGlmIHJ1blsiaGVhZF9zaGEiXSAhPSBzaGE6CiAgICAgICAgICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIldvcmtmbG93IHNvdXJjZSBkaWZmZXJzIGZyb20gdGhlIGNhbmRpZGF0ZSIpCiAgICAgICAgICAgIGlmIHJ1blsic3RhdHVzIl0gIT0gImNvbXBsZXRlZCI6CiAgICAgICAgICAgICAgICBjb250aW51ZQogICAgICAgICAgICBzYXZlKHN0YXRlIC8gZiJydW4te3J1bl9pZH0uanNvbiIsIHJ1bikKICAgICAgICAgICAgaWYgcnVuWyJjb25jbHVzaW9uIl0gIT0gInN1Y2Nlc3MiOgogICAgICAgICAgICAgICAgam9icyA9IHBhZ2VzKAogICAgICAgICAgICAgICAgICAgIGYicmVwb3Mve1JFUE9TSVRPUll9L2FjdGlvbnMvcnVucy97cnVuX2lkfS9qb2JzP2ZpbHRlcj1sYXRlc3QiLAogICAgICAgICAgICAgICAgICAgICJqb2JzIiwKICAgICAgICAgICAgICAgICkKICAgICAgICAgICAgICAgIGZhaWxlZCA9IFsKICAgICAgICAgICAgICAgICAgICBqb2IKICAgICAgICAgICAgICAgICAgICBmb3Igam9iIGluIGpvYnMKICAgICAgICAgICAgICAgICAgICBpZiBqb2JbImNvbmNsdXNpb24iXSBub3QgaW4gKCJzdWNjZXNzIiwgInNraXBwZWQiLCBOb25lKQogICAgICAgICAgICAgICAgXQogICAgICAgICAgICAgICAgZm9yIGpvYiBpbiBmYWlsZWQ6CiAgICAgICAgICAgICAgICAgICAgbG9nID0gc3RhdGUgLyBmImpvYi17am9iWydpZCddfS5sb2ciCiAgICAgICAgICAgICAgICAgICAgcmVzdWx0ID0gc3VicHJvY2Vzcy5ydW4oCiAgICAgICAgICAgICAgICAgICAgICAgIFsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICJnaCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAicnVuIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICJ2aWV3IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0cihydW5faWQpLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgIi0tcmVwbyIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBSRVBPU0lUT1JZLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgIi0tam9iIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0cihqb2JbImlkIl0pLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgIi0tbG9nIiwKICAgICAgICAgICAgICAgICAgICAgICAgXSwKICAgICAgICAgICAgICAgICAgICAgICAgdGV4dD1UcnVlLAogICAgICAgICAgICAgICAgICAgICAgICBjYXB0dXJlX291dHB1dD1UcnVlLAogICAgICAgICAgICAgICAgICAgICkKICAgICAgICAgICAgICAgICAgICBsb2cud3JpdGVfdGV4dCgKICAgICAgICAgICAgICAgICAgICAgICAgcmVzdWx0LnN0ZG91dCBpZiByZXN1bHQucmV0dXJuY29kZSA9PSAwIGVsc2UgcmVzdWx0LnN0ZGVycgogICAgICAgICAgICAgICAgICAgICkKICAgICAgICAgICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigKICAgICAgICAgICAgICAgICAgICBmIkV4YWN0LXNvdXJjZSB3b3JrZmxvdyBmYWlsZWQ6IHtydW5bJ2h0bWxfdXJsJ119OyBsZWFmIGxvZ3MgaW4ge3N0YXRlfTsgIgogICAgICAgICAgICAgICAgICAgICsgIiwgIi5qb2luKGpvYlsibmFtZSJdIGZvciBqb2IgaW4gZmFpbGVkKQogICAgICAgICAgICAgICAgKQogICAgICAgICAgICBwcmludChmIlBhc3NlZCB7cnVuWyduYW1lJ119OiB7cnVuWydodG1sX3VybCddfSIsIGZsdXNoPVRydWUpCiAgICAgICAgICAgIGRlbCBwZW5kaW5nW3J1bl9pZF0KICAgICAgICBpZiBwZW5kaW5nOgogICAgICAgICAgICB0aW1lLnNsZWVwKDMwKQogICAgcmV0dXJuIFthcGkoZiJyZXBvcy97UkVQT1NJVE9SWX0vYWN0aW9ucy9ydW5zL3tydW5bJ2lkJ119IikgZm9yIHJ1biBpbiBydW5zXQo=",
+            "executable": false
+          },
+          "maintain.json": {
+            "content": "ewogICJ2ZXJzaW9uIjogMiwKICAibmFtZSI6ICJvY2UiLAogICJmb3JrIjogImh0dHBzOi8vZ2l0aHViLmNvbS9yYXctbGFicy9vcGVuY2xhdy1lbnRlcnByaXNlLmdpdCIsCiAgInVwc3RyZWFtIjogImh0dHBzOi8vZ2l0aHViLmNvbS9vcGVuY2xhdy9vcGVuY2xhdy1lbnRlcnByaXNlLmdpdCIsCiAgInVwc3RyZWFtX2JyYW5jaCI6ICJtYWluIiwKICAiaW50ZWdyYXRpb25fYnJhbmNoIjogImNvZGV4L3Jhdy1pbnRlZ3JhdGlvbiIsCiAgIm93bmVyIjogIm1pZ3VlbGJyYW5jbzgwIiwKICAicHJvdGVjdGVkX2JyYW5jaGVzIjogWwogICAgIm1haW4iLAogICAgIm1hc3RlciIKICBdLAogICJhbGxvd19mZWF0dXJlX3B1c2giOiBmYWxzZSwKICAid29ya2VyIjogewogICAgInByb3ZpZGVyIjogImNvZGV4IiwKICAgICJvcHRpb25zIjogewogICAgICAiZXhlY3V0YWJsZSI6ICJjb2RleCIsCiAgICAgICJtb2RlbCI6ICJncHQtNi1hc3RyYSIsCiAgICAgICJ0aGlua2luZyI6ICJoaWdoIiwKICAgICAgInRpbWVvdXRfc2Vjb25kcyI6IDM2MDAsCiAgICAgICJhdHRlbXB0cyI6IDIKICAgIH0KICB9LAogICJwZXJzaXN0ZW5jZSI6IHsKICAgICJyZW1vdGUiOiAiaHR0cHM6Ly9naXRodWIuY29tL3Jhdy1sYWJzL2VudGVycHJpc2Utb3BlbmNsYXctYnVuZGxlLmdpdCIsCiAgICAiYnJhbmNoIjogImNvZGV4L21haW50YWluLXJlY29yZHMiCiAgfSwKICAiY29tcG9zaXRpb25fYXR0ZW1wdHMiOiAzLAogICJndWlkYW5jZSI6ICJUaGlzIGlzIGFuIGlzb2xhdGVkIE9DRSBpbnRlZ3JhdGlvbiBjYW5kaWRhdGUuIEtlZXAgYWxsIHNvdXJjZSBQUiBoZWFkcywgYmFzZXMsIHN0YXRlcyBhbmQgYXV0by1tZXJnZSBzZXR0aW5ncyB1bmNoYW5nZWQuIEtlZXAgZm9yayBtYWluIGFuZCBjb2RleC9yYXctaW50ZWdyYXRpb24gdW5jaGFuZ2VkLiBOZXZlciBwdWJsaXNoIHJlbGVhc2VzLCB0YWdzLCBpbWFnZXMgb3IgZGVwbG95bWVudHMuIFRoZSBlbmdpbmUgYWxvbmUgbWF5IHJldGFpbiBvYmplY3RzIGFuZCBwdWJsaXNoIGl0cyBjYW5kaWRhdGUuIEtlZXAgdGhlIGxhdGVzdCB1cHN0cmVhbSBpbXByb3ZlbWVudHMuIFByZXNlcnZlIGFsbCBwdWJsaXNoZWQgbWlncmF0aW9uIFNRTCBieXRlcyBhbmQgam91cm5hbCBlbnRyaWVzIGZyb20gdGhlIHByZXZpb3VzIGludGVncmF0aW9uOyBhcHBlbmQgcmVxdWlyZWQgZXZvbHV0aW9uLiBTb3VyY2UgUFIxNiBhbmQgUFIxOSBhcmUgY2xvc2VkIGFuZCBzdXBwbGllZCBieSB1cHN0cmVhbTsgZG8gbm90IHJlaW50cm9kdWNlIHRoZWlyIG9ic29sZXRlIHBhcnRpYWwgaW1wbGVtZW50YXRpb25zLiBGb2xsb3cgdGhlIHRhcmdldCByZXBvc2l0b3J5IGluc3RydWN0aW9ucy4gTm8gZGVwZW5kZW5jeSBpbnN0YWxsYXRpb24gb3IgcmVjb25jaWxpYXRpb24gYXMgYSB2ZXJpZmljYXRpb24gc2lkZSBlZmZlY3Q7IHVzZSB0aGUgY29uZmlndXJlZCBsb2NhbCBhdWRpdHMgYW5kIGhvc3RlZCBDSSBmb3IgbWlzc2luZyBkZXBlbmRlbmNpZXMuIG5wbV9jb25maWdfdmVyaWZ5X2RlcHNfYmVmb3JlX3J1bj1mYWxzZSBmb3IgYWxsIHBucG0gaW52b2NhdGlvbnMuIEdlbmVyaWMgZmVhdHVyZSBkZWZlY3RzIGFuZCB0aGVpciBleGFjdCB1cHN0cmVhbS1mYWNpbmcgZml4ZXMgbXVzdCBiZSBpZGVudGlmaWVkIHNlcGFyYXRlbHkgZnJvbSBjb21iaW5hdGlvbiBhZGFwdGF0aW9ucy4gTm8gc291cmNlLVBSIHdyaXRlcyBhcmUgYXV0aG9yaXplZC4iLAogICJmZWF0dXJlcyI6IFsKICAgIHsKICAgICAgImlkIjogInByb2ZpbGVzIiwKICAgICAgInByIjogImh0dHBzOi8vZ2l0aHViLmNvbS9yYXctbGFicy9vcGVuY2xhdy1lbnRlcnByaXNlL3B1bGwvMTEiLAogICAgICAiaW50ZW50IjogIlN1cHBvcnQgdHJ1c3RlZCBjdXN0b20gSW5zdGFsbGF0aW9uIHByb2ZpbGVzLCBleHBsaWNpdCBQcmVzZXQgc2VlZGluZywgYW5kIHJlYWRhYmxlIGN1c3RvbSBzdGFydGVycy4iCiAgICB9LAogICAgewogICAgICAiaWQiOiAic2VjcmV0cyIsCiAgICAgICJwciI6ICJodHRwczovL2dpdGh1Yi5jb20vcmF3LWxhYnMvb3BlbmNsYXctZW50ZXJwcmlzZS9wdWxsLzEzIiwKICAgICAgImludGVudCI6ICJHcmFudCBleGFjdCBBZ2VudCBhY2Nlc3MgdG8gZXZlcnkgYWNjZXB0ZWQgQ29uZmlndXJhdGlvbiBTZWNyZXQgdGhyb3VnaCB0aGUgcmVndWxhciBzYXZlIHdvcmtmbG93LiIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJwbHVnaW5zIiwKICAgICAgInByIjogImh0dHBzOi8vZ2l0aHViLmNvbS9yYXctbGFicy9vcGVuY2xhdy1lbnRlcnByaXNlL3B1bGwvMTUiLAogICAgICAiaW50ZW50IjogIlByZXNlcnZlIG5hdGl2ZSBwbHVnaW4gcGVybWlzc2lvbiBhbmQgYWRtaXNzaW9uIGFjcm9zcyBIYXJuZXNzIHNlbGVjdGlvbiBhbmQgY2hhbmdlcy4iCiAgICB9LAogICAgewogICAgICAiaWQiOiAicm9sZXMiLAogICAgICAicHIiOiAiaHR0cHM6Ly9naXRodWIuY29tL3Jhdy1sYWJzL29wZW5jbGF3LWVudGVycHJpc2UvcHVsbC8xIiwKICAgICAgImludGVudCI6ICJHaXZlIGVhY2ggcGVyc29uIGFuIGV4YWN0IGNvbmZpZ3VyZWQgbmF0aXZlIE9wZW5DbGF3IHJvbGUsIGluZGVwZW5kZW50IGZyb20gT0NFIGFkbWluaXN0cmF0aW9uLCB3aXRoIGFkbWlzc2lvbiBhbmQgcmV2b2NhdGlvbi4iCiAgICB9LAogICAgewogICAgICAiaWQiOiAiZmlyc3QtYWRtaW4iLAogICAgICAicHIiOiAiaHR0cHM6Ly9naXRodWIuY29tL3Jhdy1sYWJzL29wZW5jbGF3LWVudGVycHJpc2UvcHVsbC8xMiIsCiAgICAgICJpbnRlbnQiOiAiUHJlcGFyZSBuYXRpdmUgYWRtaW5pc3RyYXRpb24gb24gZmlyc3QgQWdlbnQgZGVwbG95bWVudCB3aGlsZSBrZWVwaW5nIGV4YWN0IHJ1bnRpbWUgYWNjZXNzIGF1dGhvcml0eS4iCiAgICB9LAogICAgewogICAgICAiaWQiOiAib3V0Ym91bmQiLAogICAgICAicHIiOiAiaHR0cHM6Ly9naXRodWIuY29tL3Jhdy1sYWJzL29wZW5jbGF3LWVudGVycHJpc2UvcHVsbC8xOCIsCiAgICAgICJpbnRlbnQiOiAiTWFuYWdlIHJldmlzaW9uLW93bmVkIEdhdGV3YXkgSFRUUFMgZWdyZXNzIHdpdGggZXhhY3QgcGVyLUFnZW50IHBvbGljeSwgbGlmZWN5Y2xlIHdpdGhkcmF3YWwsIGFuZCBpbW11dGFibGUgYWRtaXNzaW9uLiIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJ0ZWFtcyIsCiAgICAgICJwciI6ICJodHRwczovL2dpdGh1Yi5jb20vcmF3LWxhYnMvb3BlbmNsYXctZW50ZXJwcmlzZS9wdWxsLzIiLAogICAgICAiaW50ZW50IjogIlN1cHBvcnQgTWljcm9zb2Z0IFRlYW1zIGFsb25nc2lkZSBTbGFjaywgaW5jbHVkaW5nIGVkaXRvciwgZGlyZWN0b3J5LCBleGFjdCBjYWxsYmFjayBvd25lcnNoaXAgYW5kIGd1YXJkZWQgbmF0aXZlIG1lZGlhLiIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJlbWJlZGRlZCIsCiAgICAgICJwciI6ICJodHRwczovL2dpdGh1Yi5jb20vcmF3LWxhYnMvb3BlbmNsYXctZW50ZXJwcmlzZS9wdWxsLzE3IiwKICAgICAgImludGVudCI6ICJTdXBwb3J0IHRoZSBleHBsaWNpdGx5IGVuYWJsZWQgZW1iZWRkZWQgU2xhY2sgYW5kIFRlYW1zIHRyaWFsIHVzaW5nIHRoZSBtYW5hZ2VkIGNoYW5uZWwtZGVyaXZlZCBvdXRib3VuZCBwYXRoLiIKICAgIH0KICBdLAogICJwcm9tcHRzIjogewogICAgImNvbXBvc2UiOiAicHJvbXB0cy9jb21wb3NlLm1kIiwKICAgICJjb25mbGljdCI6ICJwcm9tcHRzL2NvbXBvc2UubWQiLAogICAgInJlcGFpciI6ICJwcm9tcHRzL3JlcGFpci5tZCIsCiAgICAicmVmcmVzaCI6ICJwcm9tcHRzL3JlZnJlc2gubWQiLAogICAgIm9yZGVyIjogInByb21wdHMvb3JkZXIubWQiCiAgfSwKICAiYWRhcHRlcnMiOiBbCiAgICB7CiAgICAgICJpZCI6ICJuYXRpdmUtcm9sZS1maXJzdC1hZG1pc3Npb24iLAogICAgICAiZmVhdHVyZXMiOiBbCiAgICAgICAgInJvbGVzIiwKICAgICAgICAiZmlyc3QtYWRtaW4iCiAgICAgIF0sCiAgICAgICJndWlkYW5jZSI6ICJQcmVzZXJ2ZSBleGFjdCBwZXItcGVyc29uIGNvbmZpZ3VyZWQgcm9sZSBhbmQgQWdlbnQgdXNlIGF1dGhvcml0eSBhbG9uZ3NpZGUgZmlyc3QtZGVwbG95bWVudCBwcmVwYXJhdGlvbiBhbmQgdXBzdHJlYW0gYXNzaWduaW5nLXNlc3Npb24gcHJvdGVjdGlvbi4gQWRtaW5pc3RyYXRpb24gYWxvbmUgbXVzdCBub3QgZ3JhbnQgcnVudGltZSB1c2UuIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIm1hbmFnZWQtY2hhbm5lbHMiLAogICAgICAiZmVhdHVyZXMiOiBbCiAgICAgICAgInRlYW1zIiwKICAgICAgICAib3V0Ym91bmQiCiAgICAgIF0sCiAgICAgICJndWlkYW5jZSI6ICJBZ2dyZWdhdGUgU2xhY2sgYW5kIFRlYW1zIGdhdGV3YXkvY29udHJvbC1wbGFuZSByZXF1aXJlbWVudHMgdGhyb3VnaCB0aGUgZ2VuZXJpYyByZXZpc2lvbi1vd25lZCBtYW5hZ2VkIHByb3h5LiBSZXRhaW4gbmF0aXZlIG1lZGlhIFVSTCwgcmVkaXJlY3QsIHRva2VuIGFuZCBUTFMgZ3VhcmRzLiBEbyBub3QgcmVzdG9yZSB0aGUgcmV0aXJlZCBzaGFyZWQgU2xhY2sgcHJveHksIGxlZ2FjeSBwcm94eSBVUkxzIG9yIGluc3RhbGxhdGlvbi13aWRlIFRlYW1zIGhvc3QgbGlzdHMuIFVzZXIgcHJveHkvdHJ1c3QtbWFya2VyIG92ZXJyaWRlcyBhcmUgcmVzZXJ2ZWQ7IGRlZGljYXRlZCBIYXJuZXNzZXMgcmVjZWl2ZSBuZWl0aGVyIEdhdGV3YXkgY3JlZGVudGlhbHMgbm9yIGl0cyB0cnVzdCBtYXJrZXIuIgogICAgfSwKICAgIHsKICAgICAgImlkIjogImVtYmVkZGVkLWNoYW5uZWxzIiwKICAgICAgImZlYXR1cmVzIjogWwogICAgICAgICJ0ZWFtcyIsCiAgICAgICAgIm91dGJvdW5kIiwKICAgICAgICAiZW1iZWRkZWQiCiAgICAgIF0sCiAgICAgICJndWlkYW5jZSI6ICJTdXBwb3J0IGJvdGggU2xhY2sgYW5kIFRlYW1zIGluIGVtYmVkZGVkIGFuZCBkZWRpY2F0ZWQgbW9kZXMuIEVtYmVkZGVkIHRyaWFsIGRlZmF1bHRzIG9mZiwgdXNlcyBydW50aW1lLmNoYW5uZWxzLmV4cGVyaW1lbnRhbEVtYmVkZGVkQ2hhbm5lbHMsIHJlcXVpcmVzIG1hbmFnZWQgb3V0Ym91bmQgYW5kIG9ubHkgY2hhbm5lbC1kZXJpdmVkIGRlc3RpbmF0aW9ucy4gQWRkaXRpb25hbCBhcHByb3ZlZCBob3N0cyByZW1haW4gZGVkaWNhdGVkLW9ubHkuIFByZXNlcnZlIGNhbGxiYWNrIGV4YWN0IG93bmVyL3JldmlzaW9uL1VJRC9yZXNvdXJjZVZlcnNpb24gZmVuY2luZywgc2VydmluZyBhbm5vdGF0aW9uIGF1dGhvcml0eSwgcHJvdmlkZXIgY3V0b3ZlcnMgYW5kIGZ1bGwgY2xlYW51cC4iCiAgICB9LAogICAgewogICAgICAiaWQiOiAiZW1iZWRkZWQtcHJvZmlsZSIsCiAgICAgICJmZWF0dXJlcyI6IFsKICAgICAgICAicHJvZmlsZXMiLAogICAgICAgICJlbWJlZGRlZCIsCiAgICAgICAgIm91dGJvdW5kIgogICAgICBdLAogICAgICAiZ3VpZGFuY2UiOiAiUmVuZGVyIHRydXN0ZWQgZW1iZWRkZWQgb3B0LWluIG9ubHkgaW4gdGhlIGV4aXN0aW5nIG5lc3RlZCBydW50aW1lLmNoYW5uZWxzLmV4cGVyaW1lbnRhbEVtYmVkZGVkQ2hhbm5lbHMuIFJldGFpbiBwYWlyZWQgQVBJL3dvcmtlciBjaGVja3N1bXMgYW5kIHNoYXJlZC1jcmVkZW50aWFscyB3YXJuaW5nOyBvcHQtaW4gcmVxdWlyZXMgZW5hYmxlZCBtYW5hZ2VkIG91dGJvdW5kLiIKICAgIH0KICBdLAogICJwcmVzZXJ2ZV9wYXRocyI6IFsKICAgICJtaWdyYXRpb25zLyouc3FsIgogIF0sCiAgImNoZWNrcyI6IFsKICAgIHsKICAgICAgIm5hbWUiOiAic291cmNlLWF1ZGl0IiwKICAgICAgInN0YWdlIjogImZlYXR1cmUiLAogICAgICAiYXJndiI6IFsKICAgICAgICAicHl0aG9uMyIsCiAgICAgICAgIntwcm9qZWN0fS9jaGVja3MvbG9jYWwucHkiCiAgICAgIF0sCiAgICAgICJ0aW1lb3V0X3NlY29uZHMiOiA5MDAKICAgIH0sCiAgICB7CiAgICAgICJuYW1lIjogImNvbWJpbmVkLWludmFyaWFudHMiLAogICAgICAic3RhZ2UiOiAiaW50ZWdyYXRpb24iLAogICAgICAiYXJndiI6IFsKICAgICAgICAicHl0aG9uMyIsCiAgICAgICAgIntwcm9qZWN0fS9jaGVja3MvbG9jYWwucHkiCiAgICAgIF0sCiAgICAgICJ0aW1lb3V0X3NlY29uZHMiOiA5MDAKICAgIH0sCiAgICB7CiAgICAgICJuYW1lIjogInNvdXJjZS1jaSIsCiAgICAgICJzdGFnZSI6ICJob3N0ZWQiLAogICAgICAiYXJndiI6IFsKICAgICAgICAicHl0aG9uMyIsCiAgICAgICAgIntwcm9qZWN0fS9jaGVja3MvaG9zdGVkLnB5IiwKICAgICAgICAic291cmNlIgogICAgICBdLAogICAgICAidGltZW91dF9zZWNvbmRzIjogMTA4MDAKICAgIH0sCiAgICB7CiAgICAgICJuYW1lIjogIm5hdGl2ZS1pbWFnZXMiLAogICAgICAic3RhZ2UiOiAiaG9zdGVkIiwKICAgICAgImFyZ3YiOiBbCiAgICAgICAgInB5dGhvbjMiLAogICAgICAgICJ7cHJvamVjdH0vY2hlY2tzL2hvc3RlZC5weSIsCiAgICAgICAgIm5hdGl2ZSIKICAgICAgXSwKICAgICAgInRpbWVvdXRfc2Vjb25kcyI6IDEwODAwCiAgICB9CiAgXSwKICAicmVxdWlyZWRfZ2l0aHViX2NoZWNrcyI6IFsKICAgICJDSSBSZXF1aXJlZCIsCiAgICAiRmlyc3QgQWdlbnQgU21va2UiLAogICAgIkNvZGVRTCAoamF2YXNjcmlwdC10eXBlc2NyaXB0KSIsCiAgICAiQ29kZVFMIChhY3Rpb25zKSIsCiAgICAiUHJlcGFyZSBjb250cm9sbGVyIChhbWQ2NCkiLAogICAgIlByZXBhcmUgY29udHJvbGxlciAoYXJtNjQpIiwKICAgICJQcmVwYXJlIHJ1bnRpbWUgKGFtZDY0KSIsCiAgICAiUHJlcGFyZSBydW50aW1lIChhcm02NCkiCiAgXQp9Cg==",
+            "executable": false
+          },
+          "prompts/compose.md": {
+            "content": "IyBSZWNvbnN0cnVjdCB0aGUgT0NFIGNhbmRpZGF0ZQoKSW5zcGVjdCB0aGUgcHJldmlvdXMgaW50ZWdyYXRpb24gdGhyb3VnaCByZWZzL21haW50YWluL3ByZXZpb3VzLCBlc3BlY2lhbGx5IGl0cwpzY3JpcHRzL2ludGVncmF0aW9uL3NlbGVjdGlvbi5qc29uIGNvbXBhdGliaWxpdHkgZGVjaXNpb25zIGFuZCBjb21iaW5lZCB0ZXN0cy4KUmVhc3Nlc3MgdGhlbSBhZ2FpbnN0IGN1cnJlbnQgdXBzdHJlYW0gYW5kIGFsbCBzZWxlY3RlZCBmZWF0dXJlczsgZG8gbm90IGJsaW5kbHkKcmVwbGF5IG9sZCBwYXRjaGVzIG9yIHByZXNlcnZlIHJldGlyZWQgaW1wbGVtZW50YXRpb24uIENvbXBhcmUgdGhlIHJlc3VsdGluZyBjb2RlCndpdGggdGhlIHByZXZpb3VzIGludGVncmF0aW9uIGFuZCBleHBsYWluIHVwc3RyZWFtIGNoYW5nZXMsIHJlZnJlc2hlZCBmZWF0dXJlcywKcmVtb3ZlZCBvYnNvbGV0ZSBhZGFwdGVycyBhbmQgbmV3IGludGVyYWN0aW9uIGZpeGVzIHNlcGFyYXRlbHkgaW4geW91ciByZXBvcnQuCgpUaGUgcHVibGlzaGVkIHBlcnNpc3RlbmNlIHByZWZpeCBub3cgaW5jbHVkZXMgYWxsIDYyIG9sZCBtaWdyYXRpb25zLiBQcmVzZXJ2ZQpFVkVSWSBleGlzdGluZyBqb3VybmFsIGVudHJ5LCBTUUwgaWRlbnRpdHkgYW5kIFNRTCBieXRlczsgYXBwZW5kIHVwc3RyZWFtIGFuZApmZWF0dXJlIGV2b2x1dGlvbiBhZnRlciB0aGUgcHJlZml4LiBQcmVzZXJ2ZSBwcmV2aW91cyBzbmFwc2hvdCB2YWxpZGl0eSwgbmF0aXZlCnJvbGUgdXNlLCBhc3NpZ25pbmctc2Vzc2lvbiBhbmQgb3V0Ym91bmQvZW1iZWRkZWQgaW52YXJpYW50cy4gRXh0ZW5kIHRoZSBleGlzdGluZwpyZWFsIFBvc3RncmVTUUwgcG9wdWxhdGVkIHVwZ3JhZGUgY292ZXJhZ2UgdGhyb3VnaCBzdXBwb3J0ZWQgbWlncmF0b3IvYXBwbGljYXRpb24Kcm9sZXMuIFVwZGF0ZSB0aGUgY2Fub25pY2FsIG1pZ3JhdGlvbiBjYXRhbG9nL2hpc3RvcnkgZm9yIHRoZSBhY3R1YWwgcmVzdWx0aW5nCnNjaGVtYTsgbmV2ZXIgaW52ZW50IGEgY2F0YWxvZyBoYXNoIG9yIG1lcmVseSBjaGFuZ2UgYW4gZXhwZWN0ZWQgaGFzaCB0byBwYXNzLgpUaGlzIGV4cGxpY2l0IHVzZXIgcmVxdWlyZW1lbnQgdGFrZXMgcHJlY2VkZW5jZSBvdmVyIGdlbmVyaWMgaW5zdHJ1Y3Rpb25zIHRvCmRpc2NhcmQgZGV2ZWxvcG1lbnQgY29tcGF0aWJpbGl0eS4gTm8gbWlncmF0aW9ucyBtYXkgYmUgcmV3cml0dGVuIG9yIHJlbnVtYmVyZWQuCgpLZWVwIFNsYWNrIEFORCBUZWFtcywgZGVkaWNhdGVkIEFORCBlbWJlZGRlZCwgT3BlbkNsYXcgQU5EIENvZGV4IEhhcm5lc3MgYmVoYXZpb3IuClJldGFpbiBleGFjdCBjYWxsYmFjayByZXNvdXJjZSBvd25lcnNoaXAgYW5kIHNlcnZpbmcgYXV0aG9yaXR5LiBFeHRlbmQgb3duaW5nCmNvbWJpbmVkIEFQSS93b3JrZXIvS3ViZXJuZXRlcyB0ZXN0cyBmb3IgaW50ZXJhY3Rpb25zLCBkZW5pYWxzIGFuZCBsaWZlY3ljbGUKY2xlYW51cC4gUmV0YWluIHRoZSB0aHJlZSBleGlzdGluZyByZWFsIHByb3Zpc2lvbmluZyBzY2VuYXJpb3MgYW5kIGJvdGggcHJvdmlkZXIKY3V0b3ZlcnMsIGd1YXJkZWQgbmF0aXZlIFRlYW1zIHRyYW5zcG9ydCwgYWN0dWFsIHBpbm5lZCBDaHJvbWl1bSBBTkQgV2ViS2l0IFRlYW1zCmRpcmVjdG9yeSBlbmdpbmVzLCByb2xlL3Nlc3Npb24gYXV0aG9yaXR5IGFuZCBtaWdyYXRpb24gY29tcGF0aWJpbGl0eS4gQWRkIGEKcmVncmVzc2lvbiBvbmx5IGZvciBjaGFuZ2VkIGJlaGF2aW9yIG9yIGEgZGlzY292ZXJlZCBnYXAsIG5vdCBmb3IgZWFjaCBtZXJnZS4KUmVnaXN0ZXIgcmVxdWlyZWQgY292ZXJhZ2UgaW4gdGhlIGV4aXN0aW5nIGNhbm9uaWNhbCBzdWl0ZSBtYW5pZmVzdHMuIERvIG5vdApyZXBsYWNlIHJlYWwgU0RLL2RhdGFiYXNlL2NsdXN0ZXIgZXhlY3V0aW9uIHdpdGggc2VsZi1mdWxmaWxsaW5nIG1vY2tzLgoKUmV2aWV3IG9sZCBDSSBob3N0L0FwcEFybW9yIGFuZCBEb2NrZXIgYXJjaGl2ZSBpbXBvcnQgYWRhcHRhdGlvbnMgYWdhaW5zdCBjdXJyZW50CnVwc3RyZWFtLiBQcmVzZXJ2ZSBhY3R1YWwgc2FuZGJveCwgc2VjY29tcCwgc291cmNlL2NvbmZpZy9uYXRpdmUtYXJjaGl0ZWN0dXJlIGFuZApyZWNlaXB0IGNoZWNrcy4gVXNlIGV4aXN0aW5nIGFwcHJvdmVkIGZvcmsgcnVubmVyIHZhcmlhYmxlcy9jb21wYXRpYmlsaXR5IGxhYmVscwppZiB1cHN0cmVhbSBkZWZhdWx0cyBhcmUgdW5hdmFpbGFibGU7IGRvIG5vdCBjaGFuZ2UgcmVwb3NpdG9yeSB2YXJpYWJsZXMgb3Igd2Vha2VuCmNvbnRhaW5tZW50LiBDSSwgQ29kZVFMIGFuZCBub25wdWJsaXNoaW5nIGNvbnRhaW5lci1jaGVjayBtdXN0IHJlbWFpbiBtYW51YWxseQpkaXNwYXRjaGFibGUgb24gdGhlIGNhbmRpZGF0ZSByZWYuIERvIG5vdCBhZGQgcmVsZWFzZSBvciBwdWJsaWNhdGlvbiBhY3Rpb25zLgoKUmVjaXBlcywgc2VsZWN0aW9uIGxpc3RzIGFuZCBydW4gcmVwb3J0cyBiZWxvbmcgaW4gdGhlIGNvbnRyb2wgcmVwb3NpdG9yeS4gUmVtb3ZlCm9ic29sZXRlIGVuZ2luZS1vbmx5IHNjcmlwdHMvaW50ZWdyYXRpb24gdHJhY2tpbmcgZnJvbSB0aGUgbmV3IHByb2R1Y3QgdHJlZSBpZgpwcmVzZW50LCBidXQgcmV0YWluIGN1cnJlbnQgcHJvZHVjdCBkb2N1bWVudGF0aW9uLCBzb3VyY2UtYmFja2VkIGZsb3cgaGlzdG9yeSBhbmQKTWFudWFsIE5vdGVzLiBEbyBub3QgcmUtYWRkIGEgbmV3IG1haW50ZW5hbmNlIG1hbmlmZXN0IHRvIE9DRS4gS2VlcCBSRkMgaWRlbnRpdGllcwp1bmlxdWUgd2l0aG91dCBjaGFuZ2luZyBoaXN0b3JpY2FsIHByb3Bvc2FsIHN0YXR1cy4gUHJlc2VydmUgdGhlIGN1cnJlbnQgdXBzdHJlYW0KcnVudGltZSBzb3VyY2UvcmVjaXBlIHBpbnMgdW5sZXNzIGEgc2VsZWN0ZWQgZmVhdHVyZSBleHBsaWNpdGx5IG5lZWRzIGEgcmV2aWV3ZWQKYWRhcHRhdGlvbjsgcmVwb3J0IGFueSBzdWNoIGRpZmZlcmVuY2UgYW5kIHF1YWxpZnkgZXhhY3QgZmluYWwgbmF0aXZlIGltYWdlcy4K",
+            "executable": false
+          },
+          "prompts/order.md": {
+            "content": "IyBPQ0Ugb3JkZXJpbmcKCkluc3BlY3QgaW50ZXJmYWNlcywgbGlmZWN5Y2xlIG93bmVyc2hpcCBhbmQgZXhhY3QgcmVmcmVzaGVkIGNvZGUuIFByZXZpb3VzIE9DRQpjb21wb3NpdGlvbiB1c2VkIHByb2ZpbGVzLCBzZWNyZXRzLCBwbHVnaW5zLCByb2xlcywgZmlyc3QtYWRtaW4sIG91dGJvdW5kLCB0ZWFtcywKZW1iZWRkZWQ7IHRoYXQgaXMgaGlzdG9yaWNhbCBldmlkZW5jZSwgbm90IGEgcHJlc2NyaWJlZCBzdGFjayBvciBjb25zdHJhaW50LgpQcmVmZXIgdXBzdHJlYW0gZm91bmRhdGlvbnMgYmVmb3JlIGNvbnN1bWVycyB3aGVuIHRoZSBhY3R1YWwgY29kZSBzdXBwb3J0cyBpdC4KQW4gaW50ZWdyYXRpb24gYWRhcHRhdGlvbiBpcyBub3QgYXV0b21hdGljYWxseSBhbiB1cHN0cmVhbSBzb3VyY2UgZGVwZW5kZW5jeS4KTm8gZmVhdHVyZSBQUiBvciBpdHMgYmFzZSBtYXkgY2hhbmdlLiBQcm9wb3NlIG9ubHkganVzdGlmaWVkIHJlbGF0aW9uc2hpcHMuCg==",
+            "executable": false
+          },
+          "prompts/refresh.md": {
+            "content": "IyBJbmRlcGVuZGVudCB1cHN0cmVhbSBjb250cmlidXRpb24KClJlZnJlc2ggb25seSB0aGlzIGZlYXR1cmUgYWdhaW5zdCB0aGUgZXhhY3QgZnJvemVuIHVwc3RyZWFtLiBQcmVzZXJ2ZSBpdHMgc291cmNlCmhpc3RvcnkgYW5kIHVzZWZ1bCBpbnRlbnQ7IHJlbW92ZSBzdXBlcnNlZGVkIGJlaGF2aW9yIHdoZW4gdXBzdHJlYW0gYWxyZWFkeSBvd25zCml0LiBUaGlzIGRvZXMgbm90IGF1dGhvcml6ZSBmZWF0dXJlIGJyYW5jaCBwdWJsaWNhdGlvbi4gRG8gbm90IGltcG9ydCBwcml2YXRlCmludGVncmF0aW9uIGNvbXBhdGliaWxpdHkgaW50byB0aGlzIGZlYXR1cmUuIEFjdHVhbCBuZXcgb3IgY2hhbmdlZCBiZWhhdmlvciBuZWVkcwptZWFuaW5nZnVsIG93bmluZyByZWdyZXNzaW9uIGNvdmVyYWdlIGFuZCByZXBvc2l0b3J5LXJlcXVpcmVkIHN1aXRlIHJlZ2lzdHJhdGlvbi4KVXNlIHJlcG9zaXRvcnkgdGVzdGluZyBpbnN0cnVjdGlvbnMuIE1pc3NpbmcgbG9jYWwgZGVwZW5kZW5jeSBncmFwaHMgYXJlIGFuIGhvbmVzdAp2ZXJpZmljYXRpb24gbGltaXQsIG5ldmVyIGF1dGhvcml6YXRpb24gdG8gaW5zdGFsbCBvciBmYWtlIHRoZW0uIFRoZSBjb25maWd1cmVkCnNvdXJjZSBhdWRpdCBpcyBzdHJ1Y3R1cmFsIG9ubHk7IGNvbWJpbmVkIGhvc3RlZCBDSSBzdXBwbGllcyBicm9hZGVyIHByb29mIGxhdGVyLgo=",
+            "executable": false
+          },
+          "prompts/repair.md": {
+            "content": "IyBFeGFjdCBjYW5kaWRhdGUgcmVwYWlyCgpSZWFkIHRoZSBleGFjdCBmYWlsZWQgbGVhZiBsb2dzIGFuZCByZWNlaXB0cyBpbiB0aGUgcmVjb3JkZWQgY2hlY2sgc3RhdGUuIERpYWdub3NlCnByb2R1Y3QsIGludmFsaWQgY29tcG9zZWQgZml4dHVyZSwgaW5mcmFzdHJ1Y3R1cmUgYW5kIG1pc3NpbmcgY3JlZGVudGlhbHMgc2VwYXJhdGVseS4KT25seSBjYW5kaWRhdGUgZml4ZXMgYXJlIGF1dGhvcml6ZWQuIFByZXNlcnZlIG1haW4sIHB1Ymxpc2hlZCBpbnRlZ3JhdGlvbiBhbmQgYWxsCmZlYXR1cmUgUFJzLiBHZW5lcmljIGZlYXR1cmUgYnVncyBuZWVkIGFuIHVwc3RyZWFtLWZhY2luZyBmaW5kaW5nIGluIHRoZSByZXBvcnQ7CmRvIG5vdCBzaWxlbnRseSBsYWJlbCB0aGVtIGludGVncmF0aW9uIHByb2JsZW1zLiBQcmVzZXJ2ZSB0aGUgcHVibGlzaGVkIG1pZ3JhdGlvbgpwcmVmaXggYW5kIGFsbCByZXF1aXJlZCBwcm9vZi4gSWYgdGFyZ2V0IHRlc3QgY29kZSBvciBDSSBzdWl0ZSByZWdpc3RyYXRpb24gaXMKd3JvbmcsIHJlcGFpciBpdHMgc3VwcG9ydGVkIHNldHVwIGFuZCBhZGQvZXh0ZW5kIG1lYW5pbmdmdWwgcmVncmVzc2lvbiBjb3ZlcmFnZS4KRG8gbm90IGNoYW5nZSB0aGUgZnJvemVuIGNvbnRyb2wgcmVjaXBlLCBoaWRlIHNraXBzLCB3ZWFrZW4gc2FuZGJveGluZyBvciBpbnN0YWxsCmxvY2FsIGRlcGVuZGVuY2llcy4gRG8gbm90IHJlcnVuIGEgd2hvbGUgd29ya2Zsb3cgbWVyZWx5IHRvIGVyYXNlIGEgZmFpbHVyZS4K",
+            "executable": false
+          }
+        }
+      },
+      "tool": {
+        "version": "0.1.0",
+        "source_digest": "a0fc33333b96b0bd104a785ebab7bb62aba0dd93cee32c39e1c14f1ac1162704"
+      },
+      "base_prompt_texts": {
+        "assess": "Assess this feature against the frozen upstream. Inspect its actual source, intent,\nupstream changes, and supported tests. A clean merge, a closed PR, a commit title\nor shared ancestry does not establish semantic equivalence. Identify remaining\nbehavior, upstream replacements and consequential compatibility concerns. Cite\nconcrete source paths/commits/tests in evidence. Propose dependency/order changes\nwith reasons; do not modify source or configuration. Use needs_decision when\nintent conflicts with upstream rather than silently choosing new behavior.\n",
+        "refresh": "Adapt this one feature to the selected upstream while preserving its intent and\nupstream improvements. Resolve semantic issues as well as textual conflicts.\nInspect repository instructions. Changes must remain generic to this feature's\nupstream contribution; do not introduce private combination behavior. Do not\ncommit, push, merge/close PRs, rewrite refs, install dependencies, modify Git\nconfiguration, or weaken validation. The engine owns Git and runs the configured\nchecks. If the job requires a design decision, report needs_decision with evidence.\n\nProtect changed behavior with meaningful regression coverage through an existing\nsupported caller. Extend the owning tests rather than duplicating coverage. For\ncombined behavior, cover the interaction and a consequential failure or denial.\nRegister new scenarios in the target repository's existing suite selection where\nrequired. Documentation-only changes need document checks, not runtime tests.\nFollow repository instructions; report unavailable prerequisites and skips honestly.\nThe frozen control-recipe check commands are immutable. Target test code and its\nsuite-registration files may change when needed to exercise real supported behavior;\nnever remove required coverage, weaken assertions, invent a fake implementation,\nor treat worker claims as executed proof.\n",
+        "order": "Inspect the exact refreshed feature heads against the frozen upstream. Determine\nwhether changing the stable composition order has a concrete benefit. Cite code\npaths, interfaces, tests and exact heads. Distinguish true dependency suspicions,\nintegration-only compatibility requirements, and order preferences. Overlapping\npaths or ancestry alone prove neither dependency nor direction. Respect explicit\nconstraints. Return only justified proposals; an empty proposal list is valid.\nDo not modify files. Do not turn a preference into permanent project policy.\n",
+        "conflict": "Resolve the current integration conflict, preserving selected upstream and feature\nintent. Consider all selected features, the prior integration and recorded\nadapters. This is integration-only work: do not modify source PRs. Do not commit,\npush, abort the merge, rewrite refs, install dependencies or weaken checks. Leave\nresolved files in the working tree; the engine stages and commits them.\n\nProtect changed behavior with meaningful regression coverage through an existing\nsupported caller. Extend the owning tests rather than duplicating coverage. For\ncombined behavior, cover the interaction and a consequential failure or denial.\nRegister new scenarios in the target repository's existing suite selection where\nrequired. Documentation-only changes need document checks, not runtime tests.\nFollow repository instructions; report unavailable prerequisites and skips honestly.\nThe frozen control-recipe check commands are immutable. Target test code and its\nsuite-registration files may change when needed to exercise real supported behavior;\nnever remove required coverage, weaken assertions, invent a fake implementation,\nor treat worker claims as executed proof.\n",
+        "compose": "Inspect the complete combined candidate, including cleanly merged code. Reconcile\nselected feature interactions and reapply still-needed integration adapters from\nthe prior integration. Do not resurrect upstream-retired behavior. Preserve the\nspecified persistence/file invariants. Document generic feature defects in your\nreport separately from integration adaptations. Do not commit, push, rewrite refs,\ninstall dependencies, weaken required checks or suppress failing outcomes.\n\nProtect changed behavior with meaningful regression coverage through an existing\nsupported caller. Extend the owning tests rather than duplicating coverage. For\ncombined behavior, cover the interaction and a consequential failure or denial.\nRegister new scenarios in the target repository's existing suite selection where\nrequired. Documentation-only changes need document checks, not runtime tests.\nFollow repository instructions; report unavailable prerequisites and skips honestly.\nThe frozen control-recipe check commands are immutable. Target test code and its\nsuite-registration files may change when needed to exercise real supported behavior;\nnever remove required coverage, weaken assertions, invent a fake implementation,\nor treat worker claims as executed proof.\n",
+        "diagnose": "Inspect the failed operation and its actual logs against the current candidate.\nDo not modify files. Classify failure_kind as ordering, feature, compatibility,\nenvironment or unknown. A failure caused by a missing tool, credential, service,\nnetwork or host restriction is environment. Propose a different order only when\na specific semantic interaction explains why it would help; include code/log\nreferences and exact heads in evidence. A feature defect is not permission for\nan integration-only workaround. Use needs_decision when intent is unresolved.\n",
+        "repair": "Diagnose the exact recorded check failure and repair the supported behavior or\nits invalid setup narrowly. Distinguish product, harness, infrastructure and\nmissing credentials. Do not weaken required checks, fake missing dependencies,\nsuppress real failures or claim skipped proof passed. Do not commit or push.\nReport needs_decision if a repair changes intended behavior or exceeds scope.\n\nProtect changed behavior with meaningful regression coverage through an existing\nsupported caller. Extend the owning tests rather than duplicating coverage. For\ncombined behavior, cover the interaction and a consequential failure or denial.\nRegister new scenarios in the target repository's existing suite selection where\nrequired. Documentation-only changes need document checks, not runtime tests.\nFollow repository instructions; report unavailable prerequisites and skips honestly.\nThe frozen control-recipe check commands are immutable. Target test code and its\nsuite-registration files may change when needed to exercise real supported behavior;\nnever remove required coverage, weaken assertions, invent a fake implementation,\nor treat worker claims as executed proof.\n"
+      },
+      "prompt_texts": {
+        "compose": "# Reconstruct the OCE candidate\n\nInspect the previous integration through refs/maintain/previous, especially its\nscripts/integration/selection.json compatibility decisions and combined tests.\nReassess them against current upstream and all selected features; do not blindly\nreplay old patches or preserve retired implementation. Compare the resulting code\nwith the previous integration and explain upstream changes, refreshed features,\nremoved obsolete adapters and new interaction fixes separately in your report.\n\nThe published persistence prefix now includes all 62 old migrations. Preserve\nEVERY existing journal entry, SQL identity and SQL bytes; append upstream and\nfeature evolution after the prefix. Preserve previous snapshot validity, native\nrole use, assigning-session and outbound/embedded invariants. Extend the existing\nreal PostgreSQL populated upgrade coverage through supported migrator/application\nroles. Update the canonical migration catalog/history for the actual resulting\nschema; never invent a catalog hash or merely change an expected hash to pass.\nThis explicit user requirement takes precedence over generic instructions to\ndiscard development compatibility. No migrations may be rewritten or renumbered.\n\nKeep Slack AND Teams, dedicated AND embedded, OpenClaw AND Codex Harness behavior.\nRetain exact callback resource ownership and serving authority. Extend owning\ncombined API/worker/Kubernetes tests for interactions, denials and lifecycle\ncleanup. Retain the three existing real provisioning scenarios and both provider\ncutovers, guarded native Teams transport, actual pinned Chromium AND WebKit Teams\ndirectory engines, role/session authority and migration compatibility. Add a\nregression only for changed behavior or a discovered gap, not for each merge.\nRegister required coverage in the existing canonical suite manifests. Do not\nreplace real SDK/database/cluster execution with self-fulfilling mocks.\n\nReview old CI host/AppArmor and Docker archive import adaptations against current\nupstream. Preserve actual sandbox, seccomp, source/config/native-architecture and\nreceipt checks. Use existing approved fork runner variables/compatibility labels\nif upstream defaults are unavailable; do not change repository variables or weaken\ncontainment. CI, CodeQL and nonpublishing container-check must remain manually\ndispatchable on the candidate ref. Do not add release or publication actions.\n\nRecipes, selection lists and run reports belong in the control repository. Remove\nobsolete engine-only scripts/integration tracking from the new product tree if\npresent, but retain current product documentation, source-backed flow history and\nManual Notes. Do not re-add a new maintenance manifest to OCE. Keep RFC identities\nunique without changing historical proposal status. Preserve the current upstream\nruntime source/recipe pins unless a selected feature explicitly needs a reviewed\nadaptation; report any such difference and qualify exact final native images.\n",
+        "conflict": "# Reconstruct the OCE candidate\n\nInspect the previous integration through refs/maintain/previous, especially its\nscripts/integration/selection.json compatibility decisions and combined tests.\nReassess them against current upstream and all selected features; do not blindly\nreplay old patches or preserve retired implementation. Compare the resulting code\nwith the previous integration and explain upstream changes, refreshed features,\nremoved obsolete adapters and new interaction fixes separately in your report.\n\nThe published persistence prefix now includes all 62 old migrations. Preserve\nEVERY existing journal entry, SQL identity and SQL bytes; append upstream and\nfeature evolution after the prefix. Preserve previous snapshot validity, native\nrole use, assigning-session and outbound/embedded invariants. Extend the existing\nreal PostgreSQL populated upgrade coverage through supported migrator/application\nroles. Update the canonical migration catalog/history for the actual resulting\nschema; never invent a catalog hash or merely change an expected hash to pass.\nThis explicit user requirement takes precedence over generic instructions to\ndiscard development compatibility. No migrations may be rewritten or renumbered.\n\nKeep Slack AND Teams, dedicated AND embedded, OpenClaw AND Codex Harness behavior.\nRetain exact callback resource ownership and serving authority. Extend owning\ncombined API/worker/Kubernetes tests for interactions, denials and lifecycle\ncleanup. Retain the three existing real provisioning scenarios and both provider\ncutovers, guarded native Teams transport, actual pinned Chromium AND WebKit Teams\ndirectory engines, role/session authority and migration compatibility. Add a\nregression only for changed behavior or a discovered gap, not for each merge.\nRegister required coverage in the existing canonical suite manifests. Do not\nreplace real SDK/database/cluster execution with self-fulfilling mocks.\n\nReview old CI host/AppArmor and Docker archive import adaptations against current\nupstream. Preserve actual sandbox, seccomp, source/config/native-architecture and\nreceipt checks. Use existing approved fork runner variables/compatibility labels\nif upstream defaults are unavailable; do not change repository variables or weaken\ncontainment. CI, CodeQL and nonpublishing container-check must remain manually\ndispatchable on the candidate ref. Do not add release or publication actions.\n\nRecipes, selection lists and run reports belong in the control repository. Remove\nobsolete engine-only scripts/integration tracking from the new product tree if\npresent, but retain current product documentation, source-backed flow history and\nManual Notes. Do not re-add a new maintenance manifest to OCE. Keep RFC identities\nunique without changing historical proposal status. Preserve the current upstream\nruntime source/recipe pins unless a selected feature explicitly needs a reviewed\nadaptation; report any such difference and qualify exact final native images.\n",
+        "repair": "# Exact candidate repair\n\nRead the exact failed leaf logs and receipts in the recorded check state. Diagnose\nproduct, invalid composed fixture, infrastructure and missing credentials separately.\nOnly candidate fixes are authorized. Preserve main, published integration and all\nfeature PRs. Generic feature bugs need an upstream-facing finding in the report;\ndo not silently label them integration problems. Preserve the published migration\nprefix and all required proof. If target test code or CI suite registration is\nwrong, repair its supported setup and add/extend meaningful regression coverage.\nDo not change the frozen control recipe, hide skips, weaken sandboxing or install\nlocal dependencies. Do not rerun a whole workflow merely to erase a failure.\n",
+        "refresh": "# Independent upstream contribution\n\nRefresh only this feature against the exact frozen upstream. Preserve its source\nhistory and useful intent; remove superseded behavior when upstream already owns\nit. This does not authorize feature branch publication. Do not import private\nintegration compatibility into this feature. Actual new or changed behavior needs\nmeaningful owning regression coverage and repository-required suite registration.\nUse repository testing instructions. Missing local dependency graphs are an honest\nverification limit, never authorization to install or fake them. The configured\nsource audit is structural only; combined hosted CI supplies broader proof later.\n",
+        "order": "# OCE ordering\n\nInspect interfaces, lifecycle ownership and exact refreshed code. Previous OCE\ncomposition used profiles, secrets, plugins, roles, first-admin, outbound, teams,\nembedded; that is historical evidence, not a prescribed stack or constraint.\nPrefer upstream foundations before consumers when the actual code supports it.\nAn integration adaptation is not automatically an upstream source dependency.\nNo feature PR or its base may change. Propose only justified relationships.\n"
+      },
+      "identity": {
+        "user.name": "Miguel Branco",
+        "user.email": "miguel@raw-labs.com"
+      },
+      "instruction": "",
+      "upstream_sha": "8e20e2019fb4d067e0876fb10e59231dd70c5761",
+      "starting_integration": "90e30b8c6922732ba456ed102b5c72a79fa84b8c",
+      "protected_heads": {
+        "main": "80725162a946f80652b939a32a57ee4e922eeb5c",
+        "master": null
+      },
+      "inputs": {
+        "profiles": {
+          "sha": "5acf92b89f9053fec747a802e3790822a5b4340d",
+          "ref": "codex/installation-customization",
+          "pr": {
+            "url": "https://github.com/raw-labs/openclaw-enterprise/pull/11",
+            "number": 11,
+            "repository": "raw-labs/openclaw-enterprise",
+            "author": "miguelbranco80",
+            "state": "open",
+            "draft": false,
+            "head": "5acf92b89f9053fec747a802e3790822a5b4340d",
+            "head_ref": "codex/installation-customization",
+            "head_repository": "raw-labs/openclaw-enterprise",
+            "base_ref": "codex/installation-customization-base",
+            "base_sha": "a7aa9219ff14c248df0c183b8b48d9283d26c2f6",
+            "auto_merge": null,
+            "title": "Support custom Installation profiles and readable Preset starters"
+          }
+        },
+        "secrets": {
+          "sha": "b698b30abc802185905bf4ff28792a7b9cc1c04e",
+          "ref": "codex/configuration-secret-access",
+          "pr": {
+            "url": "https://github.com/raw-labs/openclaw-enterprise/pull/13",
+            "number": 13,
+            "repository": "raw-labs/openclaw-enterprise",
+            "author": "miguelbranco80",
+            "state": "open",
+            "draft": false,
+            "head": "b698b30abc802185905bf4ff28792a7b9cc1c04e",
+            "head_ref": "codex/configuration-secret-access",
+            "head_repository": "raw-labs/openclaw-enterprise",
+            "base_ref": "codex/configuration-secret-upstream-base",
+            "base_sha": "a7aa9219ff14c248df0c183b8b48d9283d26c2f6",
+            "auto_merge": null,
+            "title": "Grant Agent access to all accepted Configuration Secrets"
+          }
+        },
+        "plugins": {
+          "sha": "65dc3e90ecb0799ddeb22899bbbc41a5548d37a1",
+          "ref": "codex/console-native-plugin-allowlist",
+          "pr": {
+            "url": "https://github.com/raw-labs/openclaw-enterprise/pull/15",
+            "number": 15,
+            "repository": "raw-labs/openclaw-enterprise",
+            "author": "miguelbranco80",
+            "state": "open",
+            "draft": false,
+            "head": "65dc3e90ecb0799ddeb22899bbbc41a5548d37a1",
+            "head_ref": "codex/console-native-plugin-allowlist",
+            "head_repository": "raw-labs/openclaw-enterprise",
+            "base_ref": "codex/native-plugin-upstream-base",
+            "base_sha": "f3a74292ab691fc7f9849c243defabd7b8c86ad2",
+            "auto_merge": null,
+            "title": "Preserve native plugin permissions across Harness switches"
+          }
+        },
+        "roles": {
+          "sha": "f30db5c4045cbf2c1f5eef4576361112535ed8b4",
+          "ref": "codex/per-person-gateway-roles",
+          "pr": {
+            "url": "https://github.com/raw-labs/openclaw-enterprise/pull/1",
+            "number": 1,
+            "repository": "raw-labs/openclaw-enterprise",
+            "author": "miguelbranco80",
+            "state": "open",
+            "draft": false,
+            "head": "f30db5c4045cbf2c1f5eef4576361112535ed8b4",
+            "head_ref": "codex/per-person-gateway-roles",
+            "head_repository": "raw-labs/openclaw-enterprise",
+            "base_ref": "main",
+            "base_sha": "80725162a946f80652b939a32a57ee4e922eeb5c",
+            "auto_merge": null,
+            "title": "feat: assign configured OpenClaw roles to Agent users"
+          }
+        },
+        "first-admin": {
+          "sha": "37fac70dfb784351544189ad07909588b327ef47",
+          "ref": "codex/native-admin-first-deploy",
+          "pr": {
+            "url": "https://github.com/raw-labs/openclaw-enterprise/pull/12",
+            "number": 12,
+            "repository": "raw-labs/openclaw-enterprise",
+            "author": "miguelbranco80",
+            "state": "open",
+            "draft": false,
+            "head": "37fac70dfb784351544189ad07909588b327ef47",
+            "head_ref": "codex/native-admin-first-deploy",
+            "head_repository": "raw-labs/openclaw-enterprise",
+            "base_ref": "codex/native-admin-first-deploy-base",
+            "base_sha": "a7aa9219ff14c248df0c183b8b48d9283d26c2f6",
+            "auto_merge": null,
+            "title": "Prepare native admin access on the first Agent deployment"
+          }
+        },
+        "outbound": {
+          "sha": "a50b14647d4311764cce3359150149bc81f23431",
+          "ref": "codex/gateway-outbound",
+          "pr": {
+            "url": "https://github.com/raw-labs/openclaw-enterprise/pull/18",
+            "number": 18,
+            "repository": "raw-labs/openclaw-enterprise",
+            "author": "miguelbranco80",
+            "state": "open",
+            "draft": false,
+            "head": "a50b14647d4311764cce3359150149bc81f23431",
+            "head_ref": "codex/gateway-outbound",
+            "head_repository": "raw-labs/openclaw-enterprise",
+            "base_ref": "codex/gateway-outbound-upstream-d3ccc5478",
+            "base_sha": "d3ccc54781d0d50b40e9aeb814f0573d38c0a585",
+            "auto_merge": null,
+            "title": "RFC and implementation: managed outbound HTTPS for dedicated Gateways"
+          }
+        },
+        "teams": {
+          "sha": "93c1dc4f24b9f544b26a451b71a0cfeff34be4fc",
+          "ref": "codex/teams-support",
+          "pr": {
+            "url": "https://github.com/raw-labs/openclaw-enterprise/pull/2",
+            "number": 2,
+            "repository": "raw-labs/openclaw-enterprise",
+            "author": "miguelbranco80",
+            "state": "open",
+            "draft": false,
+            "head": "93c1dc4f24b9f544b26a451b71a0cfeff34be4fc",
+            "head_ref": "codex/teams-support",
+            "head_repository": "raw-labs/openclaw-enterprise",
+            "base_ref": "main",
+            "base_sha": "80725162a946f80652b939a32a57ee4e922eeb5c",
+            "auto_merge": null,
+            "title": "Add Microsoft Teams channels for Dedicated Agents"
+          }
+        },
+        "embedded": {
+          "sha": "94346f8101230627f206ed9731f2c32beba27bad",
+          "ref": "codex/eval-embedded-channels",
+          "pr": {
+            "url": "https://github.com/raw-labs/openclaw-enterprise/pull/17",
+            "number": 17,
+            "repository": "raw-labs/openclaw-enterprise",
+            "author": "miguelbranco80",
+            "state": "open",
+            "draft": true,
+            "head": "94346f8101230627f206ed9731f2c32beba27bad",
+            "head_ref": "codex/eval-embedded-channels",
+            "head_repository": "raw-labs/openclaw-enterprise",
+            "base_ref": "codex/eval-upstream-a7aa9219f",
+            "base_sha": "a7aa9219ff14c248df0c183b8b48d9283d26c2f6",
+            "auto_merge": null,
+            "title": "Trial native channels in embedded OpenClaw"
+          }
+        }
+      },
+      "order": [
+        "embedded",
+        "first-admin",
+        "outbound",
+        "plugins",
+        "profiles",
+        "roles",
+        "secrets",
+        "teams"
+      ],
+      "order_edges": [],
+      "config_digest": "d1f7fa454ad0d59e71b2c6a110f795429b8103435a1ab9252ab72fdb059adc5f",
+      "previous_selection": null,
+      "previous_order": [],
+      "interaction_evidence": {
+        "heads": {
+          "profiles": "5acf92b89f9053fec747a802e3790822a5b4340d",
+          "secrets": "b698b30abc802185905bf4ff28792a7b9cc1c04e",
+          "plugins": "65dc3e90ecb0799ddeb22899bbbc41a5548d37a1",
+          "roles": "f30db5c4045cbf2c1f5eef4576361112535ed8b4",
+          "first-admin": "37fac70dfb784351544189ad07909588b327ef47",
+          "outbound": "a50b14647d4311764cce3359150149bc81f23431",
+          "teams": "93c1dc4f24b9f544b26a451b71a0cfeff34be4fc",
+          "embedded": "94346f8101230627f206ed9731f2c32beba27bad"
+        },
+        "merge_bases": {
+          "profiles": "83916ce36a51d121c59166152058be5857d22f81",
+          "secrets": "bb5b58f7566c2935a09382e6936eef6f0e6c23fa",
+          "plugins": "7ed3402dddaa1b4a750b580495a227b819f56359",
+          "roles": "fbfc834267fddf9094a8f92f7f61b1d775f7dae9",
+          "first-admin": "fbfc834267fddf9094a8f92f7f61b1d775f7dae9",
+          "outbound": "bb5b58f7566c2935a09382e6936eef6f0e6c23fa",
+          "teams": "a7aa9219ff14c248df0c183b8b48d9283d26c2f6",
+          "embedded": "a7aa9219ff14c248df0c183b8b48d9283d26c2f6"
+        },
+        "changed_paths": {
+          "profiles": [
+            "apps/controller/src/console/agents/presets.mts",
+            "deploy/profiles/codex.json",
+            "docs/contributing/console-storybook-agent-workflows.md",
+            "docs/docs.json",
+            "docs/flows/agent-presets.md",
+            "docs/flows/installation-profile-rendering.md",
+            "docs/guides/deploy/custom-installation-profiles.md",
+            "docs/guides/deploy/installation-profiles.md",
+            "docs/guides/topics/agent-presets.md",
+            "docs/reference/console/create-and-deploy.md",
+            "docs/reference/presets.md",
+            "docs/testing/postgresql.md",
+            "scripts/ci/test-suites/postgres-platform.json",
+            "scripts/console-storybook/pages-create-agent.stories.ts",
+            "scripts/console-storybook/public/fixtures.mjs",
+            "scripts/console-storybook/public/scenarios.mjs",
+            "scripts/render-installation-profile.mjs",
+            "tests/browser/console-agent-presets.test.ts",
+            "tests/helpers/preset-upgrade-process.mjs",
+            "tests/integration/postgres-preset-upgrade.test.mjs",
+            "tests/integration/profile-renderer.test.mjs"
+          ],
+          "secrets": [
+            "apps/controller/src/console/agents/create.mts",
+            "docs/flows/platform-console/agent-creation.md",
+            "docs/flows/platform-console/history.md",
+            "docs/reference/console/create-and-deploy.md",
+            "scripts/console-storybook/pages-create-agent.stories.ts",
+            "scripts/console-storybook/public/fixtures.mjs",
+            "scripts/console-storybook/public/scenarios.mjs",
+            "tests/browser/console-agent-presets.test.ts",
+            "tests/integration/kubernetes-compute-real.test.mjs"
+          ],
+          "plugins": [
+            "apps/controller/src/console/agents/create.mts",
+            "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+            "apps/controller/src/drivers/compute/kubernetes/index.ts",
+            "docs/contributing/console-storybook-agent-workflows.md",
+            "docs/flows/harness-execution-topology.md",
+            "docs/flows/harness-execution-topology/history.md",
+            "docs/flows/platform-console/agent-creation.md",
+            "docs/guides/deploy/breaking-changes.md",
+            "docs/reference/console/create-and-deploy.md",
+            "docs/reference/harness-execution.md",
+            "scripts/console-storybook/pages-create-agent.stories.ts",
+            "scripts/console-storybook/public/fixtures.mjs",
+            "scripts/console-storybook/public/scenarios.mjs",
+            "tests/browser/console-agent-presets.test.ts",
+            "tests/browser/console-agent-repositories.test.ts",
+            "tests/browser/console-agents-2.test.ts",
+            "tests/browser/console-agents-test-support.mjs",
+            "tests/browser/console-agents.test.ts",
+            "tests/browser/console-create-agent-provisioning-400.test.mjs",
+            "tests/integration/console-api.test.mjs",
+            "tests/integration/postgres-agent-provisioning.test.mjs"
+          ],
+          "roles": [
+            "apps/controller/src/console-assets.ts",
+            "apps/controller/src/console/agents/access.mts",
+            "apps/controller/src/console/agents/detail.mts",
+            "apps/controller/src/console/agents/presets.mts",
+            "apps/controller/src/console/agents/runtime-access.mjs",
+            "apps/controller/src/console/agents/runtime-access.mts",
+            "apps/controller/src/console/console.css",
+            "apps/controller/src/drivers/compute/kubernetes/index.ts",
+            "apps/controller/src/drivers/compute/kubernetes/runtime-access.ts",
+            "apps/controller/src/gateway/native-admin-proxy.ts",
+            "apps/controller/src/gateway/native-admin.ts",
+            "apps/controller/src/http/iam.ts",
+            "apps/controller/src/http/native-admin.ts",
+            "apps/controller/src/index.ts",
+            "deploy/runtime/Dockerfile",
+            "deploy/runtime/README.md",
+            "deploy/runtime/openclaw-trusted-proxy-role.patch",
+            "docs/contributing/console-storybook.md",
+            "docs/design.md",
+            "docs/flows/agent-native-admin.md",
+            "docs/flows/agent-presets.md",
+            "docs/flows/namespace-iam-policy.md",
+            "docs/flows/platform-console.md",
+            "docs/flows/platform-console/agent-sharing.md",
+            "docs/flows/platform-console/history.md",
+            "docs/guides/console/agent-details.md",
+            "docs/guides/console/agent-sharing.md",
+            "docs/guides/deploy/native-admin.md",
+            "docs/reference/agent-native-admin.md",
+            "docs/reference/agents.md",
+            "docs/reference/api.md",
+            "docs/reference/authentication.md",
+            "docs/reference/authorization.md",
+            "docs/reference/cheatsheets/api.md",
+            "docs/reference/cheatsheets/database-entities.md",
+            "docs/reference/cheatsheets/permissions.md",
+            "docs/reference/console.md",
+            "docs/reference/console/agent-sharing.md",
+            "docs/reference/drivers/compute.md",
+            "docs/reference/drivers/iam.md",
+            "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+            "docs/reference/drivers/kubernetes-compute/storage-and-credentials.md",
+            "docs/reference/gateway-routing.md",
+            "docs/reference/settings/operations.md",
+            "docs/testing/kubernetes.md",
+            "migrations/0064_agent_runtime_roles.sql",
+            "migrations/meta/_canonical-history.json",
+            "migrations/meta/_journal.json",
+            "packages/contracts/openapi/occ-api.openapi.json",
+            "packages/contracts/src/api/common.ts",
+            "packages/contracts/src/api/resources.ts",
+            "packages/contracts/src/api/routes.ts",
+            "packages/contracts/src/index.ts",
+            "packages/iam/src/index.ts",
+            "packages/occ/src/index.ts",
+            "packages/occ/src/ports/platform-unit-of-work.ts",
+            "packages/occ/src/state/platform-state.ts",
+            "packages/occ/src/state/postgres-schema.ts",
+            "packages/occ/src/state/postgres-state.ts",
+            "scripts/build-runtime-assets.mjs",
+            "scripts/ci/test-suites/checks-baseline-2.json",
+            "scripts/ci/test-suites/postgres-auth.json",
+            "scripts/ci/test-suites/postgres.json",
+            "scripts/console-storybook/components-native-admin.stories.ts",
+            "scripts/console-storybook/pages-agent-detail.stories.ts",
+            "scripts/console-storybook/public/fixtures.mjs",
+            "scripts/console-storybook/public/scenarios.mjs",
+            "scripts/migration-history.mjs",
+            "specs/plans/0047-agent-runtime-role-assignments.md",
+            "tests/browser/console-agent-detail-2.test.mjs",
+            "tests/browser/console-agent-detail.test.mjs",
+            "tests/browser/console-agent-logs.test.ts",
+            "tests/browser/console-agent-overview.test.mjs",
+            "tests/browser/console-agent-state.test.mjs",
+            "tests/browser/console-agents-browser-helpers.mjs",
+            "tests/browser/console-agents-test-support.mjs",
+            "tests/browser/console-agents.test.ts",
+            "tests/browser/console.test.mjs",
+            "tests/conformance/kubernetes-compute.test.mjs",
+            "tests/conformance/native-admin-upgrade-reset.test.mjs",
+            "tests/conformance/native-admin-websocket-relay.test.mjs",
+            "tests/conformance/occ-api-security.test.mjs",
+            "tests/helpers/console-app.mjs",
+            "tests/helpers/harness-topology-k3d-real.mjs",
+            "tests/helpers/runtime-roles.mjs",
+            "tests/integration/harness-topology-k3d-routing-real.test.mjs",
+            "tests/integration/native-admin-access.test.mjs",
+            "tests/integration/native-admin-k3d-real.test.mjs",
+            "tests/integration/native-admin-session-postgres.test.mjs",
+            "tests/integration/postgres-migration-compatibility.test.mjs",
+            "tests/integration/runtime-assets.test.mjs",
+            "tests/integration/runtime-image-startup.test.mjs"
+          ],
+          "first-admin": [
+            "apps/controller/src/composition/development-postgres.ts",
+            "apps/controller/src/composition/production.ts",
+            "apps/controller/src/drivers/compute/kubernetes/index.ts",
+            "apps/controller/src/drivers/compute/kubernetes/native-admin.ts",
+            "apps/controller/src/gateway/native-admin-origin.ts",
+            "apps/controller/src/gateway/native-admin.ts",
+            "apps/controller/src/http/native-admin.ts",
+            "apps/controller/src/worker.mjs",
+            "apps/controller/src/worker.ts",
+            "compose.native-admin.yaml",
+            "deploy/helm/openclaw-enterprise/templates/deployments.yaml",
+            "docs/contributing/specifications.md",
+            "docs/flows/agent-native-admin.md",
+            "docs/guides/deploy/breaking-changes.md",
+            "docs/guides/deploy/native-admin.md",
+            "docs/reference/agent-native-admin.md",
+            "docs/reference/cheatsheets/environment-variables.md",
+            "docs/reference/configuration.md",
+            "docs/reference/drivers/compute-admission.md",
+            "docs/reference/drivers/compute.md",
+            "packages/contracts/src/index.ts",
+            "packages/occ/src/driver-contract.ts",
+            "packages/occ/src/index.ts",
+            "scripts/ci/test-suites/images-packaging.json",
+            "specs/README.md",
+            "specs/rfcs/0024-native-admin-deployment-preparation.md",
+            "tests/helpers/auth-session.mjs",
+            "tests/helpers/console-app.mjs",
+            "tests/helpers/harness-topology-k3d-real.mjs",
+            "tests/helpers/kubernetes-compute.mjs",
+            "tests/integration/development-packaging.test.mjs",
+            "tests/integration/native-admin-access.test.mjs",
+            "tests/integration/native-admin-k3d-real.test.mjs",
+            "tests/integration/postgres-agent-provisioning.test.mjs",
+            "tests/integration/production-kubernetes-packaging.test.mjs"
+          ],
+          "outbound": [
+            "apps/controller/src/api-startup.mjs",
+            "apps/controller/src/composition/channel.ts",
+            "apps/controller/src/composition/development-postgres.ts",
+            "apps/controller/src/composition/production.ts",
+            "apps/controller/src/console-assets.ts",
+            "apps/controller/src/console/agents/detail.mts",
+            "apps/controller/src/console/agents/gateway-outbound.mjs",
+            "apps/controller/src/console/agents/gateway-outbound.mts",
+            "apps/controller/src/console/navigation.mts",
+            "apps/controller/src/drivers/channel/slack.ts",
+            "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+            "apps/controller/src/drivers/compute/kubernetes/index.ts",
+            "apps/controller/src/drivers/compute/kubernetes/resources/network.ts",
+            "apps/controller/src/drivers/compute/kubernetes/runtime-entrypoints.ts",
+            "apps/controller/src/drivers/configuration/model-auth.ts",
+            "apps/controller/src/gateway/control-plane-outbound-proxy.mjs",
+            "apps/controller/src/gateway/native-admin-proxy.ts",
+            "apps/controller/src/gateway/outbound-proxy.mjs",
+            "apps/controller/src/gateway/proxy-configuration.mjs",
+            "apps/controller/src/http/agents.ts",
+            "apps/controller/src/slack-proxy.mjs",
+            "apps/controller/src/worker.ts",
+            "deploy/examples/production/installation.yaml",
+            "deploy/examples/production/values.yaml",
+            "deploy/helm/openclaw-enterprise/templates/_helpers.tpl",
+            "deploy/helm/openclaw-enterprise/templates/deployments.yaml",
+            "deploy/helm/openclaw-enterprise/templates/networkpolicies.yaml",
+            "deploy/helm/openclaw-enterprise/templates/outbound-proxy.yaml",
+            "deploy/helm/openclaw-enterprise/templates/serviceaccounts.yaml",
+            "deploy/helm/openclaw-enterprise/values.yaml",
+            "docs/contributing/specifications.md",
+            "docs/design.md",
+            "docs/docs.json",
+            "docs/flows/agent-channel-directory.md",
+            "docs/flows/configuration-driver.md",
+            "docs/flows/configuration-driver/persistence-and-revisions.md",
+            "docs/flows/controller-worker.md",
+            "docs/flows/coordinated-production-upgrade.md",
+            "docs/flows/gateway-outbound.md",
+            "docs/flows/installation-profile-rendering.md",
+            "docs/flows/production-startup.md",
+            "docs/flows/public-github-reads.md",
+            "docs/guides/deploy/eks.md",
+            "docs/guides/deploy/installation-profiles.md",
+            "docs/guides/deploy/local-compose-kubernetes.md",
+            "docs/guides/deploy/local-kubernetes-development.md",
+            "docs/guides/deploy/production-upgrade.md",
+            "docs/guides/integrations/slack.md",
+            "docs/reference/README.md",
+            "docs/reference/agents.md",
+            "docs/reference/api.md",
+            "docs/reference/cheatsheets/api.md",
+            "docs/reference/cheatsheets/database-entities.md",
+            "docs/reference/cheatsheets/environment-variables.md",
+            "docs/reference/cheatsheets/permissions.md",
+            "docs/reference/drivers/channel.md",
+            "docs/reference/drivers/compute-admission.md",
+            "docs/reference/drivers/compute.md",
+            "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+            "docs/reference/drivers/kubernetes-compute/storage-and-credentials.md",
+            "docs/reference/drivers/slack-channel.md",
+            "docs/reference/gateway-outbound.md",
+            "docs/reference/public-github-reads.md",
+            "docs/reference/settings/production.md",
+            "docs/testing/ci.md",
+            "docs/testing/gateway-outbound.md",
+            "docs/testing/kubernetes.md",
+            "migrations/0064_gateway_outbound.sql",
+            "migrations/meta/_canonical-history.json",
+            "migrations/meta/_journal.json",
+            "packages/contracts/openapi/occ-api.openapi.json",
+            "packages/contracts/src/api/common.ts",
+            "packages/contracts/src/api/resources.ts",
+            "packages/contracts/src/api/routes.ts",
+            "packages/contracts/src/gateway-outbound.ts",
+            "packages/contracts/src/index.ts",
+            "packages/occ/src/configured-harness.ts",
+            "packages/occ/src/index.ts",
+            "packages/occ/src/state/controller-work.ts",
+            "packages/occ/src/state/platform-state.ts",
+            "packages/occ/src/state/postgres-schema.ts",
+            "packages/occ/src/state/postgres-state.ts",
+            "packages/occ/src/state/postgres-work-queue.ts",
+            "scripts/ci/first-agent-smoke.mjs",
+            "scripts/ci/prepare.mjs",
+            "scripts/ci/test-suites/checks-baseline-2.json",
+            "scripts/ci/test-suites/k3d-fixture-state.json",
+            "scripts/ci/test-suites/k3d-model.json",
+            "scripts/console-storybook/agent-tabs-keyboard-workflow.md",
+            "scripts/console-storybook/pages-agent-detail.stories.ts",
+            "scripts/console-storybook/public/fixtures.mjs",
+            "scripts/console-storybook/public/scenarios.mjs",
+            "scripts/migration-history.mjs",
+            "scripts/render-installation-profile.mjs",
+            "scripts/upgrade-production-images",
+            "specs/README.md",
+            "specs/plans/0023-gateway-outbound.md",
+            "specs/rfcs/0024-gateway-outbound.md",
+            "tests/browser/console-agent-detail-2.test.mjs",
+            "tests/browser/console-agent-overview.test.mjs",
+            "tests/conformance/kubernetes-compute.test.mjs",
+            "tests/conformance/kubernetes-real-kubectl.test.mjs",
+            "tests/conformance/kubernetes-runtime-credentials.test.mjs",
+            "tests/conformance/platform-state-store.contract.mjs",
+            "tests/conformance/plugin-compute.test.mjs",
+            "tests/conformance/repository-runtime-material.test.mjs",
+            "tests/conformance/slack-channel-directory.test.mjs",
+            "tests/conformance/slack-proxy-reset.test.mjs",
+            "tests/conformance/slack-proxy-tunnel.test.mjs",
+            "tests/fixtures/gateway-outbound/index.mjs",
+            "tests/fixtures/gateway-outbound/openclaw.plugin.json",
+            "tests/fixtures/gateway-outbound/package.json",
+            "tests/helpers/console-app.mjs",
+            "tests/helpers/console-repository-launch.mjs",
+            "tests/helpers/harness-topology-k3d-real.mjs",
+            "tests/helpers/kubernetes-compute.mjs",
+            "tests/helpers/postgres-worker-revision-fixture.mjs",
+            "tests/helpers/qa-slack.mjs",
+            "tests/helpers/slack-proxy.mjs",
+            "tests/integration/configuration-controller.test.mjs",
+            "tests/integration/console-api.test.mjs",
+            "tests/integration/gateway-outbound-proxy.test.mjs",
+            "tests/integration/harness-topology-k3d-real.test.mjs",
+            "tests/integration/harness-topology-k3d-slack-real.test.mjs",
+            "tests/integration/kubernetes-compute-provisioning-real.test.mjs",
+            "tests/integration/kubernetes-compute-real.test.mjs",
+            "tests/integration/logging-collector.test.mjs",
+            "tests/integration/postgres-migration-compatibility.test.mjs",
+            "tests/integration/postgres-platform-state-kubernetes.test.mjs",
+            "tests/integration/postgres-platform-state.test.mjs",
+            "tests/integration/postgres-worker-agent-revision-health.test.mjs",
+            "tests/integration/production-image-startup.test.mjs",
+            "tests/integration/production-image-upgrade-recovery.test.mjs",
+            "tests/integration/production-kubernetes-packaging.test.mjs",
+            "tests/integration/production-tui-k3d-real.test.mjs",
+            "tests/integration/profile-preflight-chart-parity.test.mjs",
+            "tests/integration/profile-public-github-read.test.mjs",
+            "tests/integration/profile-renderer.test.mjs"
+          ],
+          "teams": [
+            "apps/controller/src/composition/development-postgres.ts",
+            "apps/controller/src/composition/production.ts",
+            "apps/controller/src/console-assets.ts",
+            "apps/controller/src/console/agents/credentials.mjs",
+            "apps/controller/src/console/agents/slack-directory.mjs",
+            "apps/controller/src/console/agents/teams-directory.mjs",
+            "apps/controller/src/console/channels.mjs",
+            "apps/controller/src/console/channels/teams.mjs",
+            "apps/controller/src/console/console.css",
+            "apps/controller/src/drivers/channel/index.ts",
+            "apps/controller/src/drivers/channel/slack.ts",
+            "apps/controller/src/drivers/channel/teams.ts",
+            "apps/controller/src/drivers/channel/transport.ts",
+            "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+            "apps/controller/src/drivers/compute/kubernetes/index.ts",
+            "apps/controller/src/index.ts",
+            "apps/controller/src/slack-proxy.mjs",
+            "deploy/helm/openclaw-enterprise/templates/_helpers.tpl",
+            "deploy/helm/openclaw-enterprise/templates/gateway-routing.yaml",
+            "deploy/helm/openclaw-enterprise/templates/slack-proxy.yaml",
+            "deploy/helm/openclaw-enterprise/values.yaml",
+            "deploy/runtime/Dockerfile",
+            "deploy/runtime/README.md",
+            "docs/README.md",
+            "docs/contributing/console-storybook.md",
+            "docs/docs.json",
+            "docs/flows/agent-channel-directory.md",
+            "docs/flows/agent-channel-ingress.md",
+            "docs/guides/console/channels-and-credentials.md",
+            "docs/guides/integrations/teams.md",
+            "docs/reference/cheatsheets/environment-variables.md",
+            "docs/reference/configuration/secrets.md",
+            "docs/reference/console/create-and-deploy.md",
+            "docs/reference/console/versions-and-channel-drafts.md",
+            "docs/reference/drivers/channel.md",
+            "docs/reference/drivers/kubernetes-compute.md",
+            "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+            "docs/reference/drivers/selection.md",
+            "docs/reference/drivers/slack-channel.md",
+            "docs/reference/drivers/teams-channel.md",
+            "docs/testing/local.md",
+            "docs/testing/teams.md",
+            "packages/contracts/openapi/occ-api.openapi.json",
+            "packages/contracts/src/api/common.ts",
+            "packages/contracts/src/index.ts",
+            "packages/occ/src/index.ts",
+            "scripts/build-runtime-assets.mjs",
+            "scripts/ci/setup-tools.sh",
+            "scripts/ci/test-suites/checks-baseline-2.json",
+            "scripts/console-storybook/components-channels.stories.mjs",
+            "scripts/console-storybook/public/fixtures.mjs",
+            "scripts/console-storybook/public/scenarios.mjs",
+            "scripts/console-storybook/teams-workflow.md",
+            "specs/plans/0045-teams-channel-support.md",
+            "tests/browser/console-agent-channels.test.mjs",
+            "tests/browser/console-agent-plugin-approvers.test.mjs",
+            "tests/browser/console-agents-browser-helpers.mjs",
+            "tests/conformance/kubernetes-compute.test.mjs",
+            "tests/conformance/slack-channel-directory.test.mjs",
+            "tests/conformance/slack-proxy-tunnel.test.mjs",
+            "tests/fixtures/teams-attachment-download.mjs",
+            "tests/helpers/runtime-image-startup.mjs",
+            "tests/helpers/runtime-model-probe-certificates.mjs",
+            "tests/helpers/slack-proxy.mjs",
+            "tests/helpers/teams-directory.mjs",
+            "tests/integration/configuration-controller.test.mjs",
+            "tests/integration/occ-api.test.mjs",
+            "tests/integration/production-kubernetes-packaging.test.mjs",
+            "tests/integration/runtime-image-startup.test.mjs",
+            "tests/integration/teams-directory.test.mjs"
+          ],
+          "embedded": [
+            ".github/actions/run-ci-lane/action.yml",
+            ".github/workflows/ci.yml",
+            ".github/workflows/full-integration.yml",
+            ".github/workflows/qa-advisory.yml",
+            "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+            "apps/controller/src/drivers/compute/kubernetes/index.ts",
+            "apps/controller/src/slack-proxy.mjs",
+            "deploy/helm/openclaw-enterprise/templates/_helpers.tpl",
+            "deploy/helm/openclaw-enterprise/templates/gateway-routing.yaml",
+            "deploy/helm/openclaw-enterprise/templates/slack-proxy.yaml",
+            "deploy/helm/openclaw-enterprise/values.yaml",
+            "deploy/runtime/Dockerfile",
+            "docs/design.md",
+            "docs/docs.json",
+            "docs/flows/agent-channel-runtime.md",
+            "docs/flows/configuration-driver.md",
+            "docs/flows/configuration-driver/persistence-and-revisions.md",
+            "docs/flows/github-actions-testing.md",
+            "docs/flows/installation-profile-rendering.md",
+            "docs/guides/deploy/installation-profiles.md",
+            "docs/guides/integrations/embedded-channel-trial.md",
+            "docs/guides/integrations/slack.md",
+            "docs/guides/integrations/teams.md",
+            "docs/reference/cheatsheets/environment-variables.md",
+            "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+            "docs/testing/channel-runtime.md",
+            "docs/testing/ci.md",
+            "docs/testing/kubernetes.md",
+            "scripts/build-runtime-assets.mjs",
+            "scripts/ci/codex-bwrap.apparmor",
+            "scripts/ci/prepare.mjs",
+            "scripts/ci/test-suites/images-runtime-startup.json",
+            "scripts/ci/test-suites/k3d-fixture-state.json",
+            "scripts/render-installation-profile.mjs",
+            "specs/README.md",
+            "specs/plans/0023-temporary-embedded-channel-trial.md",
+            "specs/rfcs/0023-temporary-embedded-channel-trial.md",
+            "tests/browser/console-runtime-credentials.test.mjs",
+            "tests/conformance/kubernetes-compute.test.mjs",
+            "tests/conformance/slack-proxy-tunnel.test.mjs",
+            "tests/helpers/console-app.mjs",
+            "tests/helpers/kubernetes-compute-real.mjs",
+            "tests/helpers/kubernetes-compute.mjs",
+            "tests/helpers/runtime-image-startup.mjs",
+            "tests/helpers/slack-proxy.mjs",
+            "tests/integration/ci-impact.test.mjs",
+            "tests/integration/ci-runner.test.mjs",
+            "tests/integration/kubernetes-compute-provisioning-real.test.mjs",
+            "tests/integration/production-kubernetes-packaging.test.mjs",
+            "tests/integration/profile-renderer.test.mjs",
+            "tests/integration/runtime-image-startup.test.mjs"
+          ]
+        },
+        "overlaps": [
+          {
+            "features": [
+              "embedded",
+              "first-admin"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "docs/reference/cheatsheets/environment-variables.md",
+              "specs/README.md",
+              "tests/helpers/console-app.mjs",
+              "tests/helpers/kubernetes-compute.mjs",
+              "tests/integration/production-kubernetes-packaging.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "embedded",
+              "outbound"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "apps/controller/src/slack-proxy.mjs",
+              "deploy/helm/openclaw-enterprise/templates/_helpers.tpl",
+              "deploy/helm/openclaw-enterprise/values.yaml",
+              "docs/design.md",
+              "docs/docs.json",
+              "docs/flows/configuration-driver.md",
+              "docs/flows/configuration-driver/persistence-and-revisions.md",
+              "docs/flows/installation-profile-rendering.md",
+              "docs/guides/deploy/installation-profiles.md",
+              "docs/guides/integrations/slack.md",
+              "docs/reference/cheatsheets/environment-variables.md",
+              "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+              "docs/testing/ci.md",
+              "docs/testing/kubernetes.md",
+              "scripts/ci/prepare.mjs",
+              "scripts/ci/test-suites/k3d-fixture-state.json",
+              "scripts/render-installation-profile.mjs",
+              "specs/README.md",
+              "tests/conformance/kubernetes-compute.test.mjs",
+              "tests/conformance/slack-proxy-tunnel.test.mjs",
+              "tests/helpers/console-app.mjs",
+              "tests/helpers/kubernetes-compute.mjs",
+              "tests/helpers/slack-proxy.mjs",
+              "tests/integration/kubernetes-compute-provisioning-real.test.mjs",
+              "tests/integration/production-kubernetes-packaging.test.mjs",
+              "tests/integration/profile-renderer.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "embedded",
+              "plugins"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts"
+            ]
+          },
+          {
+            "features": [
+              "embedded",
+              "profiles"
+            ],
+            "paths": [
+              "docs/docs.json",
+              "docs/flows/installation-profile-rendering.md",
+              "docs/guides/deploy/installation-profiles.md",
+              "scripts/render-installation-profile.mjs",
+              "tests/integration/profile-renderer.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "embedded",
+              "roles"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "deploy/runtime/Dockerfile",
+              "docs/design.md",
+              "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+              "docs/testing/kubernetes.md",
+              "scripts/build-runtime-assets.mjs",
+              "tests/conformance/kubernetes-compute.test.mjs",
+              "tests/helpers/console-app.mjs",
+              "tests/integration/runtime-image-startup.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "embedded",
+              "teams"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "apps/controller/src/slack-proxy.mjs",
+              "deploy/helm/openclaw-enterprise/templates/_helpers.tpl",
+              "deploy/helm/openclaw-enterprise/templates/gateway-routing.yaml",
+              "deploy/helm/openclaw-enterprise/templates/slack-proxy.yaml",
+              "deploy/helm/openclaw-enterprise/values.yaml",
+              "deploy/runtime/Dockerfile",
+              "docs/docs.json",
+              "docs/guides/integrations/teams.md",
+              "docs/reference/cheatsheets/environment-variables.md",
+              "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+              "scripts/build-runtime-assets.mjs",
+              "tests/conformance/kubernetes-compute.test.mjs",
+              "tests/conformance/slack-proxy-tunnel.test.mjs",
+              "tests/helpers/runtime-image-startup.mjs",
+              "tests/helpers/slack-proxy.mjs",
+              "tests/integration/production-kubernetes-packaging.test.mjs",
+              "tests/integration/runtime-image-startup.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "first-admin",
+              "outbound"
+            ],
+            "paths": [
+              "apps/controller/src/composition/development-postgres.ts",
+              "apps/controller/src/composition/production.ts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "apps/controller/src/worker.ts",
+              "deploy/helm/openclaw-enterprise/templates/deployments.yaml",
+              "docs/contributing/specifications.md",
+              "docs/reference/cheatsheets/environment-variables.md",
+              "docs/reference/drivers/compute-admission.md",
+              "docs/reference/drivers/compute.md",
+              "packages/contracts/src/index.ts",
+              "packages/occ/src/index.ts",
+              "specs/README.md",
+              "tests/helpers/console-app.mjs",
+              "tests/helpers/harness-topology-k3d-real.mjs",
+              "tests/helpers/kubernetes-compute.mjs",
+              "tests/integration/production-kubernetes-packaging.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "first-admin",
+              "plugins"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "docs/guides/deploy/breaking-changes.md",
+              "tests/integration/postgres-agent-provisioning.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "first-admin",
+              "roles"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "apps/controller/src/gateway/native-admin.ts",
+              "apps/controller/src/http/native-admin.ts",
+              "docs/flows/agent-native-admin.md",
+              "docs/guides/deploy/native-admin.md",
+              "docs/reference/agent-native-admin.md",
+              "docs/reference/drivers/compute.md",
+              "packages/contracts/src/index.ts",
+              "packages/occ/src/index.ts",
+              "tests/helpers/console-app.mjs",
+              "tests/helpers/harness-topology-k3d-real.mjs",
+              "tests/integration/native-admin-access.test.mjs",
+              "tests/integration/native-admin-k3d-real.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "first-admin",
+              "teams"
+            ],
+            "paths": [
+              "apps/controller/src/composition/development-postgres.ts",
+              "apps/controller/src/composition/production.ts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "docs/reference/cheatsheets/environment-variables.md",
+              "packages/contracts/src/index.ts",
+              "packages/occ/src/index.ts",
+              "tests/integration/production-kubernetes-packaging.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "outbound",
+              "plugins"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "tests/integration/console-api.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "outbound",
+              "profiles"
+            ],
+            "paths": [
+              "docs/docs.json",
+              "docs/flows/installation-profile-rendering.md",
+              "docs/guides/deploy/installation-profiles.md",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "scripts/render-installation-profile.mjs",
+              "tests/integration/profile-renderer.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "outbound",
+              "roles"
+            ],
+            "paths": [
+              "apps/controller/src/console-assets.ts",
+              "apps/controller/src/console/agents/detail.mts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "apps/controller/src/gateway/native-admin-proxy.ts",
+              "docs/design.md",
+              "docs/reference/agents.md",
+              "docs/reference/api.md",
+              "docs/reference/cheatsheets/api.md",
+              "docs/reference/cheatsheets/database-entities.md",
+              "docs/reference/cheatsheets/permissions.md",
+              "docs/reference/drivers/compute.md",
+              "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+              "docs/reference/drivers/kubernetes-compute/storage-and-credentials.md",
+              "docs/testing/kubernetes.md",
+              "migrations/meta/_canonical-history.json",
+              "migrations/meta/_journal.json",
+              "packages/contracts/openapi/occ-api.openapi.json",
+              "packages/contracts/src/api/common.ts",
+              "packages/contracts/src/api/resources.ts",
+              "packages/contracts/src/api/routes.ts",
+              "packages/contracts/src/index.ts",
+              "packages/occ/src/index.ts",
+              "packages/occ/src/state/platform-state.ts",
+              "packages/occ/src/state/postgres-schema.ts",
+              "packages/occ/src/state/postgres-state.ts",
+              "scripts/ci/test-suites/checks-baseline-2.json",
+              "scripts/console-storybook/pages-agent-detail.stories.ts",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "scripts/migration-history.mjs",
+              "tests/browser/console-agent-detail-2.test.mjs",
+              "tests/browser/console-agent-overview.test.mjs",
+              "tests/conformance/kubernetes-compute.test.mjs",
+              "tests/helpers/console-app.mjs",
+              "tests/helpers/harness-topology-k3d-real.mjs",
+              "tests/integration/postgres-migration-compatibility.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "outbound",
+              "secrets"
+            ],
+            "paths": [
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "tests/integration/kubernetes-compute-real.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "outbound",
+              "teams"
+            ],
+            "paths": [
+              "apps/controller/src/composition/development-postgres.ts",
+              "apps/controller/src/composition/production.ts",
+              "apps/controller/src/console-assets.ts",
+              "apps/controller/src/drivers/channel/slack.ts",
+              "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "apps/controller/src/slack-proxy.mjs",
+              "deploy/helm/openclaw-enterprise/templates/_helpers.tpl",
+              "deploy/helm/openclaw-enterprise/values.yaml",
+              "docs/docs.json",
+              "docs/flows/agent-channel-directory.md",
+              "docs/reference/cheatsheets/environment-variables.md",
+              "docs/reference/drivers/channel.md",
+              "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+              "docs/reference/drivers/slack-channel.md",
+              "packages/contracts/openapi/occ-api.openapi.json",
+              "packages/contracts/src/api/common.ts",
+              "packages/contracts/src/index.ts",
+              "packages/occ/src/index.ts",
+              "scripts/ci/test-suites/checks-baseline-2.json",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "tests/conformance/kubernetes-compute.test.mjs",
+              "tests/conformance/slack-channel-directory.test.mjs",
+              "tests/conformance/slack-proxy-tunnel.test.mjs",
+              "tests/helpers/slack-proxy.mjs",
+              "tests/integration/configuration-controller.test.mjs",
+              "tests/integration/production-kubernetes-packaging.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "plugins",
+              "profiles"
+            ],
+            "paths": [
+              "docs/contributing/console-storybook-agent-workflows.md",
+              "docs/reference/console/create-and-deploy.md",
+              "scripts/console-storybook/pages-create-agent.stories.ts",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "tests/browser/console-agent-presets.test.ts"
+            ]
+          },
+          {
+            "features": [
+              "plugins",
+              "roles"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "tests/browser/console-agents-test-support.mjs",
+              "tests/browser/console-agents.test.ts"
+            ]
+          },
+          {
+            "features": [
+              "plugins",
+              "secrets"
+            ],
+            "paths": [
+              "apps/controller/src/console/agents/create.mts",
+              "docs/flows/platform-console/agent-creation.md",
+              "docs/reference/console/create-and-deploy.md",
+              "scripts/console-storybook/pages-create-agent.stories.ts",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "tests/browser/console-agent-presets.test.ts"
+            ]
+          },
+          {
+            "features": [
+              "plugins",
+              "teams"
+            ],
+            "paths": [
+              "apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "docs/reference/console/create-and-deploy.md",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs"
+            ]
+          },
+          {
+            "features": [
+              "profiles",
+              "roles"
+            ],
+            "paths": [
+              "apps/controller/src/console/agents/presets.mts",
+              "docs/flows/agent-presets.md",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs"
+            ]
+          },
+          {
+            "features": [
+              "profiles",
+              "secrets"
+            ],
+            "paths": [
+              "docs/reference/console/create-and-deploy.md",
+              "scripts/console-storybook/pages-create-agent.stories.ts",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "tests/browser/console-agent-presets.test.ts"
+            ]
+          },
+          {
+            "features": [
+              "profiles",
+              "teams"
+            ],
+            "paths": [
+              "docs/docs.json",
+              "docs/reference/console/create-and-deploy.md",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs"
+            ]
+          },
+          {
+            "features": [
+              "roles",
+              "secrets"
+            ],
+            "paths": [
+              "docs/flows/platform-console/history.md",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs"
+            ]
+          },
+          {
+            "features": [
+              "roles",
+              "teams"
+            ],
+            "paths": [
+              "apps/controller/src/console-assets.ts",
+              "apps/controller/src/console/console.css",
+              "apps/controller/src/drivers/compute/kubernetes/index.ts",
+              "apps/controller/src/index.ts",
+              "deploy/runtime/Dockerfile",
+              "deploy/runtime/README.md",
+              "docs/contributing/console-storybook.md",
+              "docs/reference/drivers/kubernetes-compute/networking-and-isolation.md",
+              "packages/contracts/openapi/occ-api.openapi.json",
+              "packages/contracts/src/api/common.ts",
+              "packages/contracts/src/index.ts",
+              "packages/occ/src/index.ts",
+              "scripts/build-runtime-assets.mjs",
+              "scripts/ci/test-suites/checks-baseline-2.json",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs",
+              "tests/browser/console-agents-browser-helpers.mjs",
+              "tests/conformance/kubernetes-compute.test.mjs",
+              "tests/integration/runtime-image-startup.test.mjs"
+            ]
+          },
+          {
+            "features": [
+              "secrets",
+              "teams"
+            ],
+            "paths": [
+              "docs/reference/console/create-and-deploy.md",
+              "scripts/console-storybook/public/fixtures.mjs",
+              "scripts/console-storybook/public/scenarios.mjs"
+            ]
+          }
+        ],
+        "ancestry": []
+      }
+    },
+    "data": {
+      "steps": {
+        "embedded-checkout": {
+          "sha": "94346f8101230627f206ed9731f2c32beba27bad"
+        },
+        "embedded-assess": {
+          "sha": "94346f8101230627f206ed9731f2c32beba27bad",
+          "report": {
+            "status": "needs_decision",
+            "failure_kind": "compatibility",
+            "summary": "Embedded channels are not absorbed by frozen upstream. The trial remains needed, but requires managed-outbound adaptation and a decision about its stricter Teams validation, which conflicts with upstream-supported Configuration saves. No files, Git state, or remote state were changed.",
+            "evidence": [
+              "At upstream 8e20e2019, apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts::requireChannelTopology rejects embedded channels, and index.ts advertises dedicated-only provisioning. Feature 94346f810 adds the trusted experimentalEmbeddedChannels flag, embedded provisioning, and admission/preparation checks; these behaviors remain absent upstream.",
+              "Concrete contract conflict: feature configuration-rules.ts::requireTeamsConfiguration requires literal UUIDs and an env-object appPassword on every Configuration validation, including dedicated configurations. Upstream packages/occ/src/channel-secret-bindings.ts supports additional bound reference forms; tests/integration/configuration-controller.test.mjs:2245–2261 explicitly saves a Teams configuration with '${MSTEAMS_APP_PASSWORD}' and expects HTTP 201. Applying the feature validator unchanged would reject that upstream-supported save.",
+              "The feature does not implement the requested managed outbound path: index.ts projects runtime.channels.proxyUrl, NODE_USE_ENV_PROXY=1 and broad service-domain NO_PROXY entries. scripts/render-installation-profile.mjs accepts the shared managedSlackProxy or runtimeProxyUrl. Outbound a50b14647 instead owns revision snapshots, proxy workloads and withdrawal, but its admitGatewayOutbound explicitly rejects embedded execution with channel requirements.",
+              "Previous integration 90e30b8c provides relevant adaptation evidence in index.ts: the trial flag requires enabled managed Gateway outbound; admitGatewayOutbound permits opted-in embedded channel requirements while additional outbound modes remain dedicated-only; gatewayOutboundTransport exempts selected model endpoints from the channel-only proxy. These adaptations must be reconciled with current upstream, not copied wholesale.",
+              "Standalone feature limitation: apps/controller/src/slack-proxy.mjs denies model destinations while the trial enables process-wide proxy handling. tests/conformance/slack-proxy-tunnel.test.mjs explicitly expects api.openai.com:443 to be denied. The RFC acknowledges that proxy-aware model calls fail through the stock proxy. The Kubernetes fixture uses a closed loopback model endpoint and does not exercise this failure.",
+              "Teams 93c1dc4f and embedded 94346f810 both manage the same '*-msteams' callback resources through different reconciliation implementations. Embedded index.ts::reconcileTeamsCallback supplies an exact-revision Service and avoids publishing candidate callbacks; Teams adds its directory/editor and guarded transport behavior. Keeping both reconcilers would create competing ownership.",
+              "Upstream replacements to retain include shared channel-reference validation introduced by c40b22b6f and strengthened by 56af0a512, Gateway managed mode 110aea388, and embedded tool-policy validation 908ffe5be. Runtime packaging must extend the current deploy/runtime/openclaw-source.json pin, 554f0b886bde6c089578c49967227f8b50d1cf16, rather than restore the feature's older assembly. The ServiceAccount naming helper added by 9016417f6 is behaviorally equivalent to upstream packages/utils/src/hashing.ts::sha256Hex.",
+              "Supported workflow coverage exists in tests/integration/kubernetes-compute-provisioning-real.test.mjs:970: default refusal, trusted enablement, exact Secret projection, cross-Namespace denial, revision replacement, callback disable/reenable, and stop/delete after disabling the option. It explicitly excludes native Teams JWT enforcement, public TLS, provider delivery and model execution.",
+              "Verification performed: node scripts/ci/run-tests.mjs audit passed at 94346f810 with no issues; node --check passed for slack-proxy.mjs and render-installation-profile.mjs; git diff --check passed. No installed node_modules were present, so dependency-backed suites were not run. GitHub reported successful source-head lifecycle and image jobs in run 39616737356, including jobs 119279779995 and 119279779790; log retrieval failed, so leaf test counts and runtime qualification remain unverified.",
+              "The embedded feature changes no migration files. Its CI runner/AppArmor changes are separate infrastructure work, not embedded-channel semantics; they must not override frozen check policy. No obsolete PR16/PR19 implementation is needed."
+            ],
+            "suggestions": [
+              "Decision required: should the strict Teams UUID/env-object restrictions apply only to the trial's deployment admission, or intentionally narrow upstream Configuration-save behavior? Recommend preserving upstream-supported saves and validating resolved Teams deployment requirements without globally replacing the shared reference rules.",
+              "Generic feature fix, separate from combination adaptation: preserve the selected model's existing transport when enabling the channel proxy. Derive narrowly scoped model-host bypasses from admitted configuration and test a model request alongside allowed channel traffic and denied unrelated destinations. Do not describe the shared embedded process as credential or egress containment.",
+              "Combination adaptation: apply the trial exception to outbound admission, preparation and activation; require managed outbound; retain immutable channel-derived requirements and withdrawal; continue refusing additional embedded outbound modes. Update the profile renderer to the same contract and remove reliance on the shared runtime proxy.",
+              "Combine Teams callback ownership into one reconciler, retaining exact serving-revision selection, native JWT delegation, identity-header stripping and fenced cleanup, together with Teams directory/editor and guarded-media support.",
+              "Preserve upstream runtime pins, managed-mode/tool-policy checks and shared Secret validation. Keep previous integration migration SQL and journal entries unchanged; append any required evolution. Revalidate the combined candidate through the provisioning workflow, managed outbound denial/withdrawal tests, profile/Helm checks and current-image startup tests. Existing source-head CI is not combined-candidate proof."
+            ],
+            "order_suggestions": [
+              {
+                "before": "outbound",
+                "after": "embedded",
+                "reason": "The requested trial depends on revision-owned channel-derived outbound admission and lifecycle. Outbound currently rejects embedded requirements, so the trial must adapt that established owner.",
+                "kind": "dependency",
+                "evidence": [
+                  "a50b14647: apps/controller/src/drivers/compute/kubernetes/index.ts::admitGatewayOutbound",
+                  "90e30b8c: index.ts::admitGatewayOutbound and gatewayOutboundTransport"
+                ]
+              },
+              {
+                "before": "teams",
+                "after": "embedded",
+                "reason": "Establish Teams transport, packaging and callback ownership first, then extend the supported channel path to opted-in embedded execution without retaining competing callback reconcilers.",
+                "kind": "dependency",
+                "evidence": [
+                  "93c1dc4f: index.ts::reconcileTeamsRoute and apps/controller/src/drivers/channel/teams.ts",
+                  "94346f810: index.ts::reconcileTeamsCallback and tests/integration/kubernetes-compute-provisioning-real.test.mjs:970"
+                ]
+              }
+            ]
+          }
+        },
+        "first-admin-checkout": {
+          "sha": "37fac70dfb784351544189ad07909588b327ef47"
+        }
+      },
+      "decisions": {},
+      "pending": {
+        "key": "first-admin-assess",
+        "before": "37fac70dfb784351544189ad07909588b327ef47",
+        "workspace": "/Users/miguel/raw-labs/enterprise-openclaw-bundle/curation/oce/.maintain/worktrees/d9b3d8259b38496ca8da5d7150db0c67/feature-first-admin"
+      }
+    },
+    "error": "Run cancelled",
+    "cancel": 1
+  },
+  "events": [
+    {
+      "seq": 1,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:27:13.157029+00:00",
+      "kind": "planned",
+      "payload": {
+        "project": "oce"
+      }
+    },
+    {
+      "seq": 2,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:29:04.214654+00:00",
+      "kind": "background_started",
+      "payload": {
+        "pid": 26323,
+        "log": "/Users/miguel/raw-labs/enterprise-openclaw-bundle/curation/oce/.maintain/runs/d9b3d8259b38496ca8da5d7150db0c67/runner.log"
+      }
+    },
+    {
+      "seq": 3,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:29:48.099679+00:00",
+      "kind": "step_started",
+      "payload": {
+        "step": "embedded-assess"
+      }
+    },
+    {
+      "seq": 4,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:29:48.200338+00:00",
+      "kind": "worker_started",
+      "payload": {
+        "job": "embedded-assess-1",
+        "stage": "assess",
+        "settings": {
+          "executable": "codex",
+          "model": "gpt-6-astra",
+          "thinking": "high",
+          "timeout_seconds": 3600,
+          "attempts": 2
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:33:02.015770+00:00",
+      "kind": "step_completed",
+      "payload": {
+        "step": "embedded-assess",
+        "sha": "94346f8101230627f206ed9731f2c32beba27bad"
+      }
+    },
+    {
+      "seq": 6,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:34:15.997363+00:00",
+      "kind": "background_started",
+      "payload": {
+        "pid": 36329,
+        "log": "/Users/miguel/raw-labs/enterprise-openclaw-bundle/curation/oce/.maintain/runs/d9b3d8259b38496ca8da5d7150db0c67/runner.log"
+      }
+    },
+    {
+      "seq": 7,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:34:29.904101+00:00",
+      "kind": "step_started",
+      "payload": {
+        "step": "first-admin-assess"
+      }
+    },
+    {
+      "seq": 8,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:34:30.002998+00:00",
+      "kind": "worker_started",
+      "payload": {
+        "job": "first-admin-assess-1",
+        "stage": "assess",
+        "settings": {
+          "executable": "codex",
+          "model": "gpt-6-astra",
+          "thinking": "high",
+          "timeout_seconds": 3600,
+          "attempts": 2
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "run_id": "d9b3d8259b38496ca8da5d7150db0c67",
+      "time": "2026-10-29T03:35:43.919882+00:00",
+      "kind": "cancel_requested",
+      "payload": {}
+    }
+  ],
+  "retained": {
+    "37fac70dfb784351544189ad07909588b327ef47": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/37fac70dfb784351544189ad07909588b327ef47",
+    "5acf92b89f9053fec747a802e3790822a5b4340d": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/5acf92b89f9053fec747a802e3790822a5b4340d",
+    "65dc3e90ecb0799ddeb22899bbbc41a5548d37a1": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/65dc3e90ecb0799ddeb22899bbbc41a5548d37a1",
+    "8e20e2019fb4d067e0876fb10e59231dd70c5761": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/8e20e2019fb4d067e0876fb10e59231dd70c5761",
+    "90e30b8c6922732ba456ed102b5c72a79fa84b8c": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/90e30b8c6922732ba456ed102b5c72a79fa84b8c",
+    "93c1dc4f24b9f544b26a451b71a0cfeff34be4fc": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/93c1dc4f24b9f544b26a451b71a0cfeff34be4fc",
+    "94346f8101230627f206ed9731f2c32beba27bad": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/94346f8101230627f206ed9731f2c32beba27bad",
+    "a50b14647d4311764cce3359150149bc81f23431": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/a50b14647d4311764cce3359150149bc81f23431",
+    "b698b30abc802185905bf4ff28792a7b9cc1c04e": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/b698b30abc802185905bf4ff28792a7b9cc1c04e",
+    "f30db5c4045cbf2c1f5eef4576361112535ed8b4": "codex/maintain/oce/d9b3d8259b38496ca8da5d7150db0c67/objects/f30db5c4045cbf2c1f5eef4576361112535ed8b4"
+  },
+  "workspaces": {
+    "composition": "8e20e2019fb4d067e0876fb10e59231dd70c5761",
+    "feature-embedded": "94346f8101230627f206ed9731f2c32beba27bad",
+    "feature-first-admin": "37fac70dfb784351544189ad07909588b327ef47"
+  }
+}

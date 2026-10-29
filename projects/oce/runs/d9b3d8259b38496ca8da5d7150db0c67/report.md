@@ -1,6 +1,6 @@
 # Maintenance run d9b3d8259b38496ca8da5d7150db0c67
 
-Status: **running**
+Status: **cancelled**
 
 Recipe: `01bfefbf7417c9832b8e8865a9806a6177e8a418`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
@@ -47,5 +47,9 @@ Embedded channels are not absorbed by frozen upstream. The trial remains needed,
 ## Publication
 
 {}
+
+## Current issue
+
+Run cancelled
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
