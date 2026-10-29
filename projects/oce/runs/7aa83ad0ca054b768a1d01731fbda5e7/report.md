@@ -161,6 +161,16 @@ Retained the standalone outbound refresh and strengthened the owning API regress
 - API, workspace, documentation, and control-plane CLI checks were blocked by missing dependencies. No dependencies were installed.
 - PostgreSQL catalog qualification remains pending; catalogs.completed is null and migration execution remains fail-closed.
 
+### plugins-adapt
+
+Reviewed the prepared plugins refresh at 5521c0280 against frozen upstream. No additional edits or design decisions were needed. Runtime verification remains blocked by missing dependencies.
+- Plugin-policy preservation and admission checks coexist with upstream Gateway validation, managed-mode handling, and Google Workspace behavior.
+- Existing browser, REST, and PostgreSQL regressions remain registered; CI ownership audit passed.
+- Syntax checks and git diff --check passed. Harness flow validation passed.
+- REST tests could not load without typebox; workspace and document checks lacked prettier and @sindresorhus/slugify.
+- Agent-creation flow validation reports a pre-existing upstream changelog-format failure.
+- Migration history and upstream’s deleted breaking-changes page remain unchanged. Working tree is clean; no Git or remote writes occurred.
+
 Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
