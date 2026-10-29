@@ -163,6 +163,18 @@ The embedded Slack/Teams trial remains useful and is not absorbed by frozen upst
 - Existing behavioral proof: tests/conformance/kubernetes-compute.test.mjs covers trusted opt-in/default refusal and callback candidate fencing. tests/integration/kubernetes-compute-provisioning-real.test.mjs contains the regular API/PostgreSQL/Kubernetes scenario covering exact Secret projection, revision replacement, Teams disable/reenable, and stop after disabling the option. Its comments explicitly exclude native Teams dispatch, JWT verification, public TLS, and model execution. Historical passes in the implementation plan do not qualify the frozen-upstream combination.
 - The embedded feature changes no migration files relative to a7aa9219f. It provides no reason to alter previously published migration SQL or journal entries.
 
+### hosted-1-repair
+
+Completed narrow candidate repairs in six files. Candidate remains unqualified pending hosted runtime verification. No commits, remote writes, dependency installation, or check-policy changes.
+- Confirmed recorded CI run 40842601336 tested ba4c143d1d46967c921c15a552b1f87ed2b26e49.
+- Fixed the independent roles defect by retaining the checked principal in runtime authorization denials; extended existing HTTP coverage with exact denial-audit assertions.
+- Fixed the composed lifecycle fixture by activating revision 2 and asserting rejected admission preserves availability and admits no successor.
+- Corrected embedded Teams Secret syntax and enabled both channels in the plugin-loading smoke. Fixed synthetic certificate permissions without relaxing container restrictions.
+- Regenerated the API reference from the checked-in schema and updated the owning runtime flow.
+- Passed syntax, changed-file formatting, suite-registration audit, workspace boundaries, flow validation, Markdown length, 307-page/4846-link validation, and specification checks.
+- Verified all 62 published migration SQL files and journal entries remain unchanged.
+- Application dependencies are absent. Integration/native tests, before-and-after regression execution, and full route-based OpenAPI regeneration were not run. No skipped runtime proof is claimed as passed.
+
 Execution tool source digests: `48c0b71d35c1b755a91327cd6dab1c9096675621f648dd1dcde388bca57018b5`
 
 Failed check combined-invariants at `09d327de7fe56bf5d896a4e58917a48355c4d0c3`: Command failed (1): python3
