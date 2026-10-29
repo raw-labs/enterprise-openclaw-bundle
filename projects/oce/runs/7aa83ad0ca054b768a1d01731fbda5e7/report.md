@@ -183,6 +183,17 @@ Reviewed the prepared profiles refresh and extended custom-starter authorization
 - Documentation and workspace checks were blocked by missing dependencies. PostgreSQL and Storybook prerequisites are unavailable; lint, formatting, and visual proof remain unverified.
 - Only tests/browser/console-agent-presets.test.ts was edited. No Git mutations, remote writes, dependency installation, migration changes, or frozen check-policy changes occurred.
 
+### roles-adapt
+
+Completed source-level roles refresh fixes. Full runtime and PostgreSQL qualification remain outstanding.
+- Fixed the runtime HTTP test’s missing ServerResponse import and corrected WebSocket denial fixtures to exercise assignment rejection with a managed identity.
+- Updated all role-patch checksum consumers; patch application check passed.
+- Runtime-assets tests passed: 2 tests, no skips. Suite-registration audit and git diff --check passed.
+- All 65 frozen-upstream SQL files and the upstream journal prefix remain unchanged.
+- API tests could not load @openclaw-enterprise/utils; workspace verification could not load prettier.
+- The completed migration catalog remains unqualified and fails closed. Local PostgreSQL is 17.6; qualification requires 18.6.
+- No commits, remote writes, dependency installation, or private combination adaptations were made.
+
 Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
