@@ -57,6 +57,7 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 - teams-revalidation-checks / source-audit: passed at `0a52d37243653170f8924ff1b679bef3239ab695`; log SHA-256 `641e076dd450df60af18aeef649c472a4454218a4e86834a739f814320514917`
 - revalidation-integration-checks / combined-invariants: passed at `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; log SHA-256 `d069365aa6f11b5b3156e2f8b17e8b58194c68cd9f1f2b7750977860c72deab6`
 - revalidation-integration-checks / migration-catalog: passed at `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; log SHA-256 `4bbf603037d56f8c016592e7ff5db359a8e735bafa01bb96afb8e172cd6412ca`
+- Hosted attempt 1: `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; checking
 
 ### profiles-assess
 
