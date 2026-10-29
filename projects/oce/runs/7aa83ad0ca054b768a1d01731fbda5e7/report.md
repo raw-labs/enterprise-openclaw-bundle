@@ -134,6 +134,14 @@ Teams is not absorbed by frozen upstream. Retain its editor, directory, callback
 - Runtime packaging must retain upstream's Docker assembly and deploy/runtime/openclaw-source.json pin 554f0b886bde6c089578c49967227f8b50d1cf16 while adding msteams. Existing runtime-image-startup tests cover SDK callback rejection and guarded media; tests/fixtures/teams-attachment-download.mjs exercises real SDK transport with simulated DNS/connections, not live Microsoft delivery.
 - Validation at Teams HEAD: CI manifest audit passed with no issues; syntax checks for Teams editor, directory UI, and proxy passed; git diff --check passed. teams-directory.test.mjs failed during import because @openclaw-enterprise/occ is unavailable: zero behavioral tests passed. No dependencies were installed, and no hosted CI, browser, cluster, or native-image pass is claimed. The worktree remained clean.
 
+### embedded-adapt
+
+Reviewed the independent embedded refresh and added missing Teams image-loading coverage. Existing upstream validation repairs remain intact; combination adaptations were not introduced.
+- Extended the registered embedded runtime startup case to require Slack and Teams plugins with installed dependencies; documented its proof limits.
+- Structural suite audit passed with no issues. Syntax, whitespace, and channel flow structure checks passed.
+- Focused API and image tests failed during import because workspace dependencies are absent. Workspace and document checks also lacked dependencies; behavioral verification remains pending.
+- Migration files and upstream runtime source pin remain unchanged. No Git or remote writes occurred.
+
 Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
