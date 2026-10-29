@@ -277,8 +277,4 @@ Failed check combined-invariants at `ae6fecaf23ddb79a5967d50ce34a2300b57e0a6e`: 
 
 {}
 
-## Current issue
-
-Command failed (1): python3
-
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
