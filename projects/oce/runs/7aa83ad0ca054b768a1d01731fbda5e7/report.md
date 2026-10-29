@@ -26,6 +26,7 @@ Worker: `codex`, requested model `gpt-6-astra`, effort `high`
 
 Order: embedded → first-admin → outbound → plugins → profiles → roles → secrets → teams
 
+- Attempt 1: embedded, first-admin, outbound, plugins, profiles, roles, secrets, teams; running
 
 ## Verification
 
