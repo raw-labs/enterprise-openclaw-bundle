@@ -1,6 +1,6 @@
 # Maintenance run 7aa83ad0ca054b768a1d01731fbda5e7
 
-Status: **running**
+Status: **failed**
 
 Recipe: `a14318257f37ed6f62957d35df94021cf4cfa8f7`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
@@ -237,5 +237,9 @@ Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f
 ## Publication
 
 {}
+
+## Current issue
+
+Coding worker returned an assessment status
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
