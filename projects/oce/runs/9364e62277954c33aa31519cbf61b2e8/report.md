@@ -39,6 +39,8 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 - roles-revalidation-checks / source-audit: passed at `489576d57120f1f83da371c0dd5a22bc7c7fddf8`; log SHA-256 `488f3e70ceca574217d5190cce68549bb26b2b13fc33087fc3ef72cc0f59c74a`
 - secrets-revalidation-checks / source-audit: passed at `b8510e379cfc9ea301406d4092ba05b09ef1126e`; log SHA-256 `760ec357281181432aa8828d54521125683effa2321ba1bb505b4e288376b1d0`
 - teams-revalidation-checks / source-audit: passed at `0a52d37243653170f8924ff1b679bef3239ab695`; log SHA-256 `641e076dd450df60af18aeef649c472a4454218a4e86834a739f814320514917`
+- revalidation-integration-checks / combined-invariants: passed at `09d327de7fe56bf5d896a4e58917a48355c4d0c3`; log SHA-256 `fb2290bda6b19a65cf162199efcd2df28f79c2f384a09cf8ac1eb2356d9d6f27`
+- revalidation-integration-checks / migration-catalog: passed at `09d327de7fe56bf5d896a4e58917a48355c4d0c3`; log SHA-256 `4bbf603037d56f8c016592e7ff5db359a8e735bafa01bb96afb8e172cd6412ca`
 
 ### profiles-assess
 
