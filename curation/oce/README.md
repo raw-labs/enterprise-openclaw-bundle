@@ -33,7 +33,18 @@ local construction and `qualify` continues hosted qualification. Retained object
 branches and a run-specific candidate live in the OCE fork. Source PRs stay intact.
 
 Local checks prove diff/suite-registration structure and published migration-prefix integrity;
-they are not runtime qualification. Dependency-backed workspace, formatting and
+they are not runtime qualification. The catalog check measures the exact migration
+SQL with PostgreSQL 18.6 and the pinned Drizzle implementation, then measures a real
+dump/restore. Its isolated `codex/maintain/oce/RUN/catalog/INPUTS-METHOD` probe adds
+only the frozen measurement harness on a separate branch. It uses the existing
+manual Full Integration workflow identity with a probe-only job; it never changes
+the candidate workflow or publishes images. Only that run's disposable database
+and volume are removed. Measured schema-input and method digests bind safe receipts;
+metadata-only repair can reuse the measurement, while changed SQL requires another.
+The guard refuses guessed/mismatched completed, ledger or restore catalogs.
+Canonical guarded migration and upgrade tests remain required on the final candidate.
+
+Dependency-backed workspace, formatting and
 static checks remain mandatory in canonical hosted CI. Hosted source checks dispatch CI and CodeQL
 once per exact candidate, validate the full canonical CI aggregate and small lane
 receipts, and require the named combined scenarios without skips. Native checks
@@ -48,3 +59,8 @@ the OCE candidate and existing suite manifests. `prompts/` owns contextual worke
 guidance. `checks/` owns orchestration and evidence validation, not product behavior.
 None of this proves live Slack/Teams messages, public Teams ingress, model turns,
 customer installations or a shipping bundle.
+
+If a committed check itself is wrong, stop the completed build, commit the corrected
+recipe, and run `maintain revalidate OLD_RUN --reason TEXT`, then build the new run.
+This retains exact selected inputs and generated code, preserves the old recipe
+and results, and reruns checks. Changed intent, prompts or selection need a new plan.

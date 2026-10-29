@@ -136,6 +136,15 @@
       "timeout_seconds": 900
     },
     {
+      "name": "migration-catalog",
+      "stage": "integration",
+      "argv": [
+        "python3",
+        "{project}/checks/catalog.py"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
       "name": "source-ci",
       "stage": "hosted",
       "argv": [

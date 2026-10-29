@@ -18,6 +18,7 @@ from pathlib import Path
 
 CHECKS = Path(__file__).resolve().parents[2] / "curation/oce/checks"
 sys.path.insert(0, str(CHECKS))
+from catalog import fingerprint, validate_measurement  # noqa: E402
 from hosted import validate_lane, validate_platforms  # noqa: E402
 from local import check_prefix  # noqa: E402
 from oce_evidence import RangeFile  # noqa: E402
@@ -96,6 +97,50 @@ class CurationEvidenceTests(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
                 validate_lane(changed, "a" * 40, True)
 
+    def test_catalog_measurement_is_bound_to_sql_method_and_real_server_identity(self):
+        measurement = {
+            "schema_digest": "schema",
+            "method_digest": "method",
+            "completed_catalog": "a" * 64,
+            "ledger_catalog": "b" * 64,
+            "restored_catalog": "c" * 64,
+            "postgresql": "18.6",
+            "drizzle": "0.45.4",
+            "probe_sha": "d" * 40,
+            "run_id": "123",
+        }
+        validate_measurement(measurement, "schema", "method")
+        for key in measurement:
+            changed = {**measurement, key: "wrong"}
+            with self.subTest(key=key), self.assertRaises(RuntimeError):
+                validate_measurement(changed, "schema", "method")
+        with tempfile.TemporaryDirectory() as directory, contextlib.chdir(directory):
+
+            def git(*args):
+                return subprocess.check_output(
+                    ["git", *args], stderr=subprocess.DEVNULL
+                )
+
+            git("init", "--initial-branch=main")
+            git("config", "user.name", "Curation Test")
+            git("config", "user.email", "curation@example.invalid")
+            Path("migrations/meta").mkdir(parents=True)
+            sql = Path("migrations/0000_first.sql")
+            sql.write_text("CREATE TABLE example (id integer);\n")
+            manifest = Path("migrations/meta/_canonical-history.json")
+            manifest.write_text('{"catalogs":{"completed":null}}')
+            git("add", ".")
+            git("commit", "-m", "unmeasured SQL")
+            original = fingerprint()
+            manifest.write_text('{"catalogs":{"completed":"measured"}}')
+            git("add", ".")
+            git("commit", "-m", "record measurement only")
+            self.assertEqual(fingerprint(), original)
+            sql.write_text("CREATE TABLE example (id text);\n")
+            git("add", ".")
+            git("commit", "-m", "different schema")
+            self.assertNotEqual(fingerprint(), original)
+
     def test_zip_receipt_uses_bounded_http_ranges_and_rejects_whole_download(self):
         content = io.BytesIO()
         with zipfile.ZipFile(content, "w", zipfile.ZIP_STORED) as archive:
@@ -173,7 +218,15 @@ class CurationEvidenceTests(unittest.TestCase):
             Path("migrations/0001_second.sql").write_text(
                 "ALTER TABLE example ADD COLUMN name text;\n"
             )
+            Path("migrations/init-local.sql").write_text(
+                "-- Bootstrap helper, not a migration.\n"
+            )
             self.assertEqual(check_prefix(previous)["candidate_entries"], 2)
+            extra = Path("migrations/0002_unregistered.sql")
+            extra.write_text("SELECT 1;\n")
+            with self.assertRaisesRegex(RuntimeError, "SQL inventory differ"):
+                check_prefix(previous)
+            extra.unlink()
             sql.write_text("CREATE TABLE example (id text);\n")
             with self.assertRaisesRegex(RuntimeError, "SQL changed"):
                 check_prefix(previous)

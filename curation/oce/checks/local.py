@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -38,7 +39,11 @@ def check_prefix(previous):
         raise RuntimeError(
             "Migration journal has duplicate identities or invalid indices"
         )
-    if set(tags) != {path.stem for path in Path("migrations").glob("*.sql")}:
+    if set(tags) != {
+        path.stem
+        for path in Path("migrations").glob("*.sql")
+        if re.fullmatch(r"[0-9]+_.+", path.stem)
+    }:
         raise RuntimeError("Migration journal and SQL inventory differ")
     return {
         "published_entries": len(prefix),
