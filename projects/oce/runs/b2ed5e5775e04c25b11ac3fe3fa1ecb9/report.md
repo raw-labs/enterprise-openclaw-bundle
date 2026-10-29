@@ -45,6 +45,80 @@ This reason is saved operator guidance for the new run. The correction is part o
 Order: embedded → first-admin → outbound → plugins → profiles → roles → secrets → teams
 
 
+## Operator notes
+
+- Migration ownership clarification: preservation of all 62 SQL files and journal entries from starting_integration applies to the FINAL COMBINED INTEGRATION only, enforced by the engine preserve guard and integration check. Standalone feature refreshes must remain upstream-contributable: retain frozen upstream migration history and this feature own intentional migration; never import unrelated role/embedded/private integration migrations. Append/adapt the standalone feature migration after upstream as needed and qualify its actual catalog through the required PostgreSQL CI. Keep existing upstream SQL immutable. The current original feature PR remains entirely untouched. Final composition later reconciles feature/upstream evolution onto the old integration 62-entry prefix with forward-only appends. This resolves ownership within the existing authorized intent; no new product behavior or source stack is requested. Do not install or reconcile local dependencies to run checks. Report missing local prerequisites honestly; final canonical CI must supply the actual PostgreSQL, API/browser and native proof.
+- The current human task is to build/test a separate combined candidate, keeping original PRs/main/integration unchanged. A coding-stage status of completed means that bounded coding work is finished; it never means the whole candidate is qualified. Report actual gaps honestly. Do not use assessment-only needed status for coding. Keep new catalog hashes explicitly null until real measurement; do not invent them or weaken the production guard. The new committed control recipe has an actual PostgreSQL 18.6/Drizzle 0.45.4 fresh/incremental and dump/restore measurement for every prefix; it will measure the FINAL combined SQL, then canonical full CI will prove guarded populated upgrades and application behavior. The older recipe in this parent run has a known inventory bug counting init-local.sql as a migration. Do not delete or change that bootstrap helper or falsify product layout to accommodate the bug: finish clean composition, preserve all 62 SQL/journal entries, and let the operator create a versioned check-policy revalidation run afterward.
+  Do not invoke local pnpm at all while the matching graph is absent: the disable flag did not prevent automatic reconciliation. Do not install, copy, link or reconcile dependencies. Use direct dependency-independent Node audits/syntax/flow checks; missing local dependencies remain explicit gaps supplied by normal hosted CI later. No Git commits/ref/config edits or remote writes by coding workers.
+  For final composition, preserve current upstream's CI-owned four native verification jobs (manual ci.yml calls container-check.yml). Do not dispatch a second native workflow. The fork repository Node-base variable remains the older 934... digest and MUST stay unchanged. Source CI currently passes that variable even though checked-in images-packaging/Dockerfile use the new 6449... Node24.22.1 digest. Correct the candidate CI call using a checked-in-source-derived job output, retaining all four native jobs, approved host/AppArmor/archive-import adapters and publication approval gates. The new control check refuses this known stale-base mismatch before candidate publication. This is an integration-only correction, not authority to change image recipes/pins, repository variables or releases.
+- Stopped-parent static preflight at ae6fecaf23ddb79a5967d50ce34a2300b57e0a6e found actual formatting and documentation failures to correct in the new check-policy revalidation candidate, without changing runtime behavior, migration SQL, historical decisions or Manual Notes. These are bounded integration cleanup, not a feature request. Direct matching Prettier 3.9.10 reported the 22 files below. External docs dependencies matched target docs package/lock and were used read-only through /private/tmp/oce-maintain-static-loader.mjs; full docs link check passed307 pages4846 links and specs passed103 documents26RFCs770links. docs word-count failed eight pages; condense repetition below2500 while keeping complete owner scope, links/anchors and history. Do not add exemptions or run runtime tests for prose-only changes. No local pnpm or dependency installation/reconciliation. The optional external loader is for read-only static tooling only; do not redirect target product modules or commit this temporary loader. Final canonical CI provides dependency-backed proof. New migration metadata must use actual new final combined measurement and production guarded populated upgrades; never copy the standalone65-prefix probe hashes blindly.
+  
+  Formatting:
+  Checking formatting...
+  [warn] apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts
+  [warn] packages/occ/src/errors.ts
+  [warn] tests/browser/console-agent-channels.test.mjs
+  [warn] tests/conformance/kubernetes-compute.test.mjs
+  [warn] tests/conformance/native-admin-upgrade-reset.test.mjs
+  [warn] tests/helpers/kubernetes-compute.mjs
+  [warn] tests/helpers/runtime-model-probe-certificates.mjs
+  [warn] tests/integration/configuration-controller.test.mjs
+  [warn] tests/integration/console-api.test.mjs
+  [warn] tests/integration/gateway-outbound-proxy.test.mjs
+  [warn] tests/integration/kubernetes-compute-provisioning-real.test.mjs
+  [warn] tests/integration/native-admin-access.test.mjs
+  [warn] tests/integration/postgres-migration-compatibility.test.mjs
+  [warn] tests/integration/teams-directory.test.mjs
+  [warn] docs/contributing/console-storybook.md
+  [warn] docs/contributing/specifications.md
+  [warn] docs/flows/agent-native-admin/history.md
+  [warn] docs/flows/configuration-driver/persistence-and-revisions.md
+  [warn] docs/reference/agents.md
+  [warn] docs/reference/cheatsheets/permissions.md
+  [warn] docs/reference/drivers/selection.md
+  [warn] docs/reference/settings/production.md
+  [warn] Code style issues found in 22 files. Run Prettier with --write to fix.
+  
+  Length (tail contains exact over-limit pages):
+  - specs/rfcs/0026-gateway-outbound.md: 1623 words
+  8 Markdown files exceed the 2500-word hard limit:
+  - deploy/runtime/README.md: 2594 words
+    - Runtime image recipe (line 1): 1087 words
+    - Build a local runtime image (line 150): 453 words
+    - Verify the local image (line 285): 331 words
+  - docs/flows/agent-native-admin.md: 2655 words
+    - 6. OCC intercepts native-host HTTP requests (line 191): 356 words
+    - Flow (line 20): 349 words
+    - 7. OCC proxies native WebSocket upgrades (line 228): 278 words
+  - docs/flows/coordinated-production-upgrade.md: 2531 words
+    - 1. Prepare the candidate (line 56): 695 words
+    - 5. Deploy and verify the recorded fleet (line 223): 410 words
+    - Changelog (line 328): 259 words
+  - docs/flows/platform-console.md: 2510 words
+    - 2. Resolve the session before private reads (line 135): 488 words
+    - Flow (line 20): 417 words
+    - 4–6. Edit the Agent and access runtime files (line 246): 413 words
+  - docs/reference/agent-native-admin.md: 2832 words
+    - Authorization and availability (line 70): 656 words
+    - Native authority and drift (line 144): 518 words
+    - Requirements (line 21): 296 words
+  - docs/reference/authorization.md: 2524 words
+    - Manage Namespace policy (line 193): 912 words
+    - Principals (line 64): 302 words
+    - Permissions and Roles (line 104): 250 words
+  - docs/reference/drivers/kubernetes-compute/networking-and-isolation.md: 2531 words
+    - Gateway authentication (line 58): 769 words
+    - Namespaces and isolation (line 282): 454 words
+    - Private Agent gateway routes (line 212): 424 words
+  - docs/reference/settings/operations.md: 2508 words
+    - Local Compose and PostgreSQL configuration (line 270): 693 words
+    - Migration history (line 40): 637 words
+    - Controller worker environment (line 223): 364 words
+- Root review on 2026-10-29: classify the roles checkedPrincipalId correction as an upstream-refresh adaptation. Original PR1 f30db5c4045cbf2c1f5eef4576361112535ed8b4 has a three-argument AuthorizationDeniedError constructor and no HTTP checkedPrincipalId filter; the newer upstream8e contract requires the fourth argument. Preserve the candidate correction, caller-specific runtime grant explanation and audit, plus the new privacy filter. The original PR-as-is omission was not a defect under its older complete contract. Original embedded943 has no bad draftValues.channels.msteams.appPassword assignment; the old $NAME fixture is only confirmed in the refreshed tree. Treat those fixture changes as refresh/composition adaptations unless the original complete behavior is independently verified. The late-DNS-disconnect proxy bug remains separately confirmed in original PR18 a50b14647d4311764cce3359150149bc81f23431 and identical pre-repair blob3ab95c1e133ed84dd478c2adc7c1ab235aa6e70e.
+  Successor63ae3115d415dde276085398befd40220ed7d47b CI40846862811 reached a later assertion in the same third real embedded provisioning case: job123356507425 reports line1521 expects /dedicated/ while the canonical ResourceConflict response is generic. Exact raw log: /private/tmp/oce-maintain-63-k3d-state.log. Inspect the current HTTP error contract and supported Agent PATCH behavior; retain the409/refusal code and the actual unchanged saved/serving/proxy-policy checks for extra embedded destinations. Never loosen the production guard or simply accept any failure. Continue using the complete final CI evidence before a bounded candidate-only repair.
+  Original PRs, their heads/bases/statuses, main and codex/raw-integration stay untouched. No source-owner messages, promotion, tags, releases, shipping-image publication, deployment or bundle ingredient changes are authorized. These are operator review findings, not successful verification receipts.
+  
+
 ## Verification
 
 - embedded-revalidation-checks / source-audit: passed at `94c824071c9b0ae248a4ebb4a22d3e44b5532cfc`; log SHA-256 `9cd1e847bd46345d6e8582006f941d91436fd8669551877c94030fdfea58f802`
