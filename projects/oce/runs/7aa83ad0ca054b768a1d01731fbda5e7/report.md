@@ -151,6 +151,15 @@ Retained first-admin preparation and upstream improvements. Added five existing 
 - Source audit passed with no issues; syntax and whitespace checks passed.
 - Runtime tests could not load: typebox is missing. Workspace verification is blocked by missing prettier. No dependencies were installed.
 
+### outbound-adapt
+
+Retained the standalone outbound refresh and strengthened the owning API regression for both Gateway managed modes. No Git or remote writes.
+- Proxy settings remain saveable; managed outbound admission rejects overrides. Coverage also permits the same Configuration without managed outbound.
+- All 64 upstream migration files and journal entries are unchanged; all 65 candidate SQL hashes match.
+- Suite-selection audit, syntax check, diff check, flow validation, and invalid-policy test passed.
+- API, workspace, documentation, and control-plane CLI checks were blocked by missing dependencies. No dependencies were installed.
+- PostgreSQL catalog qualification remains pending; catalogs.completed is null and migration execution remains fail-closed.
+
 Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
