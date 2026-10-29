@@ -156,7 +156,7 @@ def source(sha, branch, state):
     ]
     cases = {pattern: require_case(summaries, pattern) for pattern in required}
     for name in (
-        "native-admin-session.test.mjs",
+        "native-admin-session-postgres.test.mjs",
         "postgres-migration-compatibility.test.mjs",
     ):
         files = [
