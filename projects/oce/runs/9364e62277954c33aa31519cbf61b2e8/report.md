@@ -150,6 +150,8 @@ Execution tool source digests: `48c0b71d35c1b755a91327cd6dab1c9096675621f648dd1d
 
 ## Publication
 
-{}
+{
+  "candidate_branch": "codex/maintain/9364e62277954c33aa31519cbf61b2e8"
+}
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
