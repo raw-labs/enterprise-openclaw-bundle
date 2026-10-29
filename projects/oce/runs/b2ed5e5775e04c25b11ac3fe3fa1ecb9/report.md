@@ -252,6 +252,16 @@ Completed narrow candidate repairs in six files. Candidate remains unqualified p
 - Verified all 62 published migration SQL files and journal entries remain unchanged.
 - Application dependencies are absent. Integration/native tests, before-and-after regression execution, and full route-based OpenAPI regeneration were not run. No skipped runtime proof is claimed as passed.
 
+### hosted-2-repair
+
+Repaired the candidate-only test mismatch and strengthened refusal coverage. Bounded coding is complete; candidate qualification remains pending.
+- CI run 40846862811, job 123356507425 failed at line 1521: HTTP 409 passed, but the test expected internal Driver text instead of the canonical sanitized response. This was a harness mismatch, not an observed infrastructure or credential failure.
+- Updated only tests/integration/kubernetes-compute-provisioning-real.test.mjs. Both rejected outbound PATCH attempts now require RESOURCE_CONFLICT and the exact public message, then verify unchanged saved selection, active revision, serving workloads, callback ownership, and channel-only proxy policy.
+- The invalid assertion is absent from both original and refreshed embedded feature heads. No upstream-facing product defect is established by this failure.
+- Passed Node syntax, git diff --check, CI suite-registration audit, and Prettier 3.9.10. Workspace audit passed using the approved read-only static loader after direct execution encountered missing local Prettier.
+- Runtime tests were not run: local dependencies and configured Kubernetes/PostgreSQL fixtures are absent. No skipped proof is claimed as passed.
+- No commits, remote writes, migration changes, production changes, or frozen-check modifications. Existing cutover and cleanup coverage remains intact.
+
 Execution tool source digests: `48c0b71d35c1b755a91327cd6dab1c9096675621f648dd1dcde388bca57018b5`, `dbb2a393f3d665272b3ef40bb4ff80ac8a82d8a867dfd9b09124faf1424a6656`
 
 Failed check combined-invariants at `09d327de7fe56bf5d896a4e58917a48355c4d0c3`: Command failed (1): python3
