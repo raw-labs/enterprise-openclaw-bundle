@@ -143,6 +143,13 @@ Reviewed the independent embedded refresh and added missing Teams image-loading 
 - Focused API and image tests failed during import because workspace dependencies are absent. Workspace and document checks also lacked dependencies; behavioral verification remains pending.
 - Migration files and upstream runtime source pin remain unchanged. No Git or remote writes occurred.
 
+### first-admin-adapt
+
+Retained first-admin preparation and upstream improvements. Added five existing regression scenarios to required CI coverage in two suite manifests. No combination behavior, Git writes, or migration changes.
+- Preserved security defaults, Agent naming, socket/audit handling, and managed-mode restrictions.
+- Source audit passed with no issues; syntax and whitespace checks passed.
+- Runtime tests could not load: typebox is missing. Workspace verification is blocked by missing prettier. No dependencies were installed.
+
 Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
