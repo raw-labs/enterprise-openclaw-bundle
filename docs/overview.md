@@ -14,6 +14,7 @@ and credentials. Packaging a plugin does not establish provider access.
 
 | Directory | Owner and purpose |
 | --- | --- |
+| `curation/oce/` | Versioned OCE maintenance recipe, worker guidance and candidate verification; no release publication. |
 | `bundles/<version>/` | Maintained definitions, exact source selection, confinement pins and release-specific patches. |
 | `presets/` | Agent templates selected by definition; they are seeded by OCE. |
 | `profiles/` | Installation profiles selected by definition; they guide input rendering. |

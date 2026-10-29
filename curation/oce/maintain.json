@@ -1,0 +1,168 @@
+{
+  "version": 2,
+  "name": "oce",
+  "fork": "https://github.com/raw-labs/openclaw-enterprise.git",
+  "upstream": "https://github.com/openclaw/openclaw-enterprise.git",
+  "upstream_branch": "main",
+  "integration_branch": "codex/raw-integration",
+  "owner": "miguelbranco80",
+  "protected_branches": [
+    "main",
+    "master"
+  ],
+  "allow_feature_push": false,
+  "worker": {
+    "provider": "codex",
+    "options": {
+      "executable": "codex",
+      "model": "gpt-6-astra",
+      "thinking": "high",
+      "timeout_seconds": 3600,
+      "attempts": 2
+    }
+  },
+  "persistence": {
+    "remote": "https://github.com/raw-labs/enterprise-openclaw-bundle.git",
+    "branch": "codex/maintain-records"
+  },
+  "composition_attempts": 3,
+  "guidance": "This is an isolated OCE integration candidate. Keep all source PR heads, bases, states and auto-merge settings unchanged. Keep fork main and codex/raw-integration unchanged. Never publish releases, tags, images or deployments. The engine alone may retain objects and publish its candidate. Keep the latest upstream improvements. Preserve all published migration SQL bytes and journal entries from the previous integration; append required evolution. Source PR16 and PR19 are closed and supplied by upstream; do not reintroduce their obsolete partial implementations. Follow the target repository instructions. No dependency installation or reconciliation as a verification side effect; use the configured local audits and hosted CI for missing dependencies. npm_config_verify_deps_before_run=false for all pnpm invocations. Generic feature defects and their exact upstream-facing fixes must be identified separately from combination adaptations. No source-PR writes are authorized.",
+  "features": [
+    {
+      "id": "profiles",
+      "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/11",
+      "intent": "Support trusted custom Installation profiles, explicit Preset seeding, and readable custom starters."
+    },
+    {
+      "id": "secrets",
+      "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/13",
+      "intent": "Grant exact Agent access to every accepted Configuration Secret through the regular save workflow."
+    },
+    {
+      "id": "plugins",
+      "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/15",
+      "intent": "Preserve native plugin permission and admission across Harness selection and changes."
+    },
+    {
+      "id": "roles",
+      "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/1",
+      "intent": "Give each person an exact configured native OpenClaw role, independent from OCE administration, with admission and revocation."
+    },
+    {
+      "id": "first-admin",
+      "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/12",
+      "intent": "Prepare native administration on first Agent deployment while keeping exact runtime access authority."
+    },
+    {
+      "id": "outbound",
+      "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/18",
+      "intent": "Manage revision-owned Gateway HTTPS egress with exact per-Agent policy, lifecycle withdrawal, and immutable admission."
+    },
+    {
+      "id": "teams",
+      "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/2",
+      "intent": "Support Microsoft Teams alongside Slack, including editor, directory, exact callback ownership and guarded native media."
+    },
+    {
+      "id": "embedded",
+      "pr": "https://github.com/raw-labs/openclaw-enterprise/pull/17",
+      "intent": "Support the explicitly enabled embedded Slack and Teams trial using the managed channel-derived outbound path."
+    }
+  ],
+  "prompts": {
+    "compose": "prompts/compose.md",
+    "conflict": "prompts/compose.md",
+    "repair": "prompts/repair.md",
+    "refresh": "prompts/refresh.md",
+    "order": "prompts/order.md"
+  },
+  "adapters": [
+    {
+      "id": "native-role-first-admission",
+      "features": [
+        "roles",
+        "first-admin"
+      ],
+      "guidance": "Preserve exact per-person configured role and Agent use authority alongside first-deployment preparation and upstream assigning-session protection. Administration alone must not grant runtime use."
+    },
+    {
+      "id": "managed-channels",
+      "features": [
+        "teams",
+        "outbound"
+      ],
+      "guidance": "Aggregate Slack and Teams gateway/control-plane requirements through the generic revision-owned managed proxy. Retain native media URL, redirect, token and TLS guards. Do not restore the retired shared Slack proxy, legacy proxy URLs or installation-wide Teams host lists. User proxy/trust-marker overrides are reserved; dedicated Harnesses receive neither Gateway credentials nor its trust marker."
+    },
+    {
+      "id": "embedded-channels",
+      "features": [
+        "teams",
+        "outbound",
+        "embedded"
+      ],
+      "guidance": "Support both Slack and Teams in embedded and dedicated modes. Embedded trial defaults off, uses runtime.channels.experimentalEmbeddedChannels, requires managed outbound and only channel-derived destinations. Additional approved hosts remain dedicated-only. Preserve callback exact owner/revision/UID/resourceVersion fencing, serving annotation authority, provider cutovers and full cleanup."
+    },
+    {
+      "id": "embedded-profile",
+      "features": [
+        "profiles",
+        "embedded",
+        "outbound"
+      ],
+      "guidance": "Render trusted embedded opt-in only in the existing nested runtime.channels.experimentalEmbeddedChannels. Retain paired API/worker checksums and shared-credentials warning; opt-in requires enabled managed outbound."
+    }
+  ],
+  "preserve_paths": [
+    "migrations/*.sql"
+  ],
+  "checks": [
+    {
+      "name": "source-audit",
+      "stage": "feature",
+      "argv": [
+        "python3",
+        "{project}/checks/local.py"
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "name": "combined-invariants",
+      "stage": "integration",
+      "argv": [
+        "python3",
+        "{project}/checks/local.py"
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "name": "source-ci",
+      "stage": "hosted",
+      "argv": [
+        "python3",
+        "{project}/checks/hosted.py",
+        "source"
+      ],
+      "timeout_seconds": 10800
+    },
+    {
+      "name": "native-images",
+      "stage": "hosted",
+      "argv": [
+        "python3",
+        "{project}/checks/hosted.py",
+        "native"
+      ],
+      "timeout_seconds": 10800
+    }
+  ],
+  "required_github_checks": [
+    "CI Required",
+    "First Agent Smoke",
+    "CodeQL (javascript-typescript)",
+    "CodeQL (actions)",
+    "Prepare controller (amd64)",
+    "Prepare controller (arm64)",
+    "Prepare runtime (amd64)",
+    "Prepare runtime (arm64)"
+  ]
+}

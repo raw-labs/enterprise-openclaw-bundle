@@ -8,3 +8,6 @@ __pycache__/
 .env*
 .ruff_cache/
 .venv/
+
+# Maintain execution data is local; recipes and safe Git records are versioned.
+.maintain/

@@ -16,6 +16,7 @@ OCE curation and release factory.
 - [Operations procedure](docs/operate.md): installation owners.
 - [Download, access and mirrors](docs/distribution.md): release retrieval, image access and mirrors.
 
+- [OCE maintenance recipe](curation/oce/README.md): build and qualify an isolated upstream-plus-features candidate.
 - [Bundle definitions](bundles/): versioned ingredients.
 - [Bundle schema](docs/bundle-schema.md): supported fields and how to extend them.
 - [Agent presets](presets/) and [installation profiles](profiles/): selectable source ingredients.
