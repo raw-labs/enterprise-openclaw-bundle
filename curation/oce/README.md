@@ -32,10 +32,10 @@ check receipts. Ignored `.maintain/` contains local SQLite, workspaces and raw l
 local construction and `qualify` continues hosted qualification. Retained object
 branches and a run-specific candidate live in the OCE fork. Source PRs stay intact.
 
-Local checks prove diff/suite-registration structure and published migration-prefix integrity;
+Local checks prove diff/suite-registration structure and published migration-prefix integrity. Historical journal gaps are valid: published entries stay exact, and each new index matches its filename prefix so Drizzle generates the next migration safely;
 they are not runtime qualification. The catalog check measures the exact migration
 SQL with PostgreSQL 18.6 and the pinned Drizzle implementation, then measures a real
-dump/restore for the complete schema and every migration prefix. Incremental and
+dump/restore for the complete schema and every migration prefix, followed by actual SQL upgrades of each restored prefix. Exact measured mixed catalogs remain separate from fresh/fully restored catalogs; guard and grant checks stay mandatory. Incremental and
 fresh final catalogs must agree; measuring a prefix does not admit it into the
 production migration policy. Its isolated `codex/maintain/oce/RUN/catalog/INPUTS-METHOD` probe adds
 only the frozen measurement harness on a separate branch. It uses the existing

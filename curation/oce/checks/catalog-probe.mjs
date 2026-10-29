@@ -92,12 +92,19 @@ try {
       execFileSync("docker", ["exec", "-i", container, "pg_restore", "-U", "postgres", "--single-transaction", "--exit-on-error", "-d", prefixRestore], { input: prefixDump, maxBuffer: 1024 * 1024 });
       const restoredPrefix = await measure(prefixRestore);
       if (restoredPrefix.ledger !== prefix.ledger) throw new Error("Restored prefix changed ledger catalog");
-      prefixes[count] = { tag: journal.entries[count - 1].tag, catalog: prefix.completed, ledger: prefix.ledger, restored_catalog: restoredPrefix.completed };
+      // pg_dump may rewrite existing function definitions while later migrations
+      // create native definitions. Measure that mixed final catalog explicitly.
+      const upgrade = await connect("occ_migrator", "occ-migrator-local", prefixRestore);
+      try { await migrate(drizzle(upgrade), { migrationsFolder: resolve(root, "migrations") }); }
+      finally { await upgrade.end(); }
+      const upgraded = await measure(prefixRestore);
+      if (upgraded.ledger !== native.ledger) throw new Error("Restored upgrade changed ledger catalog");
+      prefixes[count] = { tag: journal.entries[count - 1].tag, catalog: prefix.completed, ledger: prefix.ledger, restored_catalog: restoredPrefix.completed, upgraded_catalog: upgraded.completed };
       await admin.query(`DROP DATABASE ${prefixRestore} WITH (FORCE)`);
     }
   } finally { await incremental.end(); }
   const finalPrefix = prefixes[journal.entries.length];
-  if (finalPrefix.catalog !== native.completed || finalPrefix.ledger !== native.ledger || finalPrefix.restored_catalog !== restored.completed) {
+  if (finalPrefix.catalog !== native.completed || finalPrefix.ledger !== native.ledger || finalPrefix.restored_catalog !== restored.completed || finalPrefix.upgraded_catalog !== restored.completed) {
     throw new Error("Incremental and fresh migration catalogs differ");
   }
   const receipt = {
@@ -111,7 +118,7 @@ try {
     completed_catalog: native.completed,
     ledger_catalog: native.ledger,
     restored_catalog: restored.completed,
-    scope: "Real fresh/incremental SQL installation and logical restore measurements for every prefix; this does not admit unsupported prefixes or replace guarded upgrade/application CI.",
+    scope: "Real fresh/incremental SQL installation, logical restore and restored-prefix upgrade measurements for every prefix; this does not admit unsupported prefixes or replace guarded upgrade/application CI.",
   };
   await writeFile("catalog-measurement.json", JSON.stringify(receipt, null, 2) + "\n");
   console.log(JSON.stringify(receipt));

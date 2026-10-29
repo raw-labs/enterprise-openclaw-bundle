@@ -142,6 +142,7 @@ class CurationEvidenceTests(unittest.TestCase):
                     "catalog": "a" * 64,
                     "ledger": "b" * 64,
                     "restored_catalog": "c" * 64,
+                    "upgraded_catalog": "c" * 64,
                 }
             },
         }
@@ -258,7 +259,18 @@ class CurationEvidenceTests(unittest.TestCase):
                 "-- Bootstrap helper, not a migration.\n"
             )
             self.assertEqual(check_prefix(previous)["candidate_entries"], 2)
-            extra = Path("migrations/0002_unregistered.sql")
+            # An intentional filename gap must keep Drizzle's next index aligned.
+            Path("migrations/0001_second.sql").rename("migrations/0002_second.sql")
+            journal["entries"][1].update(idx=2, tag="0002_second")
+            path.write_text(json.dumps(journal))
+            self.assertEqual(check_prefix(previous)["candidate_entries"], 2)
+            journal["entries"][1]["idx"] = 1
+            path.write_text(json.dumps(journal))
+            with self.assertRaisesRegex(RuntimeError, "index must match"):
+                check_prefix(previous)
+            journal["entries"][1]["idx"] = 2
+            path.write_text(json.dumps(journal))
+            extra = Path("migrations/0003_unregistered.sql")
             extra.write_text("SELECT 1;\n")
             with self.assertRaisesRegex(RuntimeError, "SQL inventory differ"):
                 check_prefix(previous)

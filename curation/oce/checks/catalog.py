@@ -64,7 +64,7 @@ def validate_measurement(value, schema, method):
     for prefix in prefixes.values():
         if not isinstance(prefix, dict) or any(
             not re.fullmatch("[0-9a-f]{64}", prefix.get(key, ""))
-            for key in ("catalog", "ledger", "restored_catalog")
+            for key in ("catalog", "ledger", "restored_catalog", "upgraded_catalog")
         ):
             raise RuntimeError(
                 "Catalog prefix lacks actual native/restore measurements"
@@ -78,6 +78,8 @@ def validate_measurement(value, schema, method):
         raise RuntimeError(
             "Final migration prefix differs from fresh catalog measurement"
         )
+    if final["upgraded_catalog"] != value["restored_catalog"]:
+        raise RuntimeError("Completed restored prefix changed during no-op upgrade")
     if (
         not value.get("postgresql", "").startswith("18.6")
         or value.get("drizzle") != "0.45.4"
@@ -243,8 +245,17 @@ def main():
         },
     )
     manifest = json.loads(Path(MANIFEST).read_text())
+    supported = set(manifest["catalogs"].values())
+    upgrades = {}
+    for prefix in value["prefixes"].values():
+        if prefix["catalog"] in supported:
+            upgrades.setdefault(prefix["catalog"], set()).add(
+                prefix["upgraded_catalog"]
+            )
+    upgrades = {key: sorted(hashes) for key, hashes in upgrades.items()}
     valid = (
-        manifest["catalogs"]["completed"] == value["completed_catalog"]
+        manifest.get("restoredUpgradeCatalogs") == upgrades
+        and manifest["catalogs"]["completed"] == value["completed_catalog"]
         and manifest["ledgerCatalogs"]["completed"] == value["ledger_catalog"]
         and manifest["logicalRestoreCatalogs"].get(value["completed_catalog"])
         == value["restored_catalog"]
@@ -252,7 +263,7 @@ def main():
     if not valid:
         print(json.dumps(value, indent=2))
         raise RuntimeError(
-            "Canonical catalog metadata differs from the measured PostgreSQL result. Update only measured completed/ledger/logical-restore digests, retain prior catalog history, then rerun. This measurement does not replace guarded upgrade and application CI."
+            "Canonical catalog metadata differs from the measured PostgreSQL result. Update measured completed/ledger/logical-restore digests and restoredUpgradeCatalogs (native prefix digest to sorted measured final-digest array), retaining prior history. The production guard must accept only these exact measured variants with completed receipts; never bypass catalog/grant checks. Then rerun. This measurement does not replace guarded upgrade and application CI."
         )
     print(
         "Canonical completed catalog and logical restore match real PostgreSQL measurements."

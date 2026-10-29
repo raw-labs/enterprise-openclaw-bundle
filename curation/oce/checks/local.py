@@ -35,12 +35,20 @@ def check_prefix(previous):
             raise RuntimeError("Published migration SQL changed: " + path)
         hashes[path] = hashlib.sha256(published).hexdigest()
     tags = [entry["tag"] for entry in new["entries"]]
-    if len(set(tags)) != len(tags) or [e["idx"] for e in new["entries"]] != list(
-        range(len(tags))
+    indices = [entry["idx"] for entry in new["entries"]]
+    if (
+        len(set(tags)) != len(tags)
+        or any(type(index) is not int or index < 0 for index in indices)
+        or any(right <= left for left, right in zip(indices, indices[1:], strict=False))
     ):
         raise RuntimeError(
             "Migration journal has duplicate identities or invalid indices"
         )
+    # Drizzle chooses the next filename from the last index, not array length.
+    # Preserve the published prefix exactly while respecting historical gaps.
+    for entry in new["entries"][len(prefix) :]:
+        if entry["idx"] != int(entry["tag"].split("_", 1)[0]):
+            raise RuntimeError("New migration index must match its filename prefix")
     if set(tags) != {
         path.stem
         for path in Path("migrations").glob("*.sql")
