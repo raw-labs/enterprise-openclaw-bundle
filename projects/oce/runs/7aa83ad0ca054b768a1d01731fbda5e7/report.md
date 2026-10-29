@@ -36,6 +36,6 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 
 ## Current issue
 
-Command failed (1): git
+Selected Git object changed or was not retained
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
