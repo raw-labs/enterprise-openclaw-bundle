@@ -328,10 +328,26 @@ The combined candidate’s test expects an internal error message that the curre
 - Upstream 8e20e2019fb4d067e0876fb10e59231dd70c5761 has the same HTTP mapping. The failing additional.error.message assertion is absent from original embedded head 94346f8101230627f206ed9731f2c32beba27bad and refreshed embedded head 94c824071c9b0ae248a4ebb4a22d3e44b5532cfc; it is present in the combined candidate.
 - CI Required job 123361406376 records 19 passing lane results and only k3d-fixture-state failing. CodeQL 40846882146 and Console Storybook 40846900994 passed on the same source. Assertions after line 1521, including serving, provider cutovers, and normal stop cleanup, were not reached.
 
+Failed check source-ci at `c088d3c7435ef786d070788fb8b2aee9414a71df`: Command failed (1): python3
+
+### Failure diagnosis: hosted-3
+
+The frozen evidence reader rejects CI receipts exceeding 1 MB. Hosted workflows passed; local qualification stopped during artifact collection. No candidate feature defect or ordering cause was established. Nothing was modified.
+- Current HEAD and all three stored workflow head_sha values equal c088d3c7435ef786d070788fb8b2aee9414a71df; working tree is clean.
+- hosted-3-0-source-ci.log:1–4 reports successful Storybook 40850996696, CodeQL 40850977761 and CI 40850958154, followed by 'JSON receipt exceeds 1 MB'.
+- curation/oce/checks/oce_evidence.py:130–138 rejects matching ZIP members when either compressed or uncompressed size exceeds 1,000,000 bytes.
+- curation/oce/checks/hosted.py:98–138 collects lane receipts before canonical aggregation. Only six lane receipts were saved; qualification did not finish.
+- At candidate c088d3c7435ef786d070788fb8b2aee9414a71df, scripts/ci/run-tests.mjs:1212–1224,1478–1502,1763–1765 serializes complete per-test results without this size limit.
+- Live CI metadata confirms CI Required job 123375328999 and all four native container jobs succeeded. Artifact downloads and leaf-log retrieval were unavailable in this worker; the exact oversized member and size remain unverified.
+
 ## Publication
 
 {
   "candidate_branch": "codex/maintain/b2ed5e5775e04c25b11ac3fe3fa1ecb9"
 }
+
+## Current issue
+
+Hosted repair budget exhausted: Command failed (1): python3
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
