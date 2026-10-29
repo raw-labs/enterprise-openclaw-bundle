@@ -1,11 +1,11 @@
 # Maintenance run 101843d9c7cb48f5bc50677566447e60
 
-Status: **running**
+Status: **qualified**
 
 Recipe: `cfe3b4826f77c93828c89089c982b8dd2b433834`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
 
-Candidate: `not qualified`
+Candidate: `c088d3c7435ef786d070788fb8b2aee9414a71df`
 Tool: `0.1.0`, source digest `dbb2a393f3d665272b3ef40bb4ff80ac8a82d8a867dfd9b09124faf1424a6656`
 Worker: `codex`, requested model `gpt-6-astra`, effort `high`
 
