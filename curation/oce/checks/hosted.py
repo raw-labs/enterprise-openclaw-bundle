@@ -99,7 +99,9 @@ def source(sha, branch, state):
         if not artifact["name"].startswith("ci-results-") or artifact["expired"]:
             continue
         for _filename, summary in artifact_json(
-            artifact, lambda name: Path(name).name in {lane + ".json" for lane in lanes}
+            artifact,
+            lambda name: Path(name).name in {lane + ".json" for lane in lanes},
+            json_limit=2_000_000,
         ):
             lane = summary.get("lane")
             if lane in summaries:

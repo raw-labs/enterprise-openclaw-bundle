@@ -71,3 +71,15 @@ If a committed check itself is wrong, stop the completed build, commit the corre
 recipe, and run `maintain revalidate OLD_RUN --reason TEXT`, then build the new run.
 This retains exact selected inputs and generated code, preserves the old recipe
 and results, and reruns checks. Changed intent, prompts or selection need a new plan.
+
+Canonical source-CI JSON receipts may contain up to 2 MB uncompressed and 1 MB
+compressed. The observed largest receipt in the pilot is 1,058,854 bytes; native
+platform JSON keeps its separate 1 MB bound, and HTTP range reads remain capped
+at 2 MB. Neither path downloads whole OCI archives.
+
+Policy-only revalidation of unchanged code can reuse one successful manually
+triggered workflow from another owned Maintain run branch. It must have the exact
+source SHA, workflow, fork and owner. Ambiguous matches stop; recorded reuse also
+rechecks its original branch and run identity. Full canonical lane/scenario and
+native source/workflow/run/attempt/platform checks remain mandatory. This avoids
+rerunning product tests when only the receipt reader changes.

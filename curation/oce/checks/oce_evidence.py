@@ -2,6 +2,7 @@
 
 import io
 import json
+import re
 import subprocess
 import time
 import urllib.error
@@ -127,14 +128,14 @@ class RangeFile(io.RawIOBase):
         return data
 
 
-def artifact_json(artifact, predicate):
+def artifact_json(artifact, predicate, *, json_limit=1_000_000):
     result = []
     with zipfile.ZipFile(RangeFile(artifact_location(artifact["id"]))) as archive:
         for item in archive.infolist():
             if not predicate(item.filename):
                 continue
-            if item.file_size > 1_000_000 or item.compress_size > 1_000_000:
-                raise RuntimeError("JSON receipt exceeds 1 MB")
+            if item.file_size > json_limit or item.compress_size > 1_000_000:
+                raise RuntimeError("JSON receipt exceeds its bounded size policy")
             result.append((item.filename, json.loads(archive.read(item))))
     return result
 
@@ -150,20 +151,52 @@ def workflow_run(workflow, sha, branch, state):
             if run["head_sha"] == sha and run["head_branch"] == branch
         ]
 
+    def reusable(run):
+        return (
+            run["head_sha"] == sha
+            and run["status"] == "completed"
+            and run["conclusion"] == "success"
+            and run.get("event") == "workflow_dispatch"
+            and run.get("head_repository", {}).get("full_name") == REPOSITORY
+            and run.get("actor", {}).get("login") == "miguelbranco80"
+            and re.fullmatch(
+                r"codex/maintain/[0-9a-f]{32}", run.get("head_branch") or ""
+            )
+        )
+
     path = state / (workflow + ".json")
     record = json.loads(path.read_text()) if path.exists() else None
     if record and record.get("run_id"):
         found = api(f"repos/{REPOSITORY}/actions/runs/{record['run_id']}")
-        if found["head_sha"] != sha or found["head_branch"] != branch:
+        recorded_branch = record.get("head_branch", branch)
+        if found["head_sha"] != sha or found["head_branch"] != recorded_branch:
             raise RuntimeError("Recorded workflow run identity changed")
+        if recorded_branch != branch and not reusable(found):
+            raise RuntimeError("Recorded workflow reuse is no longer valid")
         return found
+
     candidates = matching()
+    if not candidates and not record:
+        # Qualification follows the exact code and workflow commit. A policy-only
+        # revalidation can reuse one completed owner-dispatched run from another
+        # Maintain branch; all source, lane, scenario and native receipts still gate it.
+        prior = api(
+            f"repos/{REPOSITORY}/actions/workflows/{workflow}/runs?head_sha={sha}&per_page=100"
+        )["workflow_runs"]
+        candidates = [run for run in prior if reusable(run)]
     if len(candidates) > 1:
         raise RuntimeError(
             "Multiple exact-source workflow runs need explicit inspection"
         )
     if candidates:
-        save(path, {"source_sha": sha, "run_id": candidates[0]["id"]})
+        save(
+            path,
+            {
+                "source_sha": sha,
+                "run_id": candidates[0]["id"],
+                "head_branch": candidates[0]["head_branch"],
+            },
+        )
         return candidates[0]
     if record:
         # A POST may have succeeded without its response. Never repeat it blindly.
