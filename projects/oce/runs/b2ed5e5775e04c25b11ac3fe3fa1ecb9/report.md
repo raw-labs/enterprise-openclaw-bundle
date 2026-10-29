@@ -134,7 +134,7 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 - hosted-1-local-checks / combined-invariants: passed at `63ae3115d415dde276085398befd40220ed7d47b`; log SHA-256 `4cc87fa601efff7a1d7332f4dd809e058cc6f85721bf5dbaa6fb42ad0701737a`
 - hosted-1-local-checks / migration-catalog: passed at `63ae3115d415dde276085398befd40220ed7d47b`; log SHA-256 `4bbf603037d56f8c016592e7ff5db359a8e735bafa01bb96afb8e172cd6412ca`
 - Hosted attempt 1: `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; repaired
-- Hosted attempt 2: `63ae3115d415dde276085398befd40220ed7d47b`; checking
+- Hosted attempt 2: `63ae3115d415dde276085398befd40220ed7d47b`; repairing
 
 ### profiles-assess
 
@@ -303,6 +303,17 @@ Diagnosis complete; candidate remains unqualified. CI contains compatibility fai
 - Runtime expectation mismatch: runtime-image-startup.test.mjs:710 disables Teams, then line 719 requires both channel plugins enabled. This also exists at refreshed embedded head 94c824071c9b0ae248a4ebb4a22d3e44b5532cfc:708. Both native jobs fail this assertion, while their separate enabled-Teams callback/SDK smoke passes.
 - Environment failure: runtime-startup-diagnostics.json records EACCES opening /certificates/key.pem and an unreadable CA. The synthetic fixture uses a private temporary directory and mode-0600 key, mounted into an unprivileged image. Refreshed Teams head 0a52d37243653170f8924ff1b679bef3239ab695:729 lacks mount permission preparation; previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c:775 explicitly supplied it.
 - Native amd64 and arm64 jobs each report 182 passed and 2 failed tests. Storybook run 40842640077 and CodeQL run 40842621046 passed. Runtime tests were not rerun locally.
+
+Failed check source-ci at `63ae3115d415dde276085398befd40220ed7d47b`: Command failed (1): python3
+
+### Failure diagnosis: hosted-2
+
+The combined candidate’s test expects an internal error message that the current HTTP contract deliberately sanitizes. This is a composition test mismatch, not an observed failure of the embedded outbound guard. No files or remote state changed.
+- Checkout and CI source both equal 63ae3115d415dde276085398befd40220ed7d47b. Workflow 40846862811, attempt 1, failed; the working tree remains clean.
+- source-ci/job-123356507425.log:588 identifies tests/integration/kubernetes-compute-provisioning-real.test.mjs:1521: expected /dedicated/, received 'The requested platform resource already exists.'. The preceding HTTP 409 assertion passed. Cleanup succeeded.
+- packages/occ/src/index.ts:10161 validates outbound selection before persistence at :10257. apps/controller/src/drivers/compute/kubernetes/index.ts:3255 throws ResourceConflictError for additional embedded destinations. apps/controller/src/http/errors.ts:924 maps that error to HTTP 409, RESOURCE_CONFLICT, and the observed generic message.
+- Upstream 8e20e2019fb4d067e0876fb10e59231dd70c5761 has the same HTTP mapping. The failing additional.error.message assertion is absent from original embedded head 94346f8101230627f206ed9731f2c32beba27bad and refreshed embedded head 94c824071c9b0ae248a4ebb4a22d3e44b5532cfc; it is present in the combined candidate.
+- CI Required job 123361406376 records 19 passing lane results and only k3d-fixture-state failing. CodeQL 40846882146 and Console Storybook 40846900994 passed on the same source. Assertions after line 1521, including serving, provider cutovers, and normal stop cleanup, were not reached.
 
 ## Publication
 
