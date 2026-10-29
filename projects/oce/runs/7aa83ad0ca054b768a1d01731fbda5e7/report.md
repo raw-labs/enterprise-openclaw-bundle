@@ -1,6 +1,6 @@
 # Maintenance run 7aa83ad0ca054b768a1d01731fbda5e7
 
-Status: **failed**
+Status: **running**
 
 Recipe: `a14318257f37ed6f62957d35df94021cf4cfa8f7`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
@@ -232,7 +232,7 @@ No concrete benefit from changing the supplied composition order was established
 - Migration collisions do not establish dependency or direction. Roles and outbound independently append journal index 65 after upstream, modifying different capabilities. Previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c has a different 62-entry journal prefix. Final composition must preserve that published SQL/journal history and append evolution; changing feature order cannot resolve this requirement.
 - Verification was read-only source, interface, SQL and test inspection. Tests and hosted CI were not executed or qualified; no merge simulation was performed. Compatibility findings are not standalone source-defect claims. No files, Git objects, refs or remote state were changed; the checkout remains clean at frozen upstream. No permanent ordering policy is proposed.
 
-Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
+Execution tool source digests: `1c276273c4b4d5b1a9dc596e588f58abd6805bc9b321db3e68b9693db1ec25b0`, `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
 
