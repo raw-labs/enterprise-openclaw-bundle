@@ -108,6 +108,14 @@ class CurationEvidenceTests(unittest.TestCase):
             "drizzle": "0.45.4",
             "probe_sha": "d" * 40,
             "run_id": "123",
+            "migration_count": 1,
+            "prefixes": {
+                "1": {
+                    "catalog": "a" * 64,
+                    "ledger": "b" * 64,
+                    "restored_catalog": "c" * 64,
+                }
+            },
         }
         validate_measurement(measurement, "schema", "method")
         for key in measurement:

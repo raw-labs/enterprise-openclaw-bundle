@@ -35,7 +35,9 @@ branches and a run-specific candidate live in the OCE fork. Source PRs stay inta
 Local checks prove diff/suite-registration structure and published migration-prefix integrity;
 they are not runtime qualification. The catalog check measures the exact migration
 SQL with PostgreSQL 18.6 and the pinned Drizzle implementation, then measures a real
-dump/restore. Its isolated `codex/maintain/oce/RUN/catalog/INPUTS-METHOD` probe adds
+dump/restore for the complete schema and every migration prefix. Incremental and
+fresh final catalogs must agree; measuring a prefix does not admit it into the
+production migration policy. Its isolated `codex/maintain/oce/RUN/catalog/INPUTS-METHOD` probe adds
 only the frozen measurement harness on a separate branch. It uses the existing
 manual Full Integration workflow identity with a probe-only job; it never changes
 the candidate workflow or publishes images. Only that run's disposable database

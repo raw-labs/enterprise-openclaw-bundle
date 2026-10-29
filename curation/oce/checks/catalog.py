@@ -51,6 +51,33 @@ def validate_measurement(value, schema, method):
     for key in ("completed_catalog", "ledger_catalog", "restored_catalog"):
         if not re.fullmatch("[0-9a-f]{64}", value.get(key, "")):
             raise RuntimeError("Catalog measurement lacks an actual PostgreSQL digest")
+    count = value.get("migration_count")
+    prefixes = value.get("prefixes", {})
+    if (
+        not isinstance(count, int)
+        or isinstance(count, bool)
+        or not 1 <= count <= 512
+        or not isinstance(prefixes, dict)
+        or set(prefixes) != {str(index) for index in range(1, count + 1)}
+    ):
+        raise RuntimeError("Catalog measurement lacks complete migration prefixes")
+    for prefix in prefixes.values():
+        if not isinstance(prefix, dict) or any(
+            not re.fullmatch("[0-9a-f]{64}", prefix.get(key, ""))
+            for key in ("catalog", "ledger", "restored_catalog")
+        ):
+            raise RuntimeError(
+                "Catalog prefix lacks actual native/restore measurements"
+            )
+    final = prefixes[str(count)]
+    if (final["catalog"], final["ledger"], final["restored_catalog"]) != (
+        value["completed_catalog"],
+        value["ledger_catalog"],
+        value["restored_catalog"],
+    ):
+        raise RuntimeError(
+            "Final migration prefix differs from fresh catalog measurement"
+        )
     if (
         not value.get("postgresql", "").startswith("18.6")
         or value.get("drizzle") != "0.45.4"
