@@ -170,9 +170,9 @@
     "First Agent Smoke",
     "CodeQL (javascript-typescript)",
     "CodeQL (actions)",
-    "Prepare controller (amd64)",
-    "Prepare controller (arm64)",
-    "Prepare runtime (amd64)",
-    "Prepare runtime (arm64)"
+    "Native Container Verification / Prepare controller (amd64)",
+    "Native Container Verification / Prepare controller (arm64)",
+    "Native Container Verification / Prepare runtime (amd64)",
+    "Native Container Verification / Prepare runtime (arm64)"
   ]
 }

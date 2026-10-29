@@ -51,10 +51,13 @@ static checks remain mandatory in canonical hosted CI. Hosted source checks disp
 once per exact candidate, validate the full canonical CI aggregate and small lane
 receipts, and require the named combined scenarios without skips. The same-source
 Storybook artifact supports separate browser inspection and screenshot/video capture;
-a successful build alone is not visual proof. Native checks
-then dispatch only `container-check.yml`, require all four native image jobs and
-read bounded `platform.json` entries from their OCI artifacts. No images are
-published. Dispatch intentions survive local interruption; uncertain responses are
+a successful build alone is not visual proof. Manual CI already invokes the
+nonpublishing native container workflow. The native check reuses that exact CI run,
+requires all four native image jobs, and reads bounded `platform.json` entries from
+their OCI artifacts. It requires the same CI attempt and checked-in Node base; no
+second native workflow is dispatched. The local preflight refuses the known stale
+repository-variable input without changing variables or publication approval gates.
+No images are published. Dispatch intentions survive local interruption; uncertain responses are
 reconciled against exact-SHA remote runs before another action. Failure logs stay
 local and reports contain safe identities, counts, URLs and receipt digests.
 

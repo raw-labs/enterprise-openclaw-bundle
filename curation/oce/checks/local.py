@@ -7,6 +7,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from oce_evidence import REPOSITORY, api
+
 
 def git(*args):
     return subprocess.check_output(["git", *args])
@@ -52,6 +54,40 @@ def check_prefix(previous):
     }
 
 
+def validate_native_ci_input(workflow, tested_base, variable_base=None):
+    job = re.search(
+        r"(?ms)^  native-images:\n(.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)", workflow
+    )
+    if not job or "./.github/workflows/container-check.yml" not in job[1]:
+        raise RuntimeError(
+            "This recipe requires CI-owned native verification; review changed workflow ownership"
+        )
+    uses_variable = bool(
+        re.search(
+            r"node_base_image:\s*\$\{\{\s*vars\.CONTAINER_NODE_BASE_IMAGE\s*}}", job[1]
+        )
+    )
+    if uses_variable and variable_base != tested_base:
+        raise RuntimeError(
+            "Manual CI passes a stale repository Node-base variable to native verification. "
+            "Pass the checked-in images-packaging Node base through a source-derived job output; "
+            "preserve the repository variable, publication approval gates and all four native jobs."
+        )
+    return {"owner": "ci.yml", "repository_variable_used": uses_variable}
+
+
+def check_native_ci_input():
+    tested = json.loads(
+        Path("scripts/ci/test-suites/images-packaging.json").read_text()
+    )["prepare"]["defaultEnv"]["NODE_BASE_IMAGE"]
+    variable = api(f"repos/{REPOSITORY}/actions/variables/CONTAINER_NODE_BASE_IMAGE")[
+        "value"
+    ]
+    return validate_native_ci_input(
+        Path(".github/workflows/ci.yml").read_text(), tested, variable
+    )
+
+
 def main():
     inputs = json.loads(Path(os.environ["MAINTAIN_INPUTS_FILE"]).read_text())
     stage = os.environ["MAINTAIN_CHECK_STAGE"]
@@ -65,6 +101,10 @@ def main():
     }
     if stage == "integration" and inputs["starting_integration"]:
         details["migration_prefix"] = check_prefix(inputs["starting_integration"])
+    if stage == "integration":
+        if inputs["fork"] != f"https://github.com/{REPOSITORY}.git":
+            raise RuntimeError("CI preflight is restricted to the reviewed OCE fork")
+        details["native_ci_input"] = check_native_ci_input()
     destination = Path(os.environ["MAINTAIN_CHECK_STATE_DIR"]) / "receipt.json"
     destination.write_text(
         json.dumps({"source_sha": sha, "details": details}, indent=2) + "\n"

@@ -20,7 +20,7 @@ CHECKS = Path(__file__).resolve().parents[2] / "curation/oce/checks"
 sys.path.insert(0, str(CHECKS))
 from catalog import fingerprint, validate_measurement  # noqa: E402
 from hosted import validate_lane, validate_platforms  # noqa: E402
-from local import check_prefix  # noqa: E402
+from local import check_prefix, validate_native_ci_input  # noqa: E402
 from oce_evidence import RangeFile  # noqa: E402
 
 
@@ -35,12 +35,15 @@ class CurationEvidenceTests(unittest.TestCase):
                 "workflowSha": sha,
                 "runId": "123",
                 "native": True,
+                "ciRunId": "123",
+                "ciAttempt": "1",
+                "nodeBaseImage": "tested-base",
                 "digest": "sha256:" + "b" * 64,
             }
             for image in ("controller", "runtime")
             for arch in ("amd64", "arm64")
         ]
-        validate_platforms(receipts, sha, 123)
+        validate_platforms(receipts, sha, 123, 1, "tested-base")
         for mutation in (
             "missing",
             "duplicate",
@@ -49,6 +52,9 @@ class CurationEvidenceTests(unittest.TestCase):
             "run",
             "native",
             "digest",
+            "ci_run",
+            "ci_attempt",
+            "base",
         ):
             changed = copy.deepcopy(receipts)
             if mutation == "missing":
@@ -63,10 +69,32 @@ class CurationEvidenceTests(unittest.TestCase):
                         "run": "runId",
                         "native": "native",
                         "digest": "digest",
+                        "ci_run": "ciRunId",
+                        "ci_attempt": "ciAttempt",
+                        "base": "nodeBaseImage",
                     }[mutation]
                 ] = "wrong"
             with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
-                validate_platforms(changed, sha, 123)
+                validate_platforms(changed, sha, 123, 1, "tested-base")
+
+    def test_ci_native_preflight_refuses_stale_variable_without_disabling_checks(self):
+        workflow = """jobs:
+  native-images:
+    uses: ./.github/workflows/container-check.yml
+    with:
+      node_base_image: ${{ vars.CONTAINER_NODE_BASE_IMAGE }}
+  static-checks:
+    runs-on: ubuntu-24.04
+"""
+        validate_native_ci_input(workflow, "reviewed-base", "reviewed-base")
+        with self.assertRaisesRegex(RuntimeError, "stale repository Node-base"):
+            validate_native_ci_input(workflow, "reviewed-base", "old-variable")
+        source_output = workflow.replace(
+            "vars.CONTAINER_NODE_BASE_IMAGE", "needs.impact.outputs.node_base_image"
+        )
+        validate_native_ci_input(source_output, "reviewed-base", "old-variable")
+        with self.assertRaisesRegex(RuntimeError, "changed workflow ownership"):
+            validate_native_ci_input("jobs: {}", "reviewed-base", "old-variable")
 
     def test_lane_rejects_skip_wrong_source_and_failed_cleanup(self):
         lane = {

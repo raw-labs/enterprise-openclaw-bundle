@@ -185,7 +185,7 @@ def source(sha, branch, state):
     }
 
 
-def validate_platforms(receipts, sha, run_id):
+def validate_platforms(receipts, sha, run_id, attempt, node_base):
     expected = {
         (image, "linux/" + arch)
         for image in ("controller", "runtime")
@@ -201,6 +201,9 @@ def validate_platforms(receipts, sha, run_id):
             receipt["sourceSha"] != sha
             or receipt["workflowSha"] != sha
             or str(receipt["runId"]) != str(run_id)
+            or str(receipt.get("ciRunId")) != str(run_id)
+            or str(receipt.get("ciAttempt")) != str(attempt)
+            or receipt.get("nodeBaseImage") != node_base
             or receipt["native"] is not True
             or not re.fullmatch(r"sha256:[a-f0-9]{64}", receipt["digest"])
         ):
@@ -212,10 +215,12 @@ def validate_platforms(receipts, sha, run_id):
 
 
 def native(sha, branch, state):
-    run = workflow_run("container-check.yml", sha, branch, state)
+    # Manual CI owns these reusable-workflow jobs on current upstream. Reuse the
+    # same exact run rather than dispatching a second native build.
+    run = workflow_run("ci.yml", sha, branch, state)
     run = wait_runs([run], sha, state)[0]
     names = [
-        f"Prepare {image} ({arch})"
+        f"Native Container Verification / Prepare {image} ({arch})"
         for image in ("controller", "runtime")
         for arch in ("amd64", "arm64")
     ]
@@ -231,7 +236,10 @@ def native(sha, branch, state):
             if len(entries) != 1:
                 raise RuntimeError("Native artifact lacks one unique platform.json")
             receipts.append(entries[0][1])
-    validate_platforms(receipts, sha, run["id"])
+    node_base = json.loads(
+        Path("scripts/ci/test-suites/images-packaging.json").read_text()
+    )["prepare"]["defaultEnv"]["NODE_BASE_IMAGE"]
+    validate_platforms(receipts, sha, run["id"], run["run_attempt"], node_base)
     save(state / "platforms.json", receipts)
     return {
         "run": {"id": run["id"], "url": run["html_url"]},
