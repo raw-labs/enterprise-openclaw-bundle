@@ -57,7 +57,7 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 - teams-revalidation-checks / source-audit: passed at `0a52d37243653170f8924ff1b679bef3239ab695`; log SHA-256 `641e076dd450df60af18aeef649c472a4454218a4e86834a739f814320514917`
 - revalidation-integration-checks / combined-invariants: passed at `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; log SHA-256 `d069365aa6f11b5b3156e2f8b17e8b58194c68cd9f1f2b7750977860c72deab6`
 - revalidation-integration-checks / migration-catalog: passed at `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; log SHA-256 `4bbf603037d56f8c016592e7ff5db359a8e735bafa01bb96afb8e172cd6412ca`
-- Hosted attempt 1: `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; checking
+- Hosted attempt 1: `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; repairing
 
 ### profiles-assess
 
@@ -200,6 +200,20 @@ Diagnosis complete; no files changed. The candidate lacks measured restored-pref
 - migrations/meta/_canonical-history.json:610 sets restoredUpgradeCatalogs to null. Completed and ledger digests, plus all measured supported-prefix logical-restore mappings, already match. catalogEvidence at :651 still references an older source and measurement.
 - scripts/migration-history.mjs:315–330 accepts measured upgrade variants only with completed receipts. Without the mapping, restored prefix 24 upgrades to cfc06d434c484e8eaa6ec99e70074f99e7f4e99832882c83ee95eb31e58c6e75 and prefix 62 to b5ce9f26ce6a9947fb14ddbd2ae08066c8e87ca317c0c02ff5bf3185e19dacf4; both differ from accepted native and fully restored completed catalogs.
 - Read-only comparison against previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c confirmed all 62 published journal entries and SQL files unchanged. Appended indices are 63–67; manifest entries and SQL hashes match.
+
+Failed check source-ci at `ba4c143d1d46967c921c15a552b1f87ed2b26e49`: Command failed (1): python3
+
+### Failure diagnosis: hosted-1
+
+Diagnosis complete; candidate remains unqualified. CI contains compatibility failures, an independent roles defect, and a certificate-permission environment failure. No evidence supports reordering. No files, refs, dependencies, or remote state changed.
+- Current HEAD and CI run 40842601336 both identify ba4c143d1d46967c921c15a552b1f87ed2b26e49. Working tree is clean. Evidence directory: .maintain/runs/b2ed5e5775e04c25b11ac3fe3fa1ecb9/evidence/hosted-1/ba4c143d1d46967c921c15a552b1f87ed2b26e49/source-ci.
+- Static job-123342359024.log:1392 reports stale docs/reference/api.md. Read-only, dependency-independent regeneration comparison confirms line 75 says 49 Agent operations while the checked schema generates 50.
+- Feature defect: job-123342439719.log:703 reports generic rather than qualified runtime-access denial. packages/occ/src/index.ts:4776 omits checkedPrincipalId from AuthorizationDeniedError; apps/controller/src/http/errors.ts:953 consequently suppresses the caller-specific message. The omission also exists at original roles head f30db5c4045cbf2c1f5eef4576361112535ed8b4:4452 and refreshed head 489576d57120f1f83da371c0dd5a22bc7c7fddf8:4755.
+- Lifecycle compatibility: job-123342439719.log:704 fails native-admin-access.test.mjs:1558. The test admits revision 2 at line 1530 without activating it. tests/helpers/console-app.mjs:812 only requests deployment; native-admin.ts:765 correctly returns unavailable for an exclusive pending successor. Upstream 8e20e2019fb4d067e0876fb10e59231dd70c5761 already contains this protection.
+- Credential-reference compatibility: job-123342439667.log:588 reports HTTP 400 instead of 201. kubernetes-compute-provisioning-real.test.mjs:1317 supplies $MSTEAMS_APP_PASSWORD; current model-auth.ts:109 requires ${NAME} or SecretRef. This invalid fixture also exists at refreshed embedded head 94c824071c9b0ae248a4ebb4a22d3e44b5532cfc:1188.
+- Runtime expectation mismatch: runtime-image-startup.test.mjs:710 disables Teams, then line 719 requires both channel plugins enabled. This also exists at refreshed embedded head 94c824071c9b0ae248a4ebb4a22d3e44b5532cfc:708. Both native jobs fail this assertion, while their separate enabled-Teams callback/SDK smoke passes.
+- Environment failure: runtime-startup-diagnostics.json records EACCES opening /certificates/key.pem and an unreadable CA. The synthetic fixture uses a private temporary directory and mode-0600 key, mounted into an unprivileged image. Refreshed Teams head 0a52d37243653170f8924ff1b679bef3239ab695:729 lacks mount permission preparation; previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c:775 explicitly supplied it.
+- Native amd64 and arm64 jobs each report 182 passed and 2 failed tests. Storybook run 40842640077 and CodeQL run 40842621046 passed. Runtime tests were not rerun locally.
 
 ## Publication
 
