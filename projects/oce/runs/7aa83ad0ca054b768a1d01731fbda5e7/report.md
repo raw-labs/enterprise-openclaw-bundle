@@ -1,6 +1,6 @@
 # Maintenance run 7aa83ad0ca054b768a1d01731fbda5e7
 
-Status: **running**
+Status: **failed**
 
 Recipe: `a14318257f37ed6f62957d35df94021cf4cfa8f7`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
@@ -248,8 +248,37 @@ Bounded composition work completed. Strengthened the existing embedded-channel r
 
 Execution tool source digests: `1c276273c4b4d5b1a9dc596e588f58abd6805bc9b321db3e68b9693db1ec25b0`, `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
+Failed check combined-invariants at `ae6fecaf23ddb79a5967d50ce34a2300b57e0a6e`: Command failed (1): python3
+
+### Failure diagnosis: attempt-1-integration-checks
+
+The frozen check incorrectly counts init-local.sql as a journaled migration. Diagnosis is complete; the candidate is not fully qualified. No files or remote state changed.
+- Current clean candidate HEAD ae6fecaf23ddb79a5967d50ce34a2300b57e0a6e matches checks/attempt-1-integration-checks-0-combined-invariants.log:4. That log reports the suite-registration audit passed, then the inventory exception at lines 955–962.
+- Run 7aa83ad0ca054b768a1d01731fbda5e7 recipe/checks/local.py:41 compares journal tags against every migrations/*.sql file, incorrectly including init-local.sql.
+- Read-only comparison found 67 journal entries and 68 SQL files. The sole extra file is init-local.sql; no journaled SQL is missing, tags are unique, and indices are contiguous.
+- All 62 journal entries, journal metadata, and corresponding SQL bytes from previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c are preserved exactly. Five migrations are appended.
+- init-local.sql matches frozen upstream 8e20e2019fb4d067e0876fb10e59231dd70c5761 byte-for-byte. compose.postgres.yaml:14 mounts it as a PostgreSQL initialization helper.
+- No source-feature defect or ordering interaction explains this failure. PostgreSQL catalog and application/runtime qualification were not performed.
+
+Failed check combined-invariants at `ae6fecaf23ddb79a5967d50ce34a2300b57e0a6e`: Command failed (1): python3
+
+### Failure diagnosis: attempt-1-integration-checks
+
+The frozen check policy incorrectly counts init-local.sql as a journal migration. Diagnosis is complete; candidate qualification remains incomplete. No files or remote state changed.
+- Current clean candidate HEAD is ae6fecaf23ddb79a5967d50ce34a2300b57e0a6e. Both checks/attempt-1-integration-checks-{0,1}-combined-invariants.log identify this exact SHA, report audit status passed with issues=[], then fail at recipe/checks/local.py:42.
+- Run 7aa83ad0ca054b768a1d01731fbda5e7 recipe/checks/local.py:41 compares journal tags against every migrations/*.sql file. Read-only comparison found 67 journal entries and 68 SQL files; init-local.sql is the sole difference, with no missing migration files.
+- All 62 journal entries, journal metadata and published migration SQL bytes from previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c are preserved. Candidate tags are unique and indices contiguous.
+- migrations/init-local.sql is byte-identical to both previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c and upstream 8e20e2019fb4d067e0876fb10e59231dd70c5761. compose.postgres.yaml:14 mounts it as a database initialization helper.
+- migrations/meta/_canonical-history.json:577,613,614 retains null unmeasured catalog hashes. scripts/migration-history.mjs:34-35 still rejects an unqualified completed catalog. This inspection does not establish PostgreSQL or runtime correctness.
+
+Failed check combined-invariants at `ae6fecaf23ddb79a5967d50ce34a2300b57e0a6e`: Command failed (1): python3
+
 ## Publication
 
 {}
+
+## Current issue
+
+Command failed (1): python3
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
