@@ -1,6 +1,6 @@
 # Maintenance run 9364e62277954c33aa31519cbf61b2e8
 
-Status: **planned**
+Status: **running**
 
 Recipe: `a18b01be4fe46c02237465d7633566e757e44d94`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
@@ -31,6 +31,7 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 
 ## Verification
 
+- embedded-revalidation-checks / source-audit: passed at `94c824071c9b0ae248a4ebb4a22d3e44b5532cfc`; log SHA-256 `9cd1e847bd46345d6e8582006f941d91436fd8669551877c94030fdfea58f802`
 
 ### profiles-assess
 
@@ -135,6 +136,8 @@ The embedded Slack/Teams trial remains useful and is not absorbed by frozen upst
 - Verification performed: node scripts/ci/run-tests.mjs audit passed at 94346f8101230627f206ed9731f2c32beba27bad, with 391 discovered files, 391 selected files, and no issues. No installed node_modules graph exists in this checkout. Runtime, browser, Kubernetes, PostgreSQL, and hosted CI results were not established in this assessment; no dependencies were installed.
 - Existing behavioral proof: tests/conformance/kubernetes-compute.test.mjs covers trusted opt-in/default refusal and callback candidate fencing. tests/integration/kubernetes-compute-provisioning-real.test.mjs contains the regular API/PostgreSQL/Kubernetes scenario covering exact Secret projection, revision replacement, Teams disable/reenable, and stop after disabling the option. Its comments explicitly exclude native Teams dispatch, JWT verification, public TLS, and model execution. Historical passes in the implementation plan do not qualify the frozen-upstream combination.
 - The embedded feature changes no migration files relative to a7aa9219f. It provides no reason to alter previously published migration SQL or journal entries.
+
+Execution tool source digests: `48c0b71d35c1b755a91327cd6dab1c9096675621f648dd1dcde388bca57018b5`
 
 ## Publication
 
