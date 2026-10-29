@@ -1,6 +1,6 @@
 # Maintenance run 7aa83ad0ca054b768a1d01731fbda5e7
 
-Status: **failed**
+Status: **running**
 
 Recipe: `a14318257f37ed6f62957d35df94021cf4cfa8f7`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
@@ -20,7 +20,7 @@ Worker: `codex`, requested model `gpt-6-astra`, effort `high`
 | first-admin | `37fac70dfb784351544189ad07909588b327ef47` | `pending` |  pending |
 | outbound | `a50b14647d4311764cce3359150149bc81f23431` | `pending` |  pending |
 | teams | `93c1dc4f24b9f544b26a451b71a0cfeff34be4fc` | `pending` |  pending |
-| embedded | `94346f8101230627f206ed9731f2c32beba27bad` | `pending` |  pending |
+| embedded | `94346f8101230627f206ed9731f2c32beba27bad` | `pending` |  The embedded Slack/Teams trial remains useful and is not absorbed by frozen upstream. Integration requires a Configuration-save regression repair and the authorized outbound, provider, and callback adaptations. No intent decision is needed. Assessment only; no files, Git state, or remote resources changed. |
 
 ## Composition
 
@@ -30,12 +30,24 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 ## Verification
 
 
+### embedded-assess
+
+The embedded Slack/Teams trial remains useful and is not absorbed by frozen upstream. Integration requires a Configuration-save regression repair and the authorized outbound, provider, and callback adaptations. No intent decision is needed. Assessment only; no files, Git state, or remote resources changed.
+- Remaining feature: at 94346f810, apps/controller/src/drivers/compute/kubernetes/configuration-rules.ts::requireChannelTopology and index.ts add trusted experimentalEmbeddedChannels admission, embedded provisioning, and revision-time checks. At upstream 8e20e2019, requireChannelTopology still rejects embedded channels and agentProvisioning advertises only dedicated execution. Upstream therefore does not supply equivalent behavior.
+- Generic refresh regression: 94346f810 index.ts::validateConfigurationContent unconditionally calls requireTeamsConfiguration, including when the trial is disabled. That function requires explicit appId/tenantId UUIDs and an object-shaped appPassword environment reference. Upstream tests/integration/configuration-controller.test.mjs:2197–2334 explicitly accepts saving bound Teams password strings without those deployment prerequisites, including ${MSTEAMS_APP_PASSWORD} and $MSTEAMS_APP_PASSWORD, and accepts corresponding Preset defaults. Applying the trial validator unchanged contradicts that supported workflow.
+- Upstream replacement to preserve: c40b22b6f introduced packages/occ/src/channel-secret-bindings.ts and shared Configuration-save/deployment validation; 56af0a512 expanded runtime reference-form coverage. Frozen upstream checks embedded references, fallback expressions, shorthand secret inputs, and unreadable Slack token objects. The feature head's private collectChannelSecretBindingIds recognizes fewer forms and must not replace this shared implementation.
+- Outbound composition mismatch: selected outbound a50b14647 replaces runtime.channels.proxyUrl transport with immutable revision.gatewayOutbound snapshots. index.ts::admitGatewayOutbound currently refuses nonempty requirements for embedded execution. The embedded feature instead uses runtime.channels.proxyUrl/managedProxy and the shared slack-proxy.mjs. Thus the requested managed channel-derived path needs an adapter; neither source independently implements the combined behavior.
+- Provider compatibility concern: embedded index.ts applies HTTPS_PROXY and NODE_USE_ENV_PROXY to the combined Gateway/model process, with NO_PROXY limited to local/service destinations. Its slack-proxy.mjs allows Slack and optionally five Microsoft hosts, excluding model endpoints. Outbound a50b14647 similarly supplies only internal bypass hosts in gatewayOutboundTransport. Preserving native model execution therefore requires the authorized provider adaptation; channel-only proxy acceptance does not prove model connectivity.
+- Teams composition overlap: embedded index.ts::reconcileTeamsCallback and Teams head 93c1dc4f2 both manage the same Agent callback resource names and public listener. Embedded adds a revision-selecting callback Service and NetworkPolicy; Teams derives callback ownership from the serving Deployment and supplies directory/editor/media support. These are overlapping implementations to reconcile, not evidence that either feature requires restacking on the other.
+- Consequential upstream changes must survive: 774b3d676 introduced discoverable Driver configuration validation; 908ffe5be enforces Gateway tool policy at save and for embedded Agents; 854b1ddf5 centralizes runtime source metadata. Frozen upstream deploy/runtime/openclaw-source.json pins 554f0b886bde6c089578c49967227f8b50d1cf16. Port the opt-in and Teams packaging onto these current owners rather than restoring the older constructor, validation, or runtime-image implementation.
+- Verification performed: node scripts/ci/run-tests.mjs audit passed at 94346f8101230627f206ed9731f2c32beba27bad, with 391 discovered files, 391 selected files, and no issues. No installed node_modules graph exists in this checkout. Runtime, browser, Kubernetes, PostgreSQL, and hosted CI results were not established in this assessment; no dependencies were installed.
+- Existing behavioral proof: tests/conformance/kubernetes-compute.test.mjs covers trusted opt-in/default refusal and callback candidate fencing. tests/integration/kubernetes-compute-provisioning-real.test.mjs contains the regular API/PostgreSQL/Kubernetes scenario covering exact Secret projection, revision replacement, Teams disable/reenable, and stop after disabling the option. Its comments explicitly exclude native Teams dispatch, JWT verification, public TLS, and model execution. Historical passes in the implementation plan do not qualify the frozen-upstream combination.
+- The embedded feature changes no migration files relative to a7aa9219f. It provides no reason to alter previously published migration SQL or journal entries.
+
+Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
+
 ## Publication
 
 {}
-
-## Current issue
-
-Selected Git object changed or was not retained
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
