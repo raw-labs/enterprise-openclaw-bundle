@@ -202,6 +202,8 @@ Diagnosis complete; no files changed. The candidate lacks measured restored-pref
 
 ## Publication
 
-{}
+{
+  "candidate_branch": "codex/maintain/b2ed5e5775e04c25b11ac3fe3fa1ecb9"
+}
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
