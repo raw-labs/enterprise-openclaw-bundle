@@ -157,8 +157,4 @@ Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f
 
 {}
 
-## Current issue
-
-Partially refreshed outbound: resolved runtime conflicts, preserved upstream improvements, and added Configuration-save regression coverage. Migration-history scope remains unresolved.
-
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
