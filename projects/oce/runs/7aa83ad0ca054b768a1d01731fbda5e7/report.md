@@ -195,6 +195,16 @@ Completed source-level roles refresh fixes. Full runtime and PostgreSQL qualific
 - The completed migration catalog remains unqualified and fails closed. Local PostgreSQL is 17.6; qualification requires 18.6.
 - No commits, remote writes, dependency installation, or private combination adaptations were made.
 
+### secrets-adapt
+
+Retained the prepared Secrets adaptation and strengthened its owning regression to cover multiple distinct Configuration Secrets, partial grant failure, and retry without duplicates. No combination-specific behavior was added.
+- Preserved saved-Configuration-derived exact grants and upstream validation and permission handling.
+- Extended console-agent-presets.test.ts and updated its flow documentation; existing suite registration covers the scenario.
+- Suite inventory audit, syntax checks, flow-document validation, and diff whitespace checks passed.
+- Browser execution failed during module loading: @openclaw-enterprise/contracts is unavailable. Workspace and documentation checks also lack dependencies; runtime and visual proof remain unverified.
+- pnpm attempted automatic reconciliation despite the required environment setting. All commands were interrupted, and generated artifacts were removed; no packages were downloaded or added.
+- No migrations, Git state, remote resources, or frozen check policy were changed.
+
 Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
