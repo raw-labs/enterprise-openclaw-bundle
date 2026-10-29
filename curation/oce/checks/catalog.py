@@ -178,11 +178,12 @@ def main():
         raise RuntimeError(
             "Catalog testing is restricted to the reviewed fork and owner"
         )
-    if (
-        command(["git", "var", "GIT_AUTHOR_IDENT"]).split(">", 1)[0]
-        != "Miguel Branco <miguel@raw-labs.com"
-    ):
-        raise RuntimeError("Unexpected Git author for catalog probe")
+    for kind in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
+        if (
+            command(["git", "var", kind]).split(">", 1)[0]
+            != "Miguel Branco <miguel@raw-labs.com"
+        ):
+            raise RuntimeError("Unexpected Git author/committer for catalog probe")
     root = Path(__file__).resolve().parent
     helper, workflow = (
         (root / "catalog-probe.mjs").read_bytes(),

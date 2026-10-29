@@ -69,12 +69,24 @@ def require_case(summaries, pattern):
 def source(sha, branch, state):
     runs = [
         workflow_run(workflow, sha, branch, state)
-        for workflow in ("ci.yml", "codeql.yml")
+        for workflow in ("ci.yml", "codeql.yml", "console-storybook.yml")
     ]
     runs = wait_runs(runs, sha, state)
-    ci, codeql = runs
+    ci, codeql, storybook = runs
     jobs = require_jobs(ci["id"], ["CI Required", "First Agent Smoke"])
     require_jobs(codeql["id"], ["CodeQL (javascript-typescript)", "CodeQL (actions)"])
+    require_jobs(storybook["id"], ["build"])
+    visual_builds = [
+        artifact
+        for artifact in pages(
+            f"repos/{REPOSITORY}/actions/runs/{storybook['id']}/artifacts", "artifacts"
+        )
+        if artifact["name"] == "console-storybook" and not artifact["expired"]
+    ]
+    if len(visual_builds) != 1:
+        raise RuntimeError(
+            "Same-source Storybook build lacks one reviewable static artifact"
+        )
     manifest = json.loads(Path("scripts/ci/test-suites.json").read_text())
     lanes = manifest["groups"]["ci"]
     summaries = {}
@@ -160,6 +172,11 @@ def source(sha, branch, state):
     return {
         "runs": [{"id": run["id"], "url": run["html_url"]} for run in runs],
         "jobs": jobs,
+        "storybook": {
+            "run_id": storybook["id"],
+            "artifact_id": visual_builds[0]["id"],
+            "scope": "Pinned same-source static build; visual inspection and media are separate.",
+        },
         "lanes": {lane: summary["counts"] for lane, summary in summaries.items()},
         "required_cases": cases,
         "aggregate_sha256": hashlib.sha256(
