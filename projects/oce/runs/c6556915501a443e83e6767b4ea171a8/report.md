@@ -32,6 +32,7 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 ## Verification
 
 - embedded-revalidation-checks / source-audit: passed at `94c824071c9b0ae248a4ebb4a22d3e44b5532cfc`; log SHA-256 `9cd1e847bd46345d6e8582006f941d91436fd8669551877c94030fdfea58f802`
+- first-admin-revalidation-checks / source-audit: passed at `a768ca1bf094392d590034c17c5701d0ab549e8f`; log SHA-256 `6e3331ad3042dc5b4e748127ea946164c293961286b07057b80d560a61aaf9f4`
 
 ### profiles-assess
 
