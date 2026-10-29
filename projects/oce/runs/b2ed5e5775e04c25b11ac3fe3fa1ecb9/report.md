@@ -252,7 +252,7 @@ Completed narrow candidate repairs in six files. Candidate remains unqualified p
 - Verified all 62 published migration SQL files and journal entries remain unchanged.
 - Application dependencies are absent. Integration/native tests, before-and-after regression execution, and full route-based OpenAPI regeneration were not run. No skipped runtime proof is claimed as passed.
 
-Execution tool source digests: `48c0b71d35c1b755a91327cd6dab1c9096675621f648dd1dcde388bca57018b5`
+Execution tool source digests: `48c0b71d35c1b755a91327cd6dab1c9096675621f648dd1dcde388bca57018b5`, `dbb2a393f3d665272b3ef40bb4ff80ac8a82d8a867dfd9b09124faf1424a6656`
 
 Failed check combined-invariants at `09d327de7fe56bf5d896a4e58917a48355c4d0c3`: Command failed (1): python3
 
