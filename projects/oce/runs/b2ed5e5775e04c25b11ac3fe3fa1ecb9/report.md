@@ -60,6 +60,7 @@ Order: embedded → first-admin → outbound → plugins → profiles → roles 
 - hosted-1-local-checks / combined-invariants: passed at `63ae3115d415dde276085398befd40220ed7d47b`; log SHA-256 `4cc87fa601efff7a1d7332f4dd809e058cc6f85721bf5dbaa6fb42ad0701737a`
 - hosted-1-local-checks / migration-catalog: passed at `63ae3115d415dde276085398befd40220ed7d47b`; log SHA-256 `4bbf603037d56f8c016592e7ff5db359a8e735bafa01bb96afb8e172cd6412ca`
 - Hosted attempt 1: `ba4c143d1d46967c921c15a552b1f87ed2b26e49`; repaired
+- Hosted attempt 2: `63ae3115d415dde276085398befd40220ed7d47b`; checking
 
 ### profiles-assess
 
