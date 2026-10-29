@@ -206,6 +206,17 @@ Retained the prepared Secrets adaptation and strengthened its owning regression 
 - pnpm attempted automatic reconciliation despite the required environment setting. All commands were interrupted, and generated artifacts were removed; no packages were downloaded or added.
 - No migrations, Git state, remote resources, or frozen check policy were changed.
 
+### teams-adapt
+
+Completed standalone Teams refresh corrections, preserving upstream improvements. Fixed actionable deployment refusals and extended owning regression coverage.
+- Teams admission now preserves its specific refusal through the API as HTTP 400 before creating an Agent revision.
+- Extended existing conformance and API integration cases; both files are already registered in CI.
+- Suite-registration audit, syntax checks, flow-document validation, and git diff --check passed.
+- Admission tests could not load missing workspace packages; regression fail/pass comparison remains unverified.
+- Proxy suite: 2 passed, 13 failed because sandbox permissions prohibit listening sockets; no skips.
+- Workspace/document checks require missing dependencies. Lint, typecheck, browser, cluster, and native-image proof remain unavailable.
+- Upstream migrations and runtime source pin remain unchanged. No Git mutations, remote writes, dependency installation, or private combination adaptations.
+
 Execution tool source digests: `720c6d896abc9b3a4a1b59a5adbf09cfd1c2bf9456be581f3dc3b3ad9f76bcc0`
 
 ## Publication
