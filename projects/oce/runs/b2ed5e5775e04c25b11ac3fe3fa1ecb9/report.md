@@ -1,6 +1,6 @@
 # Maintenance run b2ed5e5775e04c25b11ac3fe3fa1ecb9
 
-Status: **running**
+Status: **failed**
 
 Recipe: `69eb32360c6b4abc687505f4824154b2e5212684`
 Upstream: `8e20e2019fb4d067e0876fb10e59231dd70c5761`
@@ -162,8 +162,24 @@ The embedded Slack/Teams trial remains useful and is not absorbed by frozen upst
 
 Execution tool source digests: `48c0b71d35c1b755a91327cd6dab1c9096675621f648dd1dcde388bca57018b5`
 
+Failed check combined-invariants at `09d327de7fe56bf5d896a4e58917a48355c4d0c3`: Command failed (1): python3
+
+### Failure diagnosis: revalidation-integration-checks
+
+Diagnosis complete. The check failed because its Python runtime does not support zip(strict=False). No files were modified. Candidate qualification remains incomplete.
+- Current HEAD is 09d327de7fe56bf5d896a4e58917a48355c4d0c3; working tree is clean.
+- revalidation-integration-checks-0-combined-invariants.log:955–962 records TypeError at frozen recipe/checks/local.py:42, before migration-prefix validation completed.
+- The non-login environment resolves python3 to /usr/bin/python3, version 3.9.6; the exact zip expression reproduces the failure. Installed Homebrew Python 3.14.6 accepts it.
+- The actual log records the suite-registration audit as passed at candidate 09d327de7fe56bf5d896a4e58917a48355c4d0c3, with no issues. This is not runtime qualification.
+- Independent read-only comparison confirms all 62 published journal entries and corresponding SQL bytes match previous integration 90e30b8c6922732ba456ed102b5c72a79fa84b8c.
+- A separate candidate compatibility defect remains: migrations/meta/_journal.json assigns appended filenames 0063–0067 indices 62–66. Frozen recipe/checks/local.py:49–51 requires indices 63–67. Upstream 8e20e2019fb4d067e0876fb10e59231dd70c5761 already ends at index 64/tag 0064.
+
 ## Publication
 
 {}
+
+## Current issue
+
+Environment failure: Command failed (1): python3
 
 Checks prove their configured behavior. Detailed worker transcripts and raw logs remain local.
