@@ -33,6 +33,7 @@ from common import (
     digest,
     distribution_visibility,
     load,
+    openclaw_source,
     read_release,
     require,
     run,
@@ -275,6 +276,10 @@ def resolve(args):
             digest(safe_path(source, path).read_bytes()) == expected,
             "confinement input changed; review and repin bundle.json",
         )
+    seccomp_module = source / "scripts/lib/codex-seccomp-profile.mjs"
+    if './codex-seccomp-profile.ts' in seccomp_module.read_text():
+        require("scripts/lib/codex-seccomp-profile.ts" in spec["build"]["confinement"],
+                "pin the TypeScript confinement implementation, not only its wrapper")
     bundled_plugins, package_plugins = plugin_selections(spec["plugins"], spec["schemaVersion"])
     plugin_packages = resolve_plugins(package_plugins, source, getattr(args, "plugin_cache", None))
     presets = []
@@ -312,7 +317,8 @@ def resolve(args):
         require(len(matches) == 1, f"unsupported source recipe: {pattern}")
         return matches[0]
 
-    oc = one(r"^ARG OPENCLAW_COMMIT=([a-f0-9]{40})$")
+    source_pins = openclaw_source(source)
+    oc = source_pins["commit"]
     codex = one(r"^ENV OPENAI_CODEX_VERSION=(" + CODEX_VERSION.pattern + r")$")
     require(
         oc == spec["openclawCommit"] and codex == spec["codexVersion"],
@@ -326,7 +332,7 @@ def resolve(args):
         bundled_plugins == selected_plugins == retained_plugins,
         "plugin selection differs from runtime recipe; select a compatible fork or patch",
     )
-    oc_archive = one(r"echo '([a-f0-9]{64})  /tmp/openclaw-source.tar.gz'")
+    oc_archive = source_pins["sourceArchiveSha256"]
     build = {
         key: one(r"^ARG " + arg + r"=([^\s]+)$")
         for key, arg in (
@@ -360,6 +366,11 @@ def resolve(args):
         r"^version: ([\w.+-]+)$", (source / chart_path / "Chart.yaml").read_text()
     )
     payload = {} if spec["schemaVersion"] >= 3 else {"defaults/" + Path(ref["path"]).name: ref for ref in preset_refs}
+    notes = Path(args.definition).resolve().with_name("NOTES.md")
+    if notes.exists():
+        payload["RELEASE_NOTES.md"] = {
+            "path": str(notes.relative_to(ROOT)), "sha256": digest(notes.read_bytes())
+        }
     payload["defaults/codex-profile.json"] = spec["codexProfile"]
     for name in BUNDLE_LICENSE_FILES:
         payload["notices/" + name] = {"path": name, "sha256": digest((ROOT / name).read_bytes())}
@@ -528,6 +539,8 @@ def verify_handoff_layout(artifact, *, native=True):
     expected = set(HANDOFF_DOCUMENTS) | {
         "bin", "defaults", "examples", "lib", "metadata", "notices", "oce",
     }
+    if "RELEASE_NOTES.md" in load(artifact / "metadata/release.json")["payloadFiles"]:
+        expected.add("RELEASE_NOTES.md")
     if native:
         expected.add("security")
     require(
@@ -805,6 +818,21 @@ def verify_installation(args):
     verify_release_assets(out, installation=True)
 
 
+def archived_release_notes(out, version):
+    """Publish only the notes selected and verified inside the handoff archive."""
+    release = load(out / "release.json")
+    require(release["version"] == version, "release notes version mismatch")
+    reference = release["payloadFiles"].get("RELEASE_NOTES.md")
+    if reference is None:
+        return ""
+    with tarfile.open(out / "bundle.tar.gz") as archive:
+        member = archive.getmember(version + "/RELEASE_NOTES.md")
+        require(member.isfile(), "release notes must be a regular file")
+        data = archive.extractfile(member).read()
+    require(digest(data) == reference, "release notes hash mismatch")
+    return data.decode("utf-8")
+
+
 def publish_release(args):
     out = Path(args.output).resolve()
     provenance = verify_release_assets(out, installation=True)
@@ -833,6 +861,9 @@ def publish_release(args):
         "Provider access and customer installation acceptance remain separate. "
         "Exact ingredients and evidence are in the attached bundle definition and provenance.\n"
     )
+    release_notes = archived_release_notes(out, version)
+    if release_notes:
+        notes_text += "\n" + release_notes
     # Draft holds every asset until the entire upload succeeds. Never replace an existing tag/asset.
     with tempfile.TemporaryDirectory(prefix="bundle-release-notes-") as temporary:
         notes = Path(temporary) / "release-notes.txt"

@@ -44,6 +44,15 @@ immutable tag and prerelease. Repository visibility controls release access; ima
 packages must match that visibility. CI never changes either setting. Raw failure
 diagnostics are uploaded only while the repository is private.
 
+## Release notes
+
+Author installer-facing changes and compatibility concerns in `NOTES.md` beside
+the new bundle definition. The resolver snapshots and hashes it as
+`RELEASE_NOTES.md` in the archive. Publication appends those verified archived
+notes to the GitHub release body; no extra release attachment is needed.
+Keep notes with the immutable release tag after publication. Do not put customer
+settings, current qualification claims or duplicated ingredient pins in notes.
+
 ## Generated outputs
 
 Publication produces three multiarchitecture images: controller, runtime and

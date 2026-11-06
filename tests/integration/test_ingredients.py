@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -57,18 +58,17 @@ class Ingredients(unittest.TestCase):
             "pkg": json.loads(files["package.json"]),
             "manifest": json.loads(files["openclaw.plugin.json"]),
             "selected": self.plugin,
+            "npmPackage": str(Path(shutil.which("npm")).resolve().parents[1] / "package.json"),
         }
         script = r"""
           import assert from 'node:assert/strict';
           import {readFileSync} from 'node:fs';
-          import {execFileSync} from 'node:child_process';
           import {createRequire} from 'node:module';
-          import {join} from 'node:path';
           import {verifyPluginCompatibility as verify} from './scripts/ingredients-runtime.mjs';
-          const semver = createRequire(join(execFileSync('npm',['root','-g'],{encoding:'utf8'}).trim(),'npm/package.json'))('semver');
-          const {pkg,manifest,selected}=JSON.parse(readFileSync(0,'utf8'));
-          for (const host of ['2026.9.8','2026.9.9','2026.10.2']) verify(pkg,manifest,selected,host,semver);
-          for (const host of ['2026.9.7','2026.10.3','invalid']) assert.throws(()=>verify(pkg,manifest,selected,host,semver));
+          const {pkg,manifest,selected,npmPackage}=JSON.parse(readFileSync(0,'utf8'));
+          const semver = createRequire(npmPackage)('semver');
+          for (const host of ['2026.9.8','2026.9.9','2026.10.2','2026.10.10']) verify(pkg,manifest,selected,host,semver);
+          for (const host of ['2026.9.7','invalid']) assert.throws(()=>verify(pkg,manifest,selected,host,semver));
           for (const change of [
             p=>p.name='other', p=>p.version='99.0.0',
             p=>p.openclaw.build.pluginSdkVersion=undefined,

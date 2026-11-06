@@ -1,7 +1,9 @@
 """Release upload boundaries; synthetic assets never qualify a real release."""
 
+import io
 import os
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 from common import digest, save  # noqa: E402
 from release import (  # noqa: E402
+    archived_release_notes,
     finish,
     publish_release,
     verify_installation,
@@ -188,11 +191,13 @@ class ReleaseAssets(unittest.TestCase):
                 notes = Path(command[command.index("--notes-file") + 1])
                 self.assertFalse(notes.is_relative_to(self.out))
                 self.assertIn("Download", notes.read_text())
+                self.assertIn("Compatibility note", notes.read_text())
 
         with patch.dict(os.environ, GITHUB_SHA="1" * 40, GITHUB_RUN_ID="synthetic-run"):
             with (
                 patch("release.preflight") as preflight,
                 patch("release.run", side_effect=capture),
+                patch("release.archived_release_notes", return_value="Compatibility note"),
             ):
                 publish_release(SimpleNamespace(output=self.out))
                 preflight.assert_called_once_with(VERSION, "1" * 40)
@@ -201,3 +206,26 @@ class ReleaseAssets(unittest.TestCase):
         self.assertEqual(assets, [self.out / name for name in sorted(ASSETS)])
         self.assertIn("--draft=false", edit)
         self.assertEqual({p.name for p in self.out.iterdir()}, ASSETS)
+
+
+class ArchivedReleaseNotes(unittest.TestCase):
+    def test_archived_notes_are_hash_bound_and_historical_notes_optional(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            release = {"version": VERSION, "payloadFiles": {}}
+            save(out / "release.json", release)
+            self.assertEqual(archived_release_notes(out, VERSION), "")
+            content = b"Upgrade concern\n"
+            release["payloadFiles"]["RELEASE_NOTES.md"] = digest(content)
+            save(out / "release.json", release)
+            with tarfile.open(out / "bundle.tar.gz", "w:gz") as archive:
+                member = tarfile.TarInfo(VERSION + "/RELEASE_NOTES.md")
+                member.size = len(content)
+                archive.addfile(member, io.BytesIO(content))
+            self.assertEqual(archived_release_notes(out, VERSION), content.decode())
+            release["payloadFiles"]["RELEASE_NOTES.md"] = "0" * 64
+            save(out / "release.json", release)
+            with self.assertRaisesRegex(ValueError, "notes hash mismatch"):
+                archived_release_notes(out, VERSION)
+            with self.assertRaisesRegex(ValueError, "notes version mismatch"):
+                archived_release_notes(out, "v0.0.0-alpha.2")

@@ -14,7 +14,7 @@ from common import digest, load, read_release, require, run, save
 PLATFORMS = [
     (os_name, arch) for os_name in ("darwin", "linux") for arch in ("amd64", "arm64")
 ]
-GO_VERSION = "go1.27.1"
+GO_VERSION = "go1.27.3"
 
 
 def build(args):

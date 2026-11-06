@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 5,
+  "version": "v0.1.0-alpha.18",
+  "oce": {
+    "repository": "https://github.com/raw-labs/openclaw-enterprise.git",
+    "commit": "c14c33ab437582ffc7641d9dc9c4184247d50a16"
+  },
+  "openclawCommit": "513c12703ad9a9161cc123e0b8ed4ecb811aa6b3",
+  "codexVersion": "0.164.0",
+  "architectures": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "presets": {
+    "includeDefaults": false,
+    "files": [
+      {
+        "path": "presets/coding-preset.json",
+        "sha256": "5e1311cd4437081b8f3191a0e6dad7b38450407af2b87b291038514b82674bed"
+      },
+      {
+        "path": "presets/assistant-preset.json",
+        "sha256": "2ea811498ae3562098242c14fb304681f8fa1b1ce78ad780bcf4bf421c07d816"
+      }
+    ]
+  },
+  "plugins": [
+    "codex",
+    "slack",
+    "msteams",
+    "browser",
+    {
+      "id": "openclaw-connections",
+      "package": "@raw-labs/openclaw-connections",
+      "version": "0.2.4",
+      "sha256": "021c73c5781f87cccc0ee26de926f96109334fbc3028d84cad1023f1affde14d",
+      "url": "https://github.com/raw-labs/openclaw-connections/releases/download/v0.2.4/raw-labs-openclaw-connections-0.2.4.tgz",
+      "source": {
+        "repository": "https://github.com/raw-labs/openclaw-connections.git",
+        "commit": "61b19e5610f8670cfe0d2c2f07a7d86c7dd8aee8"
+      }
+    }
+  ],
+  "codexProfile": {
+    "path": "profiles/codex-multi-plugin.json",
+    "sha256": "7dad28215df0bb351f7118b403a143170e83670073f00730b60add9486a8ba57"
+  },
+  "build": {
+    "patches": [
+      {
+        "path": "bundles/v0.1.0-alpha.18/assistant-browser.patch",
+        "sha256": "692277c14f0b5356cd09e1548b0cd90c0da30e989d3178a8423d0edd79467618"
+      }
+    ],
+    "confinement": {
+      "scripts/lib/codex-seccomp-profile.mjs": "0d552e9416f5c56e201189279e4b8808624edbd048bfde502ee4c3c0e1abb2eb",
+      "scripts/ci/codex-bwrap.apparmor": "1aeebba4f0b112724728b20da184e17e9025d62008cde93725cbb5c3c0b78232",
+      "scripts/lib/codex-seccomp-profile.ts": "4c3558bb56e161919e565114a2e20daa31188a127105d8d14520560e508f6e9c"
+    },
+    "upgradeFrom": "v0.1.0-alpha.17"
+  }
+}

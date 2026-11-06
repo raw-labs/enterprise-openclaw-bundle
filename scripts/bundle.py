@@ -110,11 +110,11 @@ def verify_source(release, selection, source):
         "chart version/source mismatch",
     )
     recipe = (Path(source) / release["build"]["runtime"]["dockerfile"]).read_text()
-    require(
-        release["sources"]["openclaw"]["commit"] in recipe
-        and release["sources"]["openclaw"]["archiveSha256"] in recipe,
-        "runtime Dockerfile/source selection mismatch",
-    )
+    from common import openclaw_source
+    pins = openclaw_source(Path(source))
+    require(pins["commit"] == release["sources"]["openclaw"]["commit"]
+            and pins["sourceArchiveSha256"] == release["sources"]["openclaw"]["archiveSha256"],
+            "runtime Dockerfile/source selection mismatch")
     runtime = release["runtime"]
     require(
         digest((Path(source) / runtime["inventoryHelper"]).read_bytes())
@@ -285,6 +285,22 @@ def package(args, release):
             for p in sorted((source / directory).rglob("*"))
             if p.is_file()
         )
+    # Ship the renderer/upgrade helpers' relative module closure, not controller source trees.
+    pending_modules = [name for name in shipped if name.endswith((".mjs", ".ts"))]
+    seen_modules = set()
+    while pending_modules:
+        name = pending_modules.pop()
+        if name in seen_modules:
+            continue
+        seen_modules.add(name)
+        for target in re.findall(r"(?:from\s*|import\s*\(?\s*)[\"'](\.[^\"']+)[\"']", (source / name).read_text()):
+            relative = posixpath.normpath(posixpath.join(posixpath.dirname(name), target))
+            dependency = safe_path(source, relative)
+            require(dependency.is_file(), f"helper module missing: {relative}")
+            if relative not in shipped:
+                shipped.append(relative)
+            if relative.endswith((".mjs", ".ts")):
+                pending_modules.append(relative)
     # Follow operator guides and product reference, excluding development manuals.
     pending = [name for name in shipped if name.endswith(".md")]
     while pending:

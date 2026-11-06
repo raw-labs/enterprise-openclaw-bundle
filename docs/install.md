@@ -1,5 +1,8 @@
 # Install a bundle
 
+Read `RELEASE_NOTES.md` in the selected archive, when present, before installing
+or upgrading. The same compatibility notes appear on its GitHub release.
+
 Use the `INSTALL.md` inside the selected release archive for an installation.
 This repository page describes that archive workflow; packaging adapts its links
 to shipped files or the selected immutable upstream source.

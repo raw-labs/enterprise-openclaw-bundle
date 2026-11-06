@@ -70,7 +70,9 @@ test("Connections loads in the native Gateway and retains state across Kubernete
     apiVersion: "v1", kind: "Pod", metadata: {name: "gateway", namespace: "bundle-connections"},
     spec: {
       automountServiceAccountToken: false, restartPolicy: "Never", terminationGracePeriodSeconds: 120,
-      securityContext: {runAsUser: 1000, runAsGroup: 1000, runAsNonRoot: true, fsGroup: 1000, seccompProfile: {type: "RuntimeDefault"}},
+      // Match the driver's retained-volume policy; a recursive fsGroup walk on
+      // replacement would make private credential databases group-readable.
+      securityContext: {runAsUser: 1000, runAsGroup: 1000, runAsNonRoot: true, fsGroup: 1000, fsGroupChangePolicy: "OnRootMismatch", seccompProfile: {type: "RuntimeDefault"}},
       initContainers: [driver.privateStateInitContainer("gateway", tag, true)],
       containers: [{
         name: "gateway", image: tag, imagePullPolicy: "Never", command: ["node", "/app/openclaw.mjs", "gateway", "run"],
@@ -99,6 +101,7 @@ test("Connections loads in the native Gateway and retains state across Kubernete
   const start = () => {put(pod); kube("wait", "--for=condition=Ready", "pod/gateway", "--timeout=180s");};
   const stop = () => kube("delete", "pod/gateway", "--wait=true", "--timeout=180s");
   let created = false;
+  let creationAttempted = false;
   let tagged = false;
   let previousTagged = false;
   let phase = "create disposable cluster";
@@ -109,6 +112,7 @@ test("Connections loads in the native Gateway and retains state across Kubernete
       run("docker", ["tag", previousImage, previousTag]);
       previousTagged = true;
     }
+    creationAttempted = true;
     run("k3d", ["cluster", "create", cluster, "--servers", "1", "--agents", "0", "--no-lb", "--image",
       "docker.io/rancher/k3s:v1.35.9-k3s1@sha256:ec9868c6a38d4e8c1869832fb5fd1eb8473c39794a0b44d2b952e7ba911951bc",
       "--kubeconfig-update-default=false", "--kubeconfig-switch-context=false", "--wait"]);
@@ -152,7 +156,67 @@ test("Connections loads in the native Gateway and retains state across Kubernete
         assert.equal(response.status,404); assert.match(await response.text(),/Tool not available/);
       }
     `);
+    // Never initialize this volume with the candidate before the upgrade baseline.
+    phase = "start Gateway with native plugin configuration";
+    if (previousImage) pod.spec.containers[0].image = previousTag;
+    saveConfig(); start();
+    phase = "inspect native plugin";
+    const inspected = native("plugins", "inspect", "openclaw-connections", "--runtime", "--json");
+    for (const tool of ["connections_search", "connections_describe", "connections_call"]) assert.ok(inspected.includes(tool));
+    assert.ok(!inspected.includes("synthetic-never-sent-project-key"));
+    phase = "administrator management and UI catalog";
+    const before = call("connections.status");
+    assert.equal(before.configured, true); assert.ok(before.userId);
+    const connection = call("connections.create", {connectorId: "github", name: "Bundle persistence check", grant: {mode: "selected", agentIds: []}});
+    phase = "private volume permissions and Pod replacement";
+    const permission = kube("exec", "gateway", "-c", "gateway", "--", "node", "-e",
+      `const fs=require('node:fs'),s=fs.statSync(${JSON.stringify(stateDirectory)});if((s.mode&511)!==448||s.uid!==1000)process.exit(1);`);
+    assert.equal(permission.trim(), "");
+    stop(); start();
+    assert.equal(call("connections.status").userId, before.userId);
+    const restored = call("connections.list").items.find(p => p.id === connection.id);
+    assert.ok(restored); assert.equal(restored.name, "Bundle persistence check"); assert.deepEqual(restored.grant, {mode: "selected", agentIds: []});
+    if (previousImage) {
+      phase = "upgrade retained Connections state to the candidate runtime";
+      stop(); pod.spec.containers[0].image = tag; start();
+      assert.equal(call("connections.status").userId, before.userId);
+      const upgraded = call("connections.list").items.find(p => p.id === connection.id);
+      assert.ok(upgraded); assert.equal(upgraded.name, restored.name); assert.deepEqual(upgraded.grant, restored.grant);
+      uiAvailable();
+    }
+    // Candidate asset and policy checks run only after the forward upgrade.
+    const ui = call("plugins.controlUi.list");
+    const asset = ui.plugins.find(p => p.pluginId === "openclaw-connections");
+    assert.ok(asset);
+    const plugin = plugins.find(p => p.id === "openclaw-connections");
+    const manifest = JSON.parse(await readFile(resolve("deploy/bundle/plugins/openclaw-connections/openclaw.plugin.json"), "utf8"));
+    phase = "UI asset, read-only authority and unconnected tools";
+    kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
+      import assert from 'node:assert/strict';
+      import { createHash } from 'node:crypto';
+      import { GatewayClient } from 'openclaw/plugin-sdk/gateway-runtime';
+      const url = new URL(${JSON.stringify(asset.entryUrl)}, 'http://127.0.0.1:18789');
+      assert.equal(url.origin, 'http://127.0.0.1:18789');
+      const response = await fetch(url, {headers: {authorization: 'Bearer ${token}'}});
+      assert.equal(response.status, 200);
+      assert.equal(createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex'), ${JSON.stringify(plugin.files[manifest.controlUi.entry])});
+      let admitted, rejected;
+      const ready = new Promise((yes, no) => {admitted = yes; rejected = no});
+      const client = new GatewayClient({url: 'ws://127.0.0.1:18789', token: '${token}', clientName: 'cli', mode: 'cli', role: 'operator',
+        scopes: ['operator.read'], deviceIdentity: null, env: process.env, onHelloOk: admitted, onConnectError: rejected});
+      try {
+        client.start();
+        await Promise.race([ready, new Promise((_, reject) => setTimeout(() => reject(new Error('Handshake timed out')), 10000))]);
+        await assert.rejects(client.request('connections.status', {}), /scope|admin/i);
+      } finally {client.stop()}
+      const search = await fetch('http://127.0.0.1:18789/tools/invoke', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ${token}'},
+        body: JSON.stringify({tool: 'connections_search', args: {}, agentId: 'main', idempotencyKey: 'bundle-no-accounts'})});
+      const body = await search.text();
+      assert.equal(search.status, 200); assert.match(body, /no_usable_connections/);
+      assert.ok(!body.includes('synthetic-never-sent-project-key'));
+    `);
     if (release.includeDefaultPresets === false) {
+      stop();
       pod.spec.containers[0].env = pod.spec.containers[0].env.filter(e => e.name !== "COMPOSIO_API_KEY");
       pod.spec.containers[0].env.push({name:"APP_SERVER_URL",value:"ws://127.0.0.1:9"}, {name:"APP_SERVER_TOKEN",value:"synthetic-guardian-token"});
       for (const preset of release.presets) {
@@ -230,66 +294,10 @@ test("Connections loads in the native Gateway and retains state across Kubernete
       }
       config = structuredClone(configuredBase);
     }
-    phase = "start Gateway with native plugin configuration";
-    if (previousImage) pod.spec.containers[0].image = previousTag;
-    saveConfig(); start();
-    phase = "inspect native plugin";
-    const inspected = native("plugins", "inspect", "openclaw-connections", "--runtime", "--json");
-    for (const tool of ["connections_search", "connections_describe", "connections_call"]) assert.ok(inspected.includes(tool));
-    assert.ok(!inspected.includes("synthetic-never-sent-project-key"));
-    phase = "administrator management and UI catalog";
-    const before = call("connections.status");
-    assert.equal(before.configured, true); assert.ok(before.userId);
-    const connection = call("connections.create", {connectorId: "github", name: "Bundle persistence check", grant: {mode: "selected", agentIds: []}});
-    const ui = call("plugins.controlUi.list");
-    const asset = ui.plugins.find(p => p.pluginId === "openclaw-connections");
-    assert.ok(asset);
-    const plugin = plugins.find(p => p.id === "openclaw-connections");
-    const manifest = JSON.parse(await readFile(resolve("deploy/bundle/plugins/openclaw-connections/openclaw.plugin.json"), "utf8"));
-    phase = "UI asset, read-only authority and unconnected tools";
-    kube("exec", "gateway", "-c", "gateway", "--", "node", "--input-type=module", "-e", `
-      import assert from 'node:assert/strict';
-      import { createHash } from 'node:crypto';
-      import { GatewayClient } from 'openclaw/plugin-sdk/gateway-runtime';
-      const url = new URL(${JSON.stringify(asset.entryUrl)}, 'http://127.0.0.1:18789');
-      assert.equal(url.origin, 'http://127.0.0.1:18789');
-      const response = await fetch(url, {headers: {authorization: 'Bearer ${token}'}});
-      assert.equal(response.status, 200);
-      assert.equal(createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex'), ${JSON.stringify(plugin.files[manifest.controlUi.entry])});
-      let admitted, rejected;
-      const ready = new Promise((yes, no) => {admitted = yes; rejected = no});
-      const client = new GatewayClient({url: 'ws://127.0.0.1:18789', token: '${token}', clientName: 'cli', mode: 'cli', role: 'operator',
-        scopes: ['operator.read'], deviceIdentity: null, env: process.env, onHelloOk: admitted, onConnectError: rejected});
-      try {
-        client.start();
-        await Promise.race([ready, new Promise((_, reject) => setTimeout(() => reject(new Error('Handshake timed out')), 10000))]);
-        await assert.rejects(client.request('connections.status', {}), /scope|admin/i);
-      } finally {client.stop()}
-      const search = await fetch('http://127.0.0.1:18789/tools/invoke', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ${token}'},
-        body: JSON.stringify({tool: 'connections_search', args: {}, agentId: 'main', idempotencyKey: 'bundle-no-accounts'})});
-      const body = await search.text();
-      assert.equal(search.status, 200); assert.match(body, /no_usable_connections/);
-      assert.ok(!body.includes('synthetic-never-sent-project-key'));
-    `);
-    phase = "private volume permissions and Pod replacement";
-    const permission = kube("exec", "gateway", "-c", "gateway", "--", "node", "-e",
-      `const fs=require('node:fs'),s=fs.statSync(${JSON.stringify(stateDirectory)});if((s.mode&511)!==448||s.uid!==1000)process.exit(1);`);
-    assert.equal(permission.trim(), "");
-    stop(); start();
-    assert.equal(call("connections.status").userId, before.userId);
-    const restored = call("connections.list").items.find(p => p.id === connection.id);
-    assert.ok(restored); assert.equal(restored.name, "Bundle persistence check"); assert.deepEqual(restored.grant, {mode: "selected", agentIds: []});
-    if (previousImage) {
-      phase = "upgrade retained Connections state to the candidate runtime";
-      stop(); pod.spec.containers[0].image = tag; start();
-      assert.equal(call("connections.status").userId, before.userId);
-      const upgraded = call("connections.list").items.find(p => p.id === connection.id);
-      assert.ok(upgraded); assert.equal(upgraded.name, restored.name); assert.deepEqual(upgraded.grant, restored.grant);
-      uiAvailable();
-    }
     phase = "explicitly disabled plugin";
     config.plugins.entries["openclaw-connections"].enabled = false;
-    stop(); saveConfig(); start();
+    if (release.includeDefaultPresets !== false) stop();
+    saveConfig(); start();
     assert.throws(() => call("connections.status"), /unknown method|not found|not registered/i);
   } catch (error) {
     let logs = "";
@@ -306,7 +314,7 @@ test("Connections loads in the native Gateway and retains state across Kubernete
     throw new Error(`Synthetic Connections check failed at ${phase}: ${detail}`, {cause: error});
   } finally {
     // Remove only the cluster and local tag created with this random test identity.
-    if (created) run("k3d", ["cluster", "delete", cluster]);
+    if (creationAttempted) run("k3d", ["cluster", "delete", cluster]);
     if (tagged) run("docker", ["image", "rm", tag]);
     if (previousTagged) run("docker", ["image", "rm", previousTag]);
     await rm(directory, {recursive: true, force: true});

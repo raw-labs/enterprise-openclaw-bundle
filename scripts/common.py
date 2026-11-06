@@ -48,11 +48,31 @@ def confinement_profile(inputs):
     require(isinstance(inputs, dict), "pin reviewed source confinement inputs in bundle.json")
     policies = set(inputs) & APPARMOR_PROFILES.keys()
     require(len(policies) == 1
-            and set(inputs) == {"scripts/lib/codex-seccomp-profile.mjs", *policies}
+            and set(inputs) in ({"scripts/lib/codex-seccomp-profile.mjs", *policies},
+                                {"scripts/lib/codex-seccomp-profile.mjs", "scripts/lib/codex-seccomp-profile.ts", *policies})
             and all(isinstance(h, str) and HASH.fullmatch(h) for h in inputs.values()),
             "pin reviewed source confinement inputs in bundle.json")
     path = next(iter(policies))
     return path, APPARMOR_PROFILES[path]
+
+
+def openclaw_source(source):
+    """Read the selected source's native pin format, never a caller override."""
+    manifest = source / "deploy/runtime/openclaw-source.json"
+    if manifest.exists():
+        pins = load(manifest)
+        require(set(pins) == {"commit", "sourceArchiveSha256", "buildTimestamp"}
+                and isinstance(pins["commit"], str) and SHA.fullmatch(pins["commit"])
+                and isinstance(pins["sourceArchiveSha256"], str) and HASH.fullmatch(pins["sourceArchiveSha256"])
+                and isinstance(pins["buildTimestamp"], str)
+                and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", pins["buildTimestamp"]),
+                "invalid OpenClaw source manifest")
+        return pins
+    recipe = (source / "deploy/runtime/Dockerfile").read_text()
+    commits = re.findall(r"^ARG OPENCLAW_COMMIT=([a-f0-9]{40})$", recipe, re.MULTILINE)
+    archives = re.findall(r"echo '([a-f0-9]{64})  /tmp/openclaw-source.tar.gz'", recipe)
+    require(len(commits) == len(archives) == 1, "unsupported OpenClaw source recipe")
+    return {"commit": commits[0], "sourceArchiveSha256": archives[0]}
 
 
 def load(path):
@@ -111,7 +131,7 @@ def read_release(path, root=None):
             for name, expected in release["payloadFiles"].items():
                 source = release_file(path, root, name)
                 require(
-                    digest(source.read_bytes()) == expected, f"payload mismatch: {name}"
+                    source.is_file() and digest(source.read_bytes()) == expected, f"payload mismatch: {name}"
                 )
         for arch, receipt in release["qualification"].get("nativeReceipts", {}).items():
             proof_path = safe_path(path.parent, receipt["path"])
