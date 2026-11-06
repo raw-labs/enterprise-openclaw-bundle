@@ -196,6 +196,10 @@ not ok 2 - upstream test private-in-test-name
 [bundle-runtime-phase] secret-value
 [ci-timing] lane=images-packaging phase=k3d-create duration_ms=300001
 [ci-timing] lane=images-packaging phase=private-command duration_ms=1
+[bundle-native-command] kubectl
+[bundle-native-operation] exec
+[bundle-native-failure] permission-denied
+[bundle-native-failure] private-diagnostic
 Error: private credentials
     at prepare (file://{source_file}:1:1)
     at /outside/private-source.mjs:1:1
@@ -211,10 +215,34 @@ Error: private credentials
             summary = captured.getvalue()
             self.assertIn("scripts/stock-smoke.mjs:1:1", summary)
             self.assertIn("phase reached: prepare", summary)
+            self.assertIn("Native diagnostic command: kubectl", summary)
+            self.assertIn("Native diagnostic operation: exec", summary)
+            self.assertIn("Native diagnostic failure: permission-denied", summary)
             self.assertIn("k3d-create (300001 ms)", summary)
             for private in ("secret-value", "private-command", "private credentials",
-                            "outside", "999999"):
+                            "outside", "999999", "private-diagnostic"):
                 self.assertNotIn(private, summary)
+
+    def test_native_command_diagnostics_do_not_disclose_values(self):
+        result = subprocess.run([
+            "node", "--input-type=module", "-e", """
+import { reportNativeFailure } from './scripts/native-diagnostics.mjs';
+reportNativeFailure({
+  command: '/private/kubectl', args: ['--kubeconfig', '/private/config', 'exec', 'secret-pod'],
+  exitCode: 1, timedOut: false, code: 'private-code',
+  codexSandboxProbe: {stage: 'SANDBOX', exit: 1},
+  stderr: 'private-token: bwrap: Operation not permitted',
+  message: 'private-message',
+});
+reportNativeFailure({command: 'secret-command', args: ['private-arg'],
+  exitCode: 'private-value', code: 'private-code', codexSandboxProbe: {stage: 'private-stage'}});
+"""], cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertEqual(result.stderr.splitlines(), [
+            '[bundle-native-command] kubectl', '[bundle-native-operation] exec',
+            '[bundle-native-exit] 1', '[bundle-native-probe] SANDBOX',
+            '[bundle-native-failure] permission-denied',
+        ])
+        self.assertNotIn('private', result.stderr)
 
     def test_native_promotion_requires_built_images_and_both_receipts(self):
         self.release["kind"] = "release"
