@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24.16.0'
+          node-version: '24.22.1'
       - name: Run offline contributor checks without package credentials
         run: python3 scripts/check.py
   validate:
@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24.16.0'
+          node-version: '24.22.1'
       - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
         with:
           version: v3.21.3
