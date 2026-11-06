@@ -184,6 +184,18 @@ class ReleaseAssets(unittest.TestCase):
 
     def test_publish_command_uploads_only_explicit_assets_and_external_notes(self):
         captured = []
+        content = b"Compatibility note\n"
+        release = candidate()
+        release["payloadFiles"]["RELEASE_NOTES.md"] = digest(content)
+        save(self.out / "release.json", release)
+        with tarfile.open(self.out / "bundle.tar.gz", "w:gz") as archive:
+            member = tarfile.TarInfo(VERSION + "/RELEASE_NOTES.md")
+            member.size = len(content)
+            archive.addfile(member, io.BytesIO(content))
+        for name in ("release.json", "bundle.tar.gz"):
+            self.provenance["files"][name] = digest((self.out / name).read_bytes())
+        self.provenance["artifactSha256"] = self.provenance["files"]["bundle.tar.gz"]
+        self.write_provenance()
 
         def capture(command):
             captured.append(command)
@@ -197,7 +209,6 @@ class ReleaseAssets(unittest.TestCase):
             with (
                 patch("release.preflight") as preflight,
                 patch("release.run", side_effect=capture),
-                patch("release.archived_release_notes", return_value="Compatibility note"),
             ):
                 publish_release(SimpleNamespace(output=self.out))
                 preflight.assert_called_once_with(VERSION, "1" * 40)
@@ -212,7 +223,7 @@ class ArchivedReleaseNotes(unittest.TestCase):
     def test_archived_notes_are_hash_bound_and_historical_notes_optional(self):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)
-            release = {"version": VERSION, "payloadFiles": {}}
+            release = candidate()
             save(out / "release.json", release)
             self.assertEqual(archived_release_notes(out, VERSION), "")
             content = b"Upgrade concern\n"

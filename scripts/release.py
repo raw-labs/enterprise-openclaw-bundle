@@ -821,7 +821,7 @@ def verify_installation(args):
 def archived_release_notes(out, version):
     """Publish only the notes selected and verified inside the handoff archive."""
     release = load(out / "release.json")
-    require(release["version"] == version, "release notes version mismatch")
+    require(release["id"] == version, "release notes version mismatch")
     reference = release["payloadFiles"].get("RELEASE_NOTES.md")
     if reference is None:
         return ""
