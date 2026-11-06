@@ -70,6 +70,19 @@ registration in an array without changing its `id` or `configuration`. Review th
 diff and pass `--candidate-installation` as described in OCE's guide. Keep the
 original file as `--installation`; the helper does not convert it automatically.
 
+The retired `drivers.compute.configuration.runtime.gatewayOutbound` setting is
+not accepted by controllers using the shared Installation proxy. Startup preflight
+refuses that baseline before stopping OCC writers. It is not an allowed
+`--candidate-installation` change. Plan the outbound-policy transition separately
+with the installation owner; do not simply delete a working fleet's policy or
+assume the shared proxy preserves its destinations and credentials.
+
+The package rehearsal covers an Agent-free Installation: it first verifies this
+refusal, then removes the unused optional setting through the installed controller's
+separate Installation-change procedure, keeping its images unchanged. Only then
+does it exercise the image upgrade. This does not qualify an active fleet's
+outbound-policy migration or a replacement proxy.
+
 In particular, newly selected preset files require adding their image paths to
 the existing Installation's `presets.files`. First update the controller so it
 contains those files, then apply that separate settings change. Paths are recorded

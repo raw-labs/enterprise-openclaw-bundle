@@ -64,6 +64,7 @@ def exercise(args):
             timeout=600,
             log_output=True,
             diagnostics=False,
+            expected_refusal=(),
         ):
             result = subprocess.run(
                 [str(a) for a in command],
@@ -76,6 +77,11 @@ def exercise(args):
             if log_output:
                 logs.write(result.stdout + result.stderr)
                 logs.flush()
+            if expected_refusal:
+                require(result.returncode != 0 and all(
+                    marker.encode() in result.stderr for marker in expected_refusal
+                ), "expected upgrade startup refusal was not observed; see private log")
+                return result.stdout
             if result.returncode and diagnostics:
                 print(result.stderr.decode(errors="replace"), file=sys.stderr)
             require(
@@ -827,17 +833,61 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                         if isinstance(plugin, dict):
                             upgraded_installation["drivers"]["plugin"] = [plugin]
                         save(rendered / "candidate-installation.yaml", upgraded_installation)
-                        run(["bash", candidate / "oce/scripts/upgrade-production-images",
+                        upgrade_command = ["bash", candidate / "oce/scripts/upgrade-production-images",
                              "--kubeconfig", kubeconfig, "--context", context,
                              "--namespace", cp["namespace"], "--release", cp["releaseName"],
                              "--values", rendered / "values.yaml", "--installation", rendered / "installation.yaml",
                              "--candidate-installation", rendered / "candidate-installation.yaml",
                              "--controller-image", candidate_controller,
                              "--source-revision", candidate_release["sources"]["oce"]["commit"],
-                             "--evidence-dir", work / "upgrade-evidence", "--occ", candidate / "bin/occ",
-                             "--timeout-seconds", "600"], cwd=candidate / "oce", timeout=900,
-                            env=dict(os.environ, OCC_URL=api_origin, OCC_SERVICE_KEY_FILE=str(key_path), OCC_CA_BUNDLE=str(api_ca)),
-                            diagnostics=True)
+                             "--occ", candidate / "bin/occ", "--timeout-seconds", "600"]
+                        upgrade_env = dict(os.environ, OCC_URL=api_origin,
+                                           OCC_SERVICE_KEY_FILE=str(key_path), OCC_CA_BUNDLE=str(api_ca))
+                        runtime = upgraded_installation["drivers"]["compute"]["configuration"]["runtime"]
+                        if "gatewayOutbound" in runtime:
+                            # Exercise the real incompatible baseline first. The helper
+                            # must refuse it without stopping either installed writer.
+                            writers = {role: resource("deployment", "openclaw-enterprise-" + role)["spec"]
+                                       for role in ("api", "worker")}
+                            run([*upgrade_command, "--preflight-only", "--evidence-dir", work / "refused-upgrade"],
+                                cwd=candidate / "oce", timeout=900, env=upgrade_env,
+                                expected_refusal=("DRIVER_CONFIGURATION_INVALID", '"path":"/runtime"',
+                                                  '"code":"UNKNOWN_FIELD"', "No OCC writer was stopped"))
+                            for role, spec in writers.items():
+                                require(resource("deployment", "openclaw-enterprise-" + role)["spec"] == spec,
+                                        "refused upgrade changed an installed writer")
+                            steps.append("legacy gatewayOutbound startup refusal leaves installed writer specifications unchanged")
+
+                            # This fixture has no Agents or outbound consumers. Apply
+                            # the documented separate Installation change with the OLD
+                            # chart/image; never smuggle it into the image upgrade.
+                            agents = occ("--namespace", namespace_id, "agent", "list")
+                            require((agents if isinstance(agents, list) else agents["items"]) == [],
+                                    "outbound fixture change requires an Agent-free Namespace")
+                            baseline_installation = helm_values(rendered / "installation.yaml")
+                            del baseline_installation["drivers"]["compute"]["configuration"]["runtime"]["gatewayOutbound"]
+                            save(rendered / "installation.yaml", baseline_installation)
+                            document = (rendered / "installation.yaml").read_bytes()
+                            kubectl("-n", cp["namespace"], "patch", "secret", installation_settings["secretName"],
+                                    "--type=merge", "--patch-file=/dev/stdin", input=json.dumps({"data": {
+                                        installation_settings["key"]: base64.b64encode(document).decode()
+                                    }}).encode(), log_output=False)
+                            live["controlPlane"]["installationChecksum"] = digest(document)
+                            save(rendered / "values.yaml", live)
+                            run(["helm", "upgrade", cp["releaseName"], "deploy/helm/openclaw-enterprise",
+                                 "--kubeconfig", kubeconfig, "--kube-context", context, "--namespace", cp["namespace"],
+                                 "-f", rendered / "values.yaml", "--wait", "--timeout", "10m"],
+                                cwd=upstream, timeout=660, diagnostics=True)
+                            for role in ("api", "worker"):
+                                require(resource("deployment", "openclaw-enterprise-" + role)["spec"]["template"]["spec"]["containers"][0]["image"]
+                                        == controller, "separate Installation change moved the baseline image")
+                            require(occ("installation", "get")["id"] == installation_id,
+                                    "separate Installation change replaced the Installation")
+                            del runtime["gatewayOutbound"]
+                            save(rendered / "candidate-installation.yaml", upgraded_installation)
+                            steps.append("Agent-free fixture retires optional gatewayOutbound through old-chart Installation change before image upgrade; no replacement proxy qualified")
+                        run([*upgrade_command, "--evidence-dir", work / "upgrade-evidence"],
+                            cwd=candidate / "oce", timeout=900, env=upgrade_env, diagnostics=True)
                         actual_installation = json.loads(kubectl(
                             "-n", cp["namespace"], "get", "secret", installation_settings["secretName"], "-o", "json"))
                         retained = work / "retained-installation.yaml"
