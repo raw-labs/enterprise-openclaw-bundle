@@ -80,7 +80,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24.16.0'
+          node-version: '24.22.1'
       - name: Prepare Docker for OCE's immutable image probe
         run: bash scripts/setup-docker.sh
       - name: Authenticate baseline image access for retained-state checks
@@ -157,7 +157,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24.16.0'
+          node-version: '24.22.1'
       - name: Prepare Docker for the packaged OCE upgrade helper
         run: bash scripts/setup-docker.sh
       - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
@@ -225,7 +225,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24.16.0'
+          node-version: '24.22.1'
       - name: Prepare Docker for the packaged OCE upgrade helper
         run: bash scripts/setup-docker.sh
       - uses: Azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
