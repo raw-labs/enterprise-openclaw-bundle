@@ -934,6 +934,14 @@ def distribution_package(name, visibility):
     return package
 
 
+def publication_tag(version, index_digest):
+    require(re.fullmatch(r"sha256:[0-9a-f]{64}", index_digest),
+            "invalid publication index digest")
+    # A failed release may already have pushed images. A new checked build must
+    # not overwrite them, even when it uses the same unpublished release ID.
+    return version + "-sha256-" + index_digest.split(":", 1)[1]
+
+
 def identical_tag(result, expected):
     if result.returncode == 0:
         require(
@@ -1044,7 +1052,7 @@ def publish(args, release):
         )
         if publishing:
             distribution_package(name, visibility)
-        ref = "ghcr.io/raw-labs/" + name + ":" + release["id"]
+        ref = "ghcr.io/raw-labs/" + name + ":" + publication_tag(release["id"], dg)
         exists = False
         if publishing:
             result = subprocess.run(
