@@ -683,3 +683,30 @@ class StockArtifact(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "selected by the bundle"):
                 installer.render(args, release, admit=False)
+
+    def test_packaged_upgrade_source_gate_without_git(self):
+        helper = self.artifact / "oce/scripts/upgrade-production-images"
+        subprocess.run(["bash", "-n", helper], check=True)
+        text = helper.read_text()
+        gate = text[text.index("# A selected bundle patch"):text.index('positive_integer "$doctor_heap_mib"')]
+        revision = load(self.artifact / "metadata/release.json")["sources"]["oce"]["commit"]
+        # Exercise the actual patched shell gate without starting an upgrade.
+        script = '''
+require_command() { command -v "$1" >/dev/null || exit 1; }
+die() { echo "$1" >&2; exit 1; }
+source_revision=$1
+evidence_dir=$2
+values=$3
+installation=$4
+''' + gate + '\nprintf "%s\\n" "$chart_sha256"\n'
+        for selected, success in ((revision, True), ("0" * 40, False)):
+            result = subprocess.run(
+                ["bash", "-c", script, "archive-source-check", selected,
+                 str(self.out / "evidence"), str(self.out / "values.yaml"),
+                 str(self.out / "installation.yaml")],
+                cwd=self.artifact / "oce", capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode == 0, success, result.stderr)
+            if success:
+                self.assertRegex(result.stdout.strip(), r"^[a-f0-9]{64}$")
+        self.assertFalse(list(self.artifact.rglob("__pycache__")))

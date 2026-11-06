@@ -363,7 +363,7 @@ def package(args, release):
     for name in ["THIRD_PARTY_NOTICES.md"]:
         if (source / name).exists():
             files["notices/OCE-" + name] = ((source / name).read_bytes(), 0o644)
-    for name in ("integrity.py", "prepare.py"):
+    for name in ("integrity.py", "prepare.py", "upgrade_source.py"):
         files["lib/" + name] = ((ROOT / "delivery" / name).read_bytes(), 0o644)
     for name in release["payloadFiles"]:
         payload = release_file(args.release, ROOT, name)

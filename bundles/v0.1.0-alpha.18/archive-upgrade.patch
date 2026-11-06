@@ -1,0 +1,25 @@
+--- a/scripts/upgrade-production-images
++++ b/scripts/upgrade-production-images
+@@ -400,6 +400,14 @@
+ fi
+ full_commit_sha "$source_revision" ||
+   die "--source-revision must be a full lowercase Git commit SHA."
++# A selected bundle patch permits a verified extracted kit without Git metadata.
++# A checkout still follows the upstream commit/tree verification path below.
++if [[ ! -e .git && -f ../metadata/manifest.json ]]; then
++  require_command python3
++  chart=deploy/helm/openclaw-enterprise
++  chart_sha256=$(python3 -B ../lib/upgrade_source.py "$source_revision" "$evidence_dir" "$values" "$installation") ||
++    die "could not verify the extracted release package."
++else
+ checkout_git=(git --no-optional-locks --no-replace-objects --git-dir=.git)
+ read_checkout() (
+   unset GIT_DIR GIT_COMMON_DIR
+@@ -517,6 +525,7 @@
+   esac
+   die "the stock Helm chart must match the selected commit. Use a complete release checkout with the original chart files."
+ }
++fi
+ positive_integer "$doctor_heap_mib" || die "--doctor-heap-mib must be positive."
+ # Leave room for both margins in signed 64-bit shell arithmetic; compare decimal
+ # strings before evaluating the untrusted value as an arithmetic expression.

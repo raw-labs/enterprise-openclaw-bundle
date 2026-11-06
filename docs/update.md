@@ -51,7 +51,9 @@ Review differences in sources, patches, plugins and presets between the bundles'
 Run from the candidate's `oce/` and follow its
 [production image upgrade procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-upgrade.md).
 This directory replaces the release source checkout in that guide; skip its Git
-checkout and CLI build steps. Use `--occ occ`, your actual release/namespace and
+checkout and CLI build steps. The packaged helper verifies the complete kit file
+inventory and its selected OCE revision before using the chart. Keep the extracted
+kit unchanged throughout the upgrade. Use `--occ occ`, your actual release/namespace and
 protected site paths, and the variables above for its source and image arguments.
 The matched helper, probes, chart and Collector configuration are packaged.
 
