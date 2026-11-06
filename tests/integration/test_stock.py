@@ -58,11 +58,15 @@ class ReleaseSnapshots(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             record = Path(temp) / "release.json"
             record.write_bytes(SELECTION.read_bytes())
+            for payload in read_release(SELECTION)["payloadFiles"]:
+                target = record.parent / payload
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((SELECTION.parent / payload).read_bytes())
             name = "defaults/codex-profile.json"
             tampered = record.parent / name
-            tampered.parent.mkdir(parents=True)
+            tampered.parent.mkdir(parents=True, exist_ok=True)
             tampered.write_text("changed historical input\n")
-            with self.assertRaisesRegex(ValueError, "payload mismatch"):
+            with self.assertRaisesRegex(ValueError, "payload mismatch: defaults/codex-profile.json"):
                 read_release(record, ROOT)
 
 
@@ -227,6 +231,16 @@ class StockArtifact(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("candidate cannot be installed", result.stderr)
 
+    def test_release_notes_are_delivered_from_the_selected_snapshot(self):
+        release = read_release(SELECTION)
+        expected = release["payloadFiles"].get("RELEASE_NOTES.md")
+        notes = self.artifact / "RELEASE_NOTES.md"
+        if expected is None:
+            self.assertFalse(notes.exists())
+        else:
+            self.assertEqual(digest(notes.read_bytes()), expected)
+            self.assertEqual(notes.read_bytes(), (SELECTION.parent / "RELEASE_NOTES.md").read_bytes())
+
     def test_installer_layout_links_and_commands(self):
         # Exercise the release validator on the actual unbuilt archive too.
         # Native security files are checked on the native release archive in CI.
@@ -234,6 +248,7 @@ class StockArtifact(unittest.TestCase):
         self.assertEqual(
             {p.name for p in self.artifact.iterdir()},
             {
+                *({"RELEASE_NOTES.md"} if "RELEASE_NOTES.md" in read_release(SELECTION)["payloadFiles"] else set()),
                 "AGENTS.md",
                 "INSTALL.md",
                 "UPDATE.md",
@@ -400,7 +415,7 @@ class StockArtifact(unittest.TestCase):
             installation = helm_values(output / "installation.yaml")
             runtime = installation["drivers"]["compute"]["configuration"]["runtime"]
             self.assertFalse(runtime["channels"]["experimentalEmbeddedChannels"])
-            self.assertTrue(runtime["gatewayOutbound"]["enabled"])
+            self.assertTrue(runtime["proxy"]["proxyUrl"])
             for changes, error in (
                 (
                     {"channels": {"experimentalEmbeddedChannels": "true"}},
@@ -440,7 +455,7 @@ class StockArtifact(unittest.TestCase):
                     error, " ".join(load(output / "preflight.json")["errors"])
                 )
             rejected = copy.deepcopy(site)
-            rejected["gatewayOutbound"] = {"enabled": False}
+            rejected["proxy"] = {"bundled": False}
             rejected["channels"]["experimentalEmbeddedChannels"] = True
             save(input, rejected)
             result = subprocess.run(
@@ -458,7 +473,7 @@ class StockArtifact(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "requires gatewayOutbound.enabled",
+                "requires a selected Gateway proxy",
                 " ".join(load(output / "preflight.json")["errors"]),
             )
 

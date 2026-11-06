@@ -55,11 +55,13 @@ FROM __UPSTREAM_TARGET__ AS bundle-ingredients
 USER root
 COPY --from=bundle-plugins --chown=node:node / /app/node_modules/openclaw/dist/extensions/
 COPY scripts/build-runtime-assets.mjs /tmp/bundle-inventory.mjs
+COPY scripts/lib/ /tmp/lib/
 COPY deploy/bundle/runtime.mjs /tmp/bundle-runtime.mjs
 COPY deploy/bundle/plugins.json /tmp/bundle-plugins.json
 RUN node /tmp/bundle-inventory.mjs inventory /app/node_modules/openclaw /opt/oce/runtime \\
     && node /tmp/bundle-runtime.mjs \\
-    && rm /tmp/bundle-inventory.mjs /tmp/bundle-runtime.mjs /tmp/bundle-plugins.json
+    && rm /tmp/bundle-inventory.mjs /tmp/bundle-runtime.mjs /tmp/bundle-plugins.json \\
+    && rm -rf /tmp/lib
 USER node
 """
 
@@ -358,6 +360,11 @@ def build(args, release):
         "oceCommit": release["sources"]["oce"]["commit"],
         "images": {},
     }
+    from common import openclaw_source
+    pins = openclaw_source(Path(args.source))
+    require(pins["commit"] == release["sources"]["openclaw"]["commit"]
+            and pins["sourceArchiveSha256"] == release["sources"]["openclaw"]["archiveSha256"],
+            "build source manifest mismatch")
     for role in ROLES:
         recipe = release["build"][role]
         cmd = [
@@ -382,6 +389,8 @@ def build(args, release):
             "NODE_BASE_IMAGE": release["build"]["nodeBaseImage"],
             "NODE_RUNTIME_BASE_IMAGE": release["build"]["nodeRuntimeBaseImage"],
             "OPENCLAW_COMMIT": release["sources"]["openclaw"]["commit"],
+            "OPENCLAW_SOURCE_SHA256": pins["sourceArchiveSha256"],
+            **({"OPENCLAW_BUILD_TIMESTAMP": pins["buildTimestamp"]} if "buildTimestamp" in pins else {}),
             "OCC_BUILD_REVISION": record["oceCommit"],
             "SOURCE_DATE_EPOCH": release["sources"]["oce"]["commitEpoch"],
         }.items():

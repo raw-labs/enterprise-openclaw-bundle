@@ -1,5 +1,8 @@
 # Update an installation
 
+Read `RELEASE_NOTES.md` in the selected archive, when present, before installing
+or upgrading. The same compatibility notes appear on its GitHub release.
+
 For owners of an existing production Kubernetes/Helm installation. The bundle
 packages OCE's upgrade tools; OCE defines migration and recovery behavior.
 Native artifact checks and fresh-install tests do not prove an upgrade between

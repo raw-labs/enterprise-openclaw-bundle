@@ -93,7 +93,7 @@ class Ingredients(unittest.TestCase):
 
     def test_public_release_url_cannot_change_repository_or_version(self):
         for url in (
-            self.plugin["url"].replace("v0.2.3", "latest"),
+            self.plugin["url"].replace("v" + self.plugin["version"], "latest"),
             self.plugin["url"].replace(
                 "openclaw-connections/releases", "other/releases"
             ),
