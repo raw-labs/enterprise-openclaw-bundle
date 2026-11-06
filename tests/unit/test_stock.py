@@ -161,6 +161,7 @@ class StockInputs(unittest.TestCase):
 # Subtest: selected RAW presets are image-resident and accepted by OCE's real loader
 not ok 1 - selected RAW presets are image-resident and accepted by OCE's real loader
   ---
+  location: 'tests/unit/test_stock.py:1:1'
   error: 'synthetic preset failure'
   ...
 # private output from the next source test
@@ -181,6 +182,7 @@ not ok 2 - upstream test private-in-test-name
                     log,
                 )
             self.assertIn("Native test process failed", captured.getvalue())
+            self.assertIn("tests/unit/test_stock.py:1:1", captured.getvalue())
             self.assertNotIn("synthetic preset failure", captured.getvalue())
             self.assertNotIn("private output", captured.getvalue())
             self.assertNotIn("private source diagnostics", captured.getvalue())

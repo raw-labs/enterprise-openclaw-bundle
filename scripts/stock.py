@@ -463,6 +463,27 @@ def tap_counts(text):
     return counts
 
 
+def failure_locations(output, source):
+    """Emit only existing source paths and bounded line numbers, never TAP values/names."""
+    source = Path(source).resolve()
+    locations = set()
+    for match in re.finditer(r"^\s+location: ['\"]([^'\"\n]+):(\d+):(\d+)['\"]$", output, re.MULTILINE):
+        name, line, column = match.groups()
+        path = Path(name)
+        if not path.is_absolute():
+            path = source / path
+        try:
+            relative = path.resolve().relative_to(source)
+            # Report only a location in a real, reviewed source file.
+            if path.is_file() and path.suffix in (".mjs", ".ts", ".js", ".py"):
+                lines = path.read_text().splitlines()
+                if 1 <= int(line) <= len(lines) and 1 <= int(column) <= len(lines[int(line) - 1]) + 1:
+                    locations.add(f"{relative}:{int(line)}:{int(column)}")
+        except (OSError, ValueError):
+            continue
+    return sorted(locations)
+
+
 def tests(command, source, env, log):
     with log.open("w") as file:
         os.chmod(log, 0o600)
@@ -475,6 +496,8 @@ def tests(command, source, env, log):
         )
     output = log.read_text()
     if result.returncode:
+        for location in failure_locations(output, source):
+            print("Native test source location: " + location, file=sys.stderr)
         # Test names and assertion values can both contain runtime secrets.
         print(f"Native test process failed (exit {result.returncode}); inspect private diagnostics.",
               file=sys.stderr)
