@@ -50,6 +50,10 @@
       {
         "path": "bundles/v0.1.0-alpha.18/assistant-browser.patch",
         "sha256": "692277c14f0b5356cd09e1548b0cd90c0da30e989d3178a8423d0edd79467618"
+      },
+      {
+        "path": "bundles/v0.1.0-alpha.18/archive-upgrade.patch",
+        "sha256": "af730393b50604964183d3385b4ef68fd91420f064d20d6df0e27c1dd1e60916"
       }
     ],
     "confinement": {
