@@ -26,6 +26,7 @@ from common import (  # noqa: E402
 from stock import (  # noqa: E402
     assemble_index,
     identical_tag,
+    publication_tag,
     inspect_oci,
     distribution_package,
     stage_archive,
@@ -254,6 +255,19 @@ class RegistryInputs(unittest.TestCase):
                 distribution_package("new-package", "public")
             with self.assertRaisesRegex(ValueError, "invalid package visibility"):
                 distribution_package("new-package", "internal")
+
+    def test_rebuilt_indexes_have_distinct_immutable_publication_tags(self):
+        version = "v0.1.0-alpha.18"
+        first = "sha256:" + digest(b"first checked index")
+        rebuilt = "sha256:" + digest(b"rebuilt checked index")
+        tag = publication_tag(version, first)
+        self.assertEqual(tag, publication_tag(version, first))
+        self.assertNotEqual(tag, publication_tag(version, rebuilt))
+        self.assertNotEqual(tag, version)
+        self.assertLessEqual(len(tag), 128)
+        for invalid in ("sha256:short", "sha512:" + "a" * 64, "sha256:" + "z" * 64):
+            with self.assertRaises(ValueError):
+                publication_tag(version, invalid)
 
     def test_retry_requires_identical_index_and_fails_on_unknown_authentication(self):
         index = '{"schemaVersion":2,"manifests":[]}\n'

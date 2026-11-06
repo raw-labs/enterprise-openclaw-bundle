@@ -56,7 +56,10 @@ settings, current qualification claims or duplicated ingredient pins in notes.
 ## Generated outputs
 
 Publication produces three multiarchitecture images: controller, runtime and
-repository credentials. Each has AMD64 and ARM64 manifests. The customer archive
+repository credentials. Each has AMD64 and ARM64 manifests. Registry tags combine
+the release version and checked index SHA-256; handoffs reference image digests.
+Identical retries reuse the same tag. Rebuilt indexes use distinct tags without
+overwriting images left by an earlier failed release attempt. The customer archive
 contains the chart, matched `occ` binaries, input preparation tool, upstream
 installation/upgrade helpers, templates, examples, notices and release metadata;
 images are pulled separately.
