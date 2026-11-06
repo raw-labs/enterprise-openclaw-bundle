@@ -512,6 +512,14 @@ def tests(command, source, env, log):
             r"duration_ms=(\d{1,9})$", output, re.MULTILINE
         ):
             print(f"Native preparation phase completed: {phase} ({elapsed} ms)", file=sys.stderr)
+        for kind, value in re.findall(
+            r"^\[bundle-native-(command|operation|exit|failure|probe)\] "
+            r"(docker|kubectl|k3d|exec|get|apply|create|delete|cp|wait|"
+            r"[0-9]{1,3}|timeout|ENOENT|EACCES|EPERM|permission-denied|apparmor|"
+            r"version-mismatch|missing-executable|connection-refused|"
+            r"VERSION|PREPARE|SANDBOX|ASSERTIONS|CLEANUP|DONE)$", output, re.MULTILINE
+        ):
+            print(f"Native diagnostic {kind}: {value}", file=sys.stderr)
         for location in failure_locations(output, source):
             print("Native test source location: " + location, file=sys.stderr)
         # Test names and assertion values can both contain runtime secrets.
