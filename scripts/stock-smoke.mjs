@@ -8,8 +8,10 @@ import { pathToFileURL } from "node:url";
 const [source, image, state, output] = process.argv.slice(2);
 const { prepareRuntimeImageSmoke } = await import(pathToFileURL(resolve(source, "scripts/ci/prepare.mjs")));
 const { runtimeImageSmokeTests } = await import(pathToFileURL(resolve(source, "scripts/ci/container-release.mjs")));
+console.log("[bundle-runtime-phase] prepare");
 const prepared = await prepareRuntimeImageSmoke({ image, statePath: resolve(state) });
 try {
+  console.log("[bundle-runtime-phase] confinement");
   const profile = readFileSync(prepared.env.OCC_TEST_CODEX_SECCOMP_PROFILE);
   writeFileSync(resolve(output, "codex-seccomp.json"), profile);
   const sha256 = createHash("sha256").update(profile).digest("hex");
@@ -19,11 +21,13 @@ try {
     apparmor: prepared.env.OCC_TEST_CODEX_APPARMOR_PROFILE ?? process.env.OCC_TEST_CODEX_APPARMOR_PROFILE ?? null,
     scope: "Selected source's reviewed additions to this native CI node baseline; customer node policy requires review.",
   }, null, 2) + "\n");
+  console.log("[bundle-runtime-phase] tests");
   execFileSync(process.execPath, ["--test", "--test-concurrency=1", "--test-reporter=tap", ...runtimeImageSmokeTests], {
     cwd: source,
     env: { ...process.env, ...prepared.env, OCC_TEST_RUNTIME_IMAGE: image, OCC_TEST_IMAGE_TIMEOUT_MULTIPLIER: "1" },
     stdio: "inherit",
   });
 } finally {
+  console.log("[bundle-runtime-phase] cleanup");
   await prepared.cleanup();
 }
