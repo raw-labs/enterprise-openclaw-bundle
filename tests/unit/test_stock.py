@@ -189,6 +189,32 @@ not ok 2 - upstream test private-in-test-name
             self.assertNotIn("private-in-test-name", captured.getvalue())
             self.assertIn("private source diagnostics", log.read_text())
 
+    def test_preparation_stack_reports_only_existing_source_locations(self):
+        source_file = ROOT / "scripts/stock-smoke.mjs"
+        text = f"""[bundle-runtime-phase] prepare
+[bundle-runtime-phase] secret-value
+[ci-timing] lane=images-packaging phase=k3d-create duration_ms=300001
+[ci-timing] lane=images-packaging phase=private-command duration_ms=1
+Error: private credentials
+    at prepare (file://{source_file}:1:1)
+    at /outside/private-source.mjs:1:1
+    at prepare (file://{source_file}:999999:1)
+"""
+        with tempfile.TemporaryDirectory() as temp:
+            captured = io.StringIO()
+            with contextlib.redirect_stderr(captured), self.assertRaises(ValueError):
+                native_tests(
+                    [sys.executable, "-c", f"import sys; print({text!r}); sys.exit(1)"],
+                    ROOT, os.environ, Path(temp) / "test.log",
+                )
+            summary = captured.getvalue()
+            self.assertIn("scripts/stock-smoke.mjs:1:1", summary)
+            self.assertIn("phase reached: prepare", summary)
+            self.assertIn("k3d-create (300001 ms)", summary)
+            for private in ("secret-value", "private-command", "private credentials",
+                            "outside", "999999"):
+                self.assertNotIn(private, summary)
+
     def test_native_promotion_requires_built_images_and_both_receipts(self):
         self.release["kind"] = "release"
         self.release["qualification"].update(

@@ -467,8 +467,14 @@ def failure_locations(output, source):
     """Emit only existing source paths and bounded line numbers, never TAP values/names."""
     source = Path(source).resolve()
     locations = set()
-    for match in re.finditer(r"^\s+location: ['\"]([^'\"\n]+):(\d+):(\d+)['\"]$", output, re.MULTILINE):
+    patterns = (
+        r"^\s+location: ['\"]([^'\"\n]+):(\d+):(\d+)['\"]$",
+        r"^\s+at (?:[^\n(]+\()?((?:file://)?/[^\n)]+):(\d+):(\d+)\)?$",
+    )
+    matches = [match for pattern in patterns for match in re.finditer(pattern, output, re.MULTILINE)]
+    for match in matches:
         name, line, column = match.groups()
+        name = name.removeprefix("file://")
         path = Path(name)
         if not path.is_absolute():
             path = source / path
@@ -496,6 +502,16 @@ def tests(command, source, env, log):
         )
     output = log.read_text()
     if result.returncode:
+        # Fixed wrapper phases and source-controlled preparation timing labels only.
+        for phase in re.findall(r"^\[bundle-runtime-phase\] (prepare|confinement|tests|cleanup)$",
+                                output, re.MULTILINE):
+            print("Native runtime phase reached: " + phase, file=sys.stderr)
+        for phase, elapsed in re.findall(
+            r"^\[ci-timing\] lane=images-packaging "
+            r"phase=(k3d-create|runtime-image-import|codex-seccomp-profile) "
+            r"duration_ms=(\d{1,9})$", output, re.MULTILINE
+        ):
+            print(f"Native preparation phase completed: {phase} ({elapsed} ms)", file=sys.stderr)
         for location in failure_locations(output, source):
             print("Native test source location: " + location, file=sys.stderr)
         # Test names and assertion values can both contain runtime secrets.
