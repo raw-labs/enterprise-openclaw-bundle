@@ -64,6 +64,12 @@ listed in OCE's guide. Apply other Installation changes separately with its
 [documented procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-installation-changes.md).
 Use the bundle matching the currently installed controller for that step.
 
+When the selected controller requires `drivers.plugin` as an array, copy the live
+Installation to a separate protected candidate file and wrap its existing single
+registration in an array without changing its `id` or `configuration`. Review the
+diff and pass `--candidate-installation` as described in OCE's guide. Keep the
+original file as `--installation`; the helper does not convert it automatically.
+
 In particular, newly selected preset files require adding their image paths to
 the existing Installation's `presets.files`. First update the controller so it
 contains those files, then apply that separate settings change. Paths are recorded

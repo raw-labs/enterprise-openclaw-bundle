@@ -2,6 +2,7 @@
 """Exercise the extracted package on an owned, disposable k3d cluster."""
 
 import argparse
+import base64
 import io
 import json
 import os
@@ -818,16 +819,32 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                                               "--kubeconfig", kubeconfig, "--kube-context", context,
                                               "--namespace", cp["namespace"], "--output", "json"]))
                         save(rendered / "values.yaml", live)
+                        # The new controller requires explicit Plugin Driver registrations.
+                        # Keep the installed file as baseline; pass the documented,
+                        # reviewed object-to-array conversion as a separate candidate.
+                        upgraded_installation = helm_values(rendered / "installation.yaml")
+                        plugin = upgraded_installation["drivers"].get("plugin")
+                        if isinstance(plugin, dict):
+                            upgraded_installation["drivers"]["plugin"] = [plugin]
+                        save(rendered / "candidate-installation.yaml", upgraded_installation)
                         run(["bash", candidate / "oce/scripts/upgrade-production-images",
                              "--kubeconfig", kubeconfig, "--context", context,
                              "--namespace", cp["namespace"], "--release", cp["releaseName"],
                              "--values", rendered / "values.yaml", "--installation", rendered / "installation.yaml",
+                             "--candidate-installation", rendered / "candidate-installation.yaml",
                              "--controller-image", candidate_controller,
                              "--source-revision", candidate_release["sources"]["oce"]["commit"],
                              "--evidence-dir", work / "upgrade-evidence", "--occ", candidate / "bin/occ",
                              "--timeout-seconds", "600"], cwd=candidate / "oce", timeout=900,
                             env=dict(os.environ, OCC_URL=api_origin, OCC_SERVICE_KEY_FILE=str(key_path), OCC_CA_BUNDLE=str(api_ca)),
                             diagnostics=True)
+                        actual_installation = json.loads(kubectl(
+                            "-n", cp["namespace"], "get", "secret", installation_settings["secretName"], "-o", "json"))
+                        retained = work / "retained-installation.yaml"
+                        retained.write_bytes(base64.b64decode(actual_installation["data"][installation_settings["key"]]))
+                        require(helm_values(retained)["drivers"]["plugin"] == upgraded_installation["drivers"]["plugin"],
+                                "upgrade did not retain the reviewed Plugin Driver registrations")
+                        steps.append("explicit Plugin Driver object-to-array conversion preserves registration configuration")
                         artifact = candidate
                         require(occ("installation", "get")["id"] == installation_id, "upgrade replaced the Installation")
                         require(occ("namespace", "get", namespace_id)["status"] == "ready", "upgrade lost the Namespace")
