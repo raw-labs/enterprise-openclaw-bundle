@@ -100,14 +100,20 @@ Omit `userId` so each Gateway retains its own Composio identity.
 Stored templates contain references only; keep keys and customer IDs in protected
 installation files. Future Agents inherit the binding; existing drafts do not.
 
-Dedicated provisioning and Console Agent creation grant the new Agent principal
-exact Secret `operate` access for accepted Configuration bindings. The Console
-caller needs permission to create those IAM grants. If a grant fails, retain the
-saved Agent and retry credential access or ask an administrator to complete it.
-For Agents created directly through the API or CLI, grant `servicePrincipalId`
-exact `operate` on each bound Secret before deployment. Use
-`occ iam role create --file FILE` and `occ iam access-binding create --file FILE`;
-verify the exact Namespace, Secret, principal and Role.
+Follow the selected OCE source's credential-access procedure. Where deploy-time
+grants are supported, deployment grants the Agent principal exact `operate` on
+referenced Secrets and credential sources that the deploying caller can operate,
+including Configuration bindings inherited from presets. This also covers API-
+and CLI-created Agents; the caller still needs deployment permission. It does not
+give the caller access to an otherwise unauthorized shared Secret.
+
+Older sources may require creation-time grants or an administrator's explicit
+Agent-principal grant before deployment. If a Console grant fails, retain the
+saved Agent and use its credential-access retry or ask an administrator.
+For an explicit grant, use `occ iam role create --file FILE` and
+`occ iam access-binding create --file FILE`; verify the exact Namespace, Secret,
+`servicePrincipalId` and Role. Do not assume a newer workflow applies to an older
+installed release.
 
 Each OCE Agent has its own Gateway Connections page, accounts and grants; the shared
 project credential does not create a central account list. Administrators link

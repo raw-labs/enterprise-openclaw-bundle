@@ -1,0 +1,65 @@
+--- a/deploy/runtime/Dockerfile
++++ b/deploy/runtime/Dockerfile
+@@ -309,7 +309,7 @@
+ FROM openclaw-patched-source AS openclaw-build
+ # Follow the pinned upstream Docker assembly; plugin-local dependencies remain
+ # separate when a plugin and core require different versions.
+-RUN OPENCLAW_INTERNAL_DOCKER_BUILD_PLUGIN_IDS=codex,slack,msteams \
++RUN OPENCLAW_INTERNAL_DOCKER_BUILD_PLUGIN_IDS=codex,slack,msteams,browser \
+     OPENCLAW_RUN_NODE_SKIP_DTS_BUILD=1 pnpm_config_verify_deps_before_run=false \
+     pnpm build:docker \
+     && pnpm_config_verify_deps_before_run=false pnpm ui:build
+@@ -345,7 +345,7 @@
+ # The materialized AI package sits one level deeper. Keep its pnpm targets
+ # relative to the final destination so Node resolves the same dependencies.
+ RUN node scripts/postinstall-bundled-plugins.mjs \
+-    && OPENCLAW_EXTENSIONS=codex,slack,msteams node scripts/prune-docker-plugin-dist.mjs \
++    && OPENCLAW_EXTENSIONS=codex,slack,msteams,browser node scripts/prune-docker-plugin-dist.mjs \
+     && find dist -type f \( -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.map' \) -delete \
+     && if [ -L node_modules/@openclaw/ai ]; then \
+       target="$(realpath -e node_modules/@openclaw/ai)" || exit 1; \
+@@ -380,13 +380,13 @@
+ RUN node --input-type=module <<'NODE'
+ import { existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync } from "node:fs";
+ import { dirname, relative, resolve } from "node:path";
+-for (const plugin of ["codex", "slack", "msteams"]) {
++for (const plugin of ["codex", "slack", "msteams", "browser"]) {
+   const root = resolve("dist/extensions", plugin);
+   const manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+   for (const name of Object.keys(manifest.dependencies ?? {})) {
+     const destination = resolve("node_modules", name);
+     if (existsSync(destination)) continue;
+-    const source = realpathSync(resolve(root, "node_modules", name));
++    const source = realpathSync(resolve("extensions", plugin, "node_modules", name));
+     mkdirSync(dirname(destination), { recursive: true });
+     symlinkSync(relative(dirname(destination), source), destination);
+   }
+@@ -423,7 +423,7 @@
+     && candidate="$(apt-cache policy curl | sed -n 's/^  Candidate: //p')" \
+     && expected="$(cat /tmp/curl-packages/debian-version)" \
+     && { [ "$candidate" = "$expected" ] || { echo "Refresh the curl backport: Debian candidate is $candidate, source is $expected" >&2; exit 1; }; } \
+-    && apt-get install -y --no-install-recommends tini git ca-certificates openssh-client libstdc++6 libgomp1 python3 procps /tmp/curl-packages/*.deb \
++    && apt-get install -y --no-install-recommends tini git ca-certificates openssh-client libstdc++6 libgomp1 python3 procps chromium fonts-liberation /tmp/curl-packages/*.deb \
+     && mkdir -p /usr/share/doc/curl/oce \
+     && cp /tmp/curl-packages/*.sha256 /usr/share/doc/curl/oce/ \
+     && rm -rf /var/lib/apt/lists/*
+--- a/scripts/build-runtime-assets.mjs
++++ b/scripts/build-runtime-assets.mjs
+@@ -229,7 +229,7 @@
+     [
+       join(root, "scripts/lib/docker-plugin-selection.mjs"),
+       join(root, "extensions"),
+-      "codex,slack,msteams",
++      "codex,slack,msteams,browser",
+       "--required-bundled",
+       join(root, "package.json"),
+     ],
+@@ -369,7 +369,7 @@
+         packageManager: pkg.packageManager,
+         platform: process.platform,
+         architecture: process.arch,
+-        plugins: ["codex", "slack", "msteams"],
++        plugins: ["codex", "slack", "msteams", "browser"],
+       },
+       null,
+       2,
