@@ -1,11 +1,13 @@
 # Get support
 
-Use the private support contact in your RAW Labs agreement. Confirm supported
-versions and upgrade paths with that contact before a production change.
+For community support, [open a GitHub issue](https://github.com/raw-labs/enterprise-openclaw-bundle/issues/new)
+in this repository. If you have a RAW Labs support agreement, use the private
+contact listed in it to get help or confirm an upgrade path.
 
-Include the bundle version, archive checksum, platform, profile, failing command
-and sanitized error. For a component issue, include its identity from
-`metadata/release.json`. Use the agreed private channel for logs and site
-configuration. Keep credentials out of reports.
+Tell us which bundle version and archive checksum you used, your platform and
+installation profile, and the command and error you saw. If the problem is with
+a specific component, include its version, commit, or image digest from
+`metadata/release.json`. Remove sensitive details from public issues and share
+logs and site configuration through your private support channel.
 
-Report suspected vulnerabilities using [SECURITY.md](../SECURITY.md).
+Report suspected vulnerabilities through the [private reporting process](../SECURITY.md).
