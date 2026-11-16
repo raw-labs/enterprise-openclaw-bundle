@@ -8,9 +8,9 @@ older formats from their release tags.
 | Field | Selects |
 | --- | --- |
 | `schemaVersion` | Definition format version |
-| `version` | Folder and release tag: numbered `alpha`, `beta`, or `rc` |
+| `version` | Folder name and release tag, using a numbered `alpha`, `beta`, or `rc` |
 | `oce` | HTTPS GitHub repository URL and full commit |
-| `openclawCommit`, `codexVersion` | OpenClaw commit and Codex version; must match the selected runtime recipe |
+| `openclawCommit`, `codexVersion` | Must match the OpenClaw commit and Codex version in OCE's runtime recipe |
 | `architectures` | `linux/amd64` and `linux/arm64` |
 | `plugins` | Plugin IDs from the runtime recipe or pinned package objects |
 | `presets` | `includeDefaults` and hash-pinned `files` using OCE's preset format |
@@ -18,9 +18,9 @@ older formats from their release tags.
 | `build.patches` | Ordered hash-pinned source patches; may be empty |
 | `build.confinement` | Hashes of OCE's seccomp generator, its implementation if split, and the CI AppArmor policy |
 
-A file reference is `{"path": "...", "sha256": "..."}`; paths are relative to
-the repo. Keep presets in `presets/` and profiles in `profiles/`. A definition
-selects files; adding a file to either directory does not activate it.
+A file reference has a repository-relative `path` and a `sha256` hash. To
+include a preset from `presets/` or a profile from `profiles/`, reference it
+in the definition.
 
 A plugin package uses `id`, `package`, `version`, tarball `sha256`, and a
 `source` object with `repository` and `commit`. Supply `url` for a public
