@@ -1,94 +1,51 @@
-# Install a bundle
+# Install OpenClaw Enterprise
 
-Read `RELEASE_NOTES.md` in the selected archive, when present, before installing
-or upgrading. The same compatibility notes appear on its GitHub release.
+Start in the verified bundle directory. Read `RELEASE_NOTES.md` if present.
+Use Python 3.12+, Node 24+, Bash, Helm 3, kubectl, psql, jq, Mike Farah yq v4,
+and OpenSSL. Prepare the cluster, database, storage and network using OCE's
+[production prerequisites](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy.md#production-prerequisites).
 
-Use the `INSTALL.md` inside the selected release archive for an installation.
-This repository page describes that archive workflow; packaging adapts its links
-to shipped files or the selected immutable upstream source.
+## Render site inputs
 
-For operators installing OCE into prepared Kubernetes infrastructure.
-Start in the extracted package root. Commands and relative links below apply
-to that directory. The preparation tool reads the bundle version and image
-digests from `metadata/release.json`.
-
-## Prerequisites
-
-Use Python 3.12+, Node 24+, Bash, Helm 3, psql and kubectl compatible with the cluster.
-OCE's production procedures also use jq, Mike Farah yq v4 and openssl;
-its image-upgrade compatibility probe requires Docker on a Linux workstation.
-
-Prepare Kubernetes, PostgreSQL roles and CA trust, DNS/TLS, storage, disjoint
-control/runtime node pools, enforced NetworkPolicies, cert-manager and Envoy
-Gateway as specified by the packaged OCE production guide. Infrastructure,
-ingress access and credentials belong to the installation owner.
-
-Public bundle images need no pull credentials. For private packages, authorize
-image pulls or arrange a digest-preserving registry mirror.
-Images are pulled separately; this archive is not an offline image package.
-
-Before starting, record the reviewed cluster context, release name, namespace,
-node selectors, storage classes, ingress endpoints and registry access in the
-installation owner's protected workspace. The example CIDRs, labels and domains
-are placeholders. A successful render does not prove those resources exist or
-that node confinement has been provisioned.
-
-## Prepare OCE inputs
-
-Run from the extracted bundle root. Keep site settings, generated files and
-credentials in a protected directory outside the package.
+Set `SITE` to a protected absolute directory outside the package and
+`KUBECONFIG_FILE` and `CONTEXT` to the intended cluster. Set `PROFILE` to
+`openclaw` or `codex` and `ARCHITECTURE` to `linux/amd64` or `linux/arm64`.
 
 ```bash
 umask 077
-: "${SITE:?Set SITE to an absolute installation directory}"
 mkdir -p -m 700 "$SITE"
-: "${KUBECONFIG_FILE:?Set KUBECONFIG_FILE to an absolute protected kubeconfig}"
-: "${CONTEXT:?Set CONTEXT to the reviewed Kubernetes context}"
-export KUBECONFIG_FILE CONTEXT
-chmod 600 "$KUBECONFIG_FILE"
 bin/prepare verify
 export PATH="$PWD/bin:$PATH"
-occ --version
 test -e "$SITE/site.json" || cp examples/installations/site.json "$SITE/site.json"
 ```
 
-Edit `site.json` using OCE's [installation input format](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/installation-profiles.md).
-Select `openclaw` or `codex` and the target `linux/amd64` or `linux/arm64`:
+Edit `site.json` using OCE's [profile inputs](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/installation-profiles.md).
+Replace the sample domains, network ranges, node labels and storage class.
 
 ```bash
-PROFILE=codex
-ARCHITECTURE=linux/amd64
 bin/prepare render --input "$SITE/site.json" --profile "$PROFILE" \
   --architecture "$ARCHITECTURE" --output "$SITE/rendered"
-bin/prepare check --directory "$SITE/rendered"
 ```
 
-For a mirror, add `--mirrors "$SITE/mirrors.json"` to `render`. Map
-`controller`, `runtime` and `repositoryCredentials` to destinations retaining
-the release's exact digests. The tool rejects conflicting images and confinement.
+Review `values.yaml`, `installation.yaml`, and `rendered.yaml`. Change the site
+inputs and render to a new directory when settings change. Use
+`bin/prepare check --directory "$SITE/rendered"` to recheck the pair.
 
-Pass YAML or JSON overrides with `--helm-overrides FILE` and
-`--installation-overrides FILE`. Helm accepts `cluster.port` and the channel
-listener settings. Installation accepts Namespace pod quota, native session
-capacity, `repository.configuration.sessionDurationSeconds` and the callback
-hostname. For callbacks, use the same hostname in both files. For repository
-sessions, stay within the site's broker policy. Render again when inputs change.
-
-Review `preflight.json`, `values.yaml`, `installation.yaml` and `rendered.yaml`.
-The tool only prepares files. It does not create Kubernetes resources or credentials.
-For Codex, provision the packaged architecture-specific seccomp file at the
-node path selected in `installation.yaml`. The selected Codex profile uses RAW's
-curated catalog; original OCE profiles are under `oce/deploy/profiles/`.
-The delivered seccomp policies are under `security/seccomp/`.
+- **Mirrors:** pass `--mirrors FILE` with `controller`, `runtime` and
+  `repositoryCredentials` references that retain the release digests.
+- **Overrides:** use `--helm-overrides FILE` for `cluster.port` and channel
+  listener settings. Use `--installation-overrides FILE` for namespace pod quota,
+  native session capacity, `repository.configuration.sessionDurationSeconds`,
+  or the callback hostname. Use the same callback hostname in both files.
 
 ## Check the target
 
 Set `PG_SERVICE` to the target database's libpq service and
-`BOOTSTRAP_STORAGE_CLASS` to the class selected for the bootstrap PVC. Set
-`API_POLICY_DESTINATION` to `service`, `endpoint` or `both` according to what
-your CNI evaluates. For K3s with policy applied after translation, use
+`BOOTSTRAP_STORAGE_CLASS` to the bootstrap PVC's class. Set
+`API_POLICY_DESTINATION` to `service`, `endpoint`, or `both`, according to which
+address the CNI evaluates. For K3s with policy applied after translation, use
 `endpoint`, the backend CIDR in `controlPlane.clusterCidrs`, and the backend
-port (commonly `6443`) as `cluster.port`.
+port (commonly `6443`) in the Helm override.
 
 ```bash
 bin/prepare preflight --directory "$SITE/rendered" \
@@ -97,69 +54,23 @@ bin/prepare preflight --directory "$SITE/rendered" \
   --bootstrap-storage-class "$BOOTSTRAP_STORAGE_CLASS"
 ```
 
-Resolve failures before installing. This checks configuration and target
-metadata. Use OCE's [network probes](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/operate/network-isolation.md)
-and node confinement checks separately for runtime proof.
+Resolve failures before installing. Before deploying Codex Agents, install
+the policy from `security/seccomp/` at the node path selected in the Installation.
+Use OCE's [network probes](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/operate/network-isolation.md)
+to verify workload connectivity separately.
 
-## Install and bootstrap
-
-Change to `oce/` and follow the packaged
-[production installation procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-installation.md#shared-bootstrap-pvc-and-configuration-checks)
-from **Shared bootstrap PVC and configuration checks** onward. Use absolute paths:
+## Install and verify
 
 ```bash
 export OCC_INPUT_DIRECTORY="$SITE/rendered"
+export KUBECONFIG_FILE CONTEXT
 cd oce
 ```
 
-The prepared files replace that guide's build and profile-rendering steps.
-Its chart path, bootstrap PVC example and `scripts/prepare-bootstrap-volume`
-are included. Follow its protected Secret creation, volume preparation, Helm
-installation and authenticated `occ installation get` check.
+Follow OCE's [production installation guide](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-installation.md#shared-bootstrap-pvc-and-configuration-checks)
+from **Shared bootstrap PVC and configuration checks**. Use the prepared pair,
+packaged chart, and your site context, namespace and release name. Set the
+bootstrap PVC's name, namespace and storage class to match the site.
 
-The upstream runbook uses example names `oce`, `openclaw-system` and
-`/secure/occ`. Substitute the release/namespace from your site inputs and your
-protected credential directory. Create that directory with mode 0700 before
-writing credentials. Edit the bootstrap PVC example to use the selected claim,
-namespace and an available protected storage class; bootstrap and runtime
-storage classes may differ.
-
-OCE owns authentication, tenant permissions and Agent setup. Continue with
-[production Agents](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-agents.md) and, when enabled,
-[repository access](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/repository-credentials/installation.md).
-Use the selected release images instead of upstream image-build steps.
-The definition selects preset files and whether to seed OCE's additional defaults.
-Preparation applies that selection; OCE seeds missing copies automatically.
-Presets can enable Connections without a provider key; an installation
-owner configures the key and outbound access in OCE as described in
-[OPERATE.md](operate.md#connections). Existing same-name presets are preserved.
-Selected files are available under `oce/deploy/presets/raw/` for inspection.
-The supplied site example enables managed Gateway outbound and disables
-`channels.experimentalEmbeddedChannels`. Review its denied infrastructure CIDRs
-for your cluster. Slack and Teams are disabled in the Assistant template. To trial
-them, an installation owner must explicitly enable the selected channel plugin
-and the installation's experimental channel option. This mode shares channel and
-model credentials in the Agent workload; restrict it to trusted evaluation.
-Configure provider credentials through OCE and follow
-its [embedded channel procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/integrations/embedded-channel-trial.md).
-Teams also requires the public callback listener described there.
-
-Both templates disable browser access and experimental plugin UI. Chromium and
-the browser plugin remain build ingredients for a separately reviewed operator
-opt-in; the templates do not request `noSandbox`. Verify Chromium sandbox support
-and OCE confinement on the actual target before enabling it.
-
-Coding requests human approval, workspace confinement and the limited managed
-network proxy, with exact source/package hosts in its template. Cached search is
-enabled and direct web fetch is disabled. The limited proxy can reject Git HTTPS
-POST requests; review any required policy change rather than granting all hosts.
-Template settings are editable defaults, not a Pod-wide firewall or proof that the
-running Harness enforced them. Follow OCE's
-[policy verification procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/topics/standard-codex-preset.md#verify-before-use).
-
-Human sign-in and Agent setup use OCE's APIs and Console.
-Packaged `occ` supports remote administration;
-`occ dev` requires an OCE source checkout.
-
-Follow [OPERATE.md](operate.md) for acceptance and [UPDATE.md](update.md) for later updates. Each installation
-uses its own OCE inputs; the same immutable bundle can serve multiple clusters.
+Confirm authenticated `occ installation get` succeeds, then follow
+[OPERATE.md](operate.md).

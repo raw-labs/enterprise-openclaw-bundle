@@ -277,6 +277,33 @@ class StockArtifact(unittest.TestCase):
                         (document.parent / target.split("#")[0]).is_file(),
                         f"broken package document link: {name}: {target}",
                     )
+        install = (self.artifact / "INSTALL.md").read_text()
+        update = (self.artifact / "UPDATE.md").read_text()
+        operate = (self.artifact / "OPERATE.md").read_text()
+        self.assertIn("(oce/docs/guides/deploy/production-installation.md#", install)
+        self.assertIn("(oce/docs/guides/deploy/upgrade-baseline.md)", update)
+        self.assertIn("(oce/docs/guides/deploy/production-upgrade-recovery.md)", update)
+        self.assertIn("(oce/docs/guides/deploy/production-agents.md)", operate)
+        self.assertFalse((self.artifact / "oce/docs/guides/observability/demo.md").exists())
+        oce = read_release(SELECTION)["sources"]["oce"]
+        guide = self.artifact / "oce/docs/guides/deploy/production-installation.md"
+        self.assertIn(
+            f"{oce['repository'].removesuffix('.git')}/blob/{oce['commit']}/"
+            "docs/guides/observability/demo.md",
+            guide.read_text(),
+        )
+        upgrade_guide = "docs/guides/deploy/production-upgrade.md"
+        commands = r"^```[^\n]*\n(.*?)^```$"
+        source_commands = re.findall(
+            commands, (SELECTION.parent / "source" / upgrade_guide).read_text(),
+            re.MULTILINE | re.DOTALL,
+        )
+        delivered_commands = re.findall(
+            commands, (self.artifact / "oce" / upgrade_guide).read_text(),
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertTrue(source_commands)
+        self.assertEqual(source_commands, delivered_commands)
         plugin = next(
             p
             for p in read_release(SELECTION)["pluginPackages"]

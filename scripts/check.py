@@ -19,7 +19,7 @@ def run(command, **kwargs):
 def repository_links():
     documents = [
         *sorted(ROOT.glob("*.md")),
-        *sorted((ROOT / "docs").glob("*.md")),
+        *sorted((ROOT / "docs").rglob("*.md")),
     ]
     for document in documents:
         for target in re.findall(r"\]\(([^)]+)\)", document.read_text()):
