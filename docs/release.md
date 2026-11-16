@@ -98,8 +98,8 @@ offline contributor check without package credentials. Native release jobs requi
 manual dispatch in the canonical repository; publishing requires main. These
 boundaries apply with either private or public visibility. CI sets
 `BUNDLE_DISTRIBUTION_VISIBILITY` from repository visibility and rejects a mismatched
-live destination or image package. Public packages must already exist. Visibility
-changes require the owner's separate [public transition](public-readiness.md).
+live destination or image package. Public image packages must already exist.
+CI does not change visibility.
 
 Maintainers may manually dispatch `release.yml` at a reviewed `codex/` branch with
 `publish=false` to test unmerged factory changes. This runs both native targets and

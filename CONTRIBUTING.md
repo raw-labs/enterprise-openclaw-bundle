@@ -5,7 +5,8 @@ Change factory behavior here. Product behavior belongs in OCE; provider integrat
 behavior belongs in its plugin repository. Customer infrastructure and credentials
 belong outside this repository.
 
-Follow the [review responsibilities](docs/maintainers.md). Report suspected
+A maintainer reviews changes before merging. A sole maintainer may review and
+merge their own changes, subject to GitHub branch rules. Report suspected
 vulnerabilities through the [private security procedure](SECURITY.md).
 
 ## Fast checks

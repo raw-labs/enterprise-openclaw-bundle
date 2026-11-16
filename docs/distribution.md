@@ -44,14 +44,6 @@ is needed for those images. While packages remain private, authorized pulls need
 a classic GitHub token with `read:packages` and any required organization SSO
 authorization. CI publication uses its short-lived `GITHUB_TOKEN` in either mode.
 
-The intended public distribution includes source, release downloads and all three
-image packages. Keep them private until the owner authorizes the transition.
-Package visibility is configured independently from repository visibility. The
-factory checks that both match before publishing; it does not change settings.
-Reuse an existing tag only when its index matches exactly; reject a different or
-unverifiable tag. Installations select verified digests. Keep registry credentials
-out of artifacts, examples and Git.
-
 Customer installations use their own authorized registry and pull identities:
 ECR for AWS, ACR for Azure, or an on-prem registry such as Harbor. Registry choice
 does not establish tested support for that customer's cluster. Copy all manifests
