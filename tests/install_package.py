@@ -39,6 +39,39 @@ ROUTING = (
 )
 
 
+def render_rehearsal_site(run, artifact, release, site, rendered, architecture, api_port):
+    prepare = artifact / "bin/prepare"
+    uses_overrides = b"--helm-overrides" in run([prepare, "render", "--help"])
+    override = site.with_name("helm-overrides.json")
+    if uses_overrides:
+        save(override, {"cluster": {"port": api_port}})
+    if release["distribution"]["published"]:
+        command = [
+            prepare, "render", "--input", site, "--profile", "codex",
+            "--architecture", architecture, "--output", rendered,
+        ]
+        if uses_overrides:
+            command += ["--helm-overrides", override]
+        run(command)
+    else:
+        preparation_tool(artifact).render(
+            argparse.Namespace(
+                input=site, profile="codex", architecture=architecture, output=rendered,
+                mirrors=None, helm_overrides=override if uses_overrides else None,
+            ),
+            release,
+            admit=False,
+        )
+    values_path = rendered / "values.yaml"
+    values = helm_values(values_path)
+    if not uses_overrides:
+        # Retained bundles predate the render option and allow this chart-only edit.
+        values["cluster"]["port"] = api_port
+        save(values_path, values)
+    run([prepare, "check", "--directory", rendered])
+    return values
+
+
 def exercise(args):
     archive = Path(args.archive).resolve()
     layout = Path(args.controller).resolve()
@@ -430,56 +463,11 @@ def exercise(args):
             path = work / "site.json"
             save(path, site)
             rendered = work / "rendered"
-            if release["distribution"]["published"]:
-                run(
-                    [
-                        artifact / "bin/prepare",
-                        "render",
-                        "--input",
-                        path,
-                        "--profile",
-                        "codex",
-                        "--architecture",
-                        "linux/" + arch,
-                        "--output",
-                        rendered,
-                    ]
-                )
-            else:
-                prepare = preparation_tool(artifact)
-                prepare.render(
-                    argparse.Namespace(
-                        input=path,
-                        profile="codex",
-                        architecture="linux/" + arch,
-                        output=rendered,
-                        mirrors=None,
-                    ),
-                    release,
-                    admit=False,
-                )
-            run(
-                [
-                    artifact / "bin/prepare",
-                    "check",
-                    "--directory",
-                    rendered,
-                ]
+            values = render_rehearsal_site(
+                run, artifact, release, path, rendered, "linux/" + arch,
+                endpoint["ports"][0]["port"],
             )
             steps.append("extracted package verification and release-bound rendering")
-            values = helm_values(rendered / "values.yaml")
-            # k3d exposes its API endpoint on 6443; cluster.port is an upstream chart option.
-            # The Installation bytes and their paired checksum remain unchanged.
-            values["cluster"]["port"] = endpoint["ports"][0]["port"]
-            save(rendered / "values.yaml", values)
-            run(
-                [
-                    artifact / "bin/prepare",
-                    "check",
-                    "--directory",
-                    rendered,
-                ]
-            )
             upstream = artifact / "oce"
             claim = helm_values(
                 upstream / "deploy/examples/production/bootstrap-pvc.yaml"
