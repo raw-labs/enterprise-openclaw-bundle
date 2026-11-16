@@ -1,7 +1,9 @@
 # Bundle definition
 
 Edit `bundles/<version>/bundle.json` to select what ships. Use schema version
-`5` for new definitions. Reproduce older formats from their release tags.
+`6` for new definitions. When copying a schema 5 definition, remove
+`build.upgradeFrom` and use the [release workflow input](release.md). Reproduce
+older formats from their release tags.
 
 | Field | Selects |
 | --- | --- |
@@ -15,7 +17,6 @@ Edit `bundles/<version>/bundle.json` to select what ships. Use schema version
 | `codexProfile` | Hash-pinned Codex installation profile in OCE's format |
 | `build.patches` | Ordered hash-pinned source patches; may be empty |
 | `build.confinement` | Hashes of OCE's seccomp generator, its implementation if split, and the CI AppArmor policy |
-| `build.upgradeFrom` | Optional published bundle for the upgrade rehearsal |
 
 A file reference is `{"path": "...", "sha256": "..."}`; paths are relative to
 the repo. Keep presets in `presets/` and profiles in `profiles/`. A definition
