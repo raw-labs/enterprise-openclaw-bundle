@@ -21,10 +21,11 @@ head, then dispatch main with `publish=true`. GHCR package visibility must
 match the repository. CI does not change visibility or deploy installations.
 
 The Action checks both native architectures and rehearses installation before
-publishing the image indexes and GitHub prerelease. If the definition selects
-an upgrade baseline, the Action checks that path too. The customer downloads
-are `bundle.tar.gz` and its checksum. Inspect provenance and the receipts for
-the exact scope of the checks.
+publishing the image indexes and GitHub prerelease. To rehearse an upgrade,
+enter an exact published tag in **Upgrade from** (`-f upgrade_from="$BASELINE"`
+with the CLI). Leave it blank for a fresh install only. Receipts record the
+baseline and the checks run. The customer downloads are `bundle.tar.gz` and
+its checksum.
 
 Use **Re-run failed jobs** while the original inputs and exports are still
 available and main has not moved. Inspect partial publication before retrying.

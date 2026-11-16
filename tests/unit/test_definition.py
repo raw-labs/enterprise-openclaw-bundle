@@ -22,6 +22,7 @@ from release import (  # noqa: E402
     pinned_file,
     preflight,
     preset_selection,
+    resolve,
 )
 from stock import publish  # noqa: E402
 
@@ -81,8 +82,7 @@ class DefinitionInputs(unittest.TestCase):
             with self.assertRaises(ValueError):
                 confinement_profile(inputs)
 
-    def test_codex_prereleases_and_upgrade_baseline_are_explicit(self):
-        self.assertEqual(self.spec["schemaVersion"], 5)
+    def test_codex_prereleases_are_explicit(self):
         for version in ("0.163.0", "0.163.0-alpha.2", "0.163.0-beta.1", "0.163.0-rc.0"):
             with patch(
                 "release.load",
@@ -97,11 +97,55 @@ class DefinitionInputs(unittest.TestCase):
             lambda s: s.update(codexVersion="latest"),
             lambda s: s.update(codexVersion="0.163.0-alpha.02"),
             lambda s: s.update(codexVersion="0.163.0-alpha.2+unreviewed"),
-            lambda s: s.update(schemaVersion=4),
-            lambda s: s["build"].update(upgradeFrom=s["version"]),
-            lambda s: s["build"].update(upgradeFrom="latest"),
         ):
             self.rejected(mutate)
+
+    def test_schema_six_keeps_upgrade_baseline_out_of_the_definition(self):
+        spec = copy.deepcopy(self.spec)
+        spec["schemaVersion"] = 6
+        spec["build"].pop("upgradeFrom", None)
+        with patch(
+            "release.load",
+            side_effect=lambda path: spec if Path(path) == self.path else load(path),
+        ):
+            self.assertEqual(definition(self.path), spec)
+            spec["build"]["upgradeFrom"] = "v0.1.0-alpha.1"
+            with self.assertRaisesRegex(ValueError, "unknown or missing build fields"):
+                definition(self.path)
+
+    def test_resolve_takes_the_explicit_baseline_or_skips_when_blank(self):
+        spec = {"version": "v0.1.0-alpha.20", "build": {"upgradeFrom": "v0.1.0-alpha.18"}}
+        cases = (
+            ("v0.1.0-alpha.19", "v0.1.0-alpha.19"),
+            ("", None),
+            (None, "v0.1.0-alpha.18"),
+        )
+        for supplied, expected in cases:
+            with self.subTest(supplied=supplied), tempfile.TemporaryDirectory() as temp:
+                args = SimpleNamespace(definition=self.path, output=Path(temp) / "out",
+                                       upgrade_from=supplied, from_git=None)
+                with (
+                    patch("release.definition", return_value=spec),
+                    patch("release.resolve_baseline") as baseline,
+                    patch("release.export_source", side_effect=RuntimeError("stop before export")),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "stop before export"):
+                        resolve(args)
+                if expected:
+                    baseline.assert_called_once_with(expected, args.output.resolve())
+                else:
+                    baseline.assert_not_called()
+
+    def test_resolve_rejects_invalid_baselines_before_retrieving_artifacts(self):
+        for supplied in ("latest", self.spec["version"], "v0.1.0"):
+            with self.subTest(supplied=supplied), tempfile.TemporaryDirectory() as temp:
+                args = SimpleNamespace(definition=self.path, output=Path(temp) / "out",
+                                       upgrade_from=supplied)
+                with patch("release.resolve_baseline") as baseline:
+                    with self.assertRaisesRegex(ValueError, "different immutable bundle version"):
+                        resolve(args)
+                    baseline.assert_not_called()
+                self.assertFalse(args.output.exists())
 
     def test_preset_policy_and_enabled_plugin_must_match_selection(self):
         for mutate in (

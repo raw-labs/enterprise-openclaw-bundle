@@ -6,6 +6,10 @@ on:
         description: Versioned bundle definition to build
         required: true
         type: string
+      upgrade_from:
+        description: "Upgrade from (optional published bundle tag)"
+        required: false
+        type: string
       publish:
         description: Publish images, tag and GitHub prerelease after all checks
         required: true
@@ -43,9 +47,10 @@ jobs:
         id: version
         env:
           DEFINITION: ${{ inputs.definition }}
+          UPGRADE_FROM: ${{ inputs.upgrade_from }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python3 scripts/release.py resolve --definition "$DEFINITION" --output .work/resolved
+          python3 scripts/release.py resolve --definition "$DEFINITION" --upgrade-from="$UPGRADE_FROM" --output .work/resolved
           python3 -c 'import json, os; d=json.load(open(".work/resolved/candidate.json")); open(os.environ["GITHUB_OUTPUT"], "a").write("version="+d["id"]+"\n")'
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:

@@ -53,6 +53,11 @@ SEMVER = re.compile(
 )
 
 
+def validate_upgrade_from(version, target):
+    require(isinstance(version, str) and SEMVER.fullmatch(version) and version != target,
+            "upgrade baseline requires a different immutable bundle version")
+
+
 def preset_selection(spec):
     if spec["schemaVersion"] < 4:
         return True, spec["presets"]
@@ -98,7 +103,7 @@ def definition(path):
         "unknown or missing bundle fields",
     )
     require(
-        spec["schemaVersion"] in (2, 3, 4, 5) and SEMVER.fullmatch(spec["version"]),
+        spec["schemaVersion"] in (2, 3, 4, 5, 6) and SEMVER.fullmatch(spec["version"]),
         "use an immutable numbered alpha, beta or rc version",
     )
     require(path.parent.name == spec["version"], "folder/version mismatch")
@@ -125,13 +130,10 @@ def definition(path):
     plugin_selections(spec["plugins"], spec["schemaVersion"])
     build = spec["build"]
     required = {"patches", "confinement"}
-    allowed = required | ({"upgradeFrom"} if spec["schemaVersion"] >= 5 else set())
+    allowed = required | ({"upgradeFrom"} if spec["schemaVersion"] == 5 else set())
     require(required <= set(build) <= allowed, "unknown or missing build fields")
     if "upgradeFrom" in build:
-        require(isinstance(build["upgradeFrom"], str)
-                and SEMVER.fullmatch(build["upgradeFrom"])
-                and build["upgradeFrom"] != spec["version"],
-                "upgradeFrom requires a different immutable bundle version")
+        validate_upgrade_from(build["upgradeFrom"], spec["version"])
     require(isinstance(build["patches"], list), "patches must be a list")
     for patch in build["patches"]:
         pinned_file(patch)
@@ -254,11 +256,15 @@ def resolve_baseline(version, output):
 
 def resolve(args):
     spec = definition(args.definition)
+    upgrade_from = args.upgrade_from
+    if upgrade_from is None:
+        upgrade_from = spec["build"].get("upgradeFrom")
+    if upgrade_from:
+        validate_upgrade_from(upgrade_from, spec["version"])
     out = Path(args.output).resolve()
     require(not out.exists(), "resolved output already exists")
     out.mkdir(parents=True)
-    baseline = (resolve_baseline(spec["build"]["upgradeFrom"], out)
-                if spec["build"].get("upgradeFrom") else None)
+    baseline = resolve_baseline(upgrade_from, out) if upgrade_from else None
     source = out / "source"
     oce = export_source(spec, source, args.from_git)
     original_license = (source / "LICENSE").read_bytes()
@@ -930,6 +936,7 @@ def main():
     p.add_argument("--from-git")
     p.add_argument("--dependency-cache")
     p.add_argument("--plugin-cache")
+    p.add_argument("--upgrade-from", help="published baseline tag; pass an empty string to skip upgrades")
     sub.add_parser("validate-definitions")
     p = sub.add_parser("preflight")
     p.add_argument("--definition", required=True)

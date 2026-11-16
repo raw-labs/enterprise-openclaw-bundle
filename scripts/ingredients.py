@@ -26,7 +26,7 @@ def plugin_selections(plugins, schema):
             bundled.append(plugin)
             identity = plugin
         else:
-            require(schema in (3, 4, 5) and isinstance(plugin, dict), "unsupported plugin selection")
+            require(schema in (3, 4, 5, 6) and isinstance(plugin, dict), "unsupported plugin selection")
             require(
                 {"id", "package", "version", "sha256", "source"} <= set(plugin)
                 <= {"id", "package", "version", "sha256", "source", "url"},
