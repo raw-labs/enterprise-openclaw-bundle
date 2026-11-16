@@ -1,33 +1,39 @@
 # Build a release
 
-1. Add a [definition](bundle-schema.md) under `bundles/<version>/`. Use a new
-   version for changes to published artifacts.
-2. Add `NOTES.md` beside it with the changes operators need to know and any
-   required action. The same notes appear in the archive and GitHub release.
-3. Run [contributor checks](../../CONTRIBUTING.md). Verify the archive contents
-   and operator instructions.
+1. Add a [bundle definition](bundle-schema.md) under `bundles/<version>/`. Use
+   a new version whenever you change a published bundle.
+2. Add `NOTES.md` beside it. Include changes operators need to know and any
+   steps they need to take. These notes go into the archive and GitHub release.
+3. Run the [contributor checks](../../CONTRIBUTING.md) and inspect the extracted
+   archive.
 
-Set `BUNDLE_DEFINITION` to the path to the new definition. Start **Release bundle**
-on demand; a commit or tag does not start it.
+## Run a review build
+
+In GitHub Actions, open **Release bundle** and choose **Run workflow**. Enter
+the path to the definition and leave **Publish** off. You can run a review
+build from `main` or a reviewed `codex/` branch. Review builds produce archives
+for inspection.
+
+The workflow checks both architectures and rehearses a fresh install. To
+rehearse an upgrade as well, enter the published starting tag in **Upgrade
+from**. The receipts list the baseline and checks run.
+
+From the GitHub CLI, replace `<version>` with the version you're building.
 
 ```bash
-gh workflow run release.yml --ref main -f definition="$BUNDLE_DEFINITION" -f publish=false
+gh workflow run release.yml --ref main -f definition='bundles/<version>/bundle.json' -f publish=false
 ```
 
-Use `publish=false` for a review build on main or a reviewed `codex/` branch.
-The review archive cannot be installed through normal bundle tooling.
-To publish, verify identity, origin, repository visibility and exact remote
-head, then dispatch main with `publish=true`. GHCR package visibility must
-match the repository. CI does not change visibility or deploy installations.
+To include an upgrade rehearsal, also pass `-f upgrade_from='<published tag>'`.
 
-The Action checks both native architectures and rehearses installation before
-publishing the image indexes and GitHub prerelease. To rehearse an upgrade,
-enter an exact published tag in **Upgrade from** (`-f upgrade_from="$BASELINE"`
-with the CLI). Leave it blank for a fresh install only. Receipts record the
-baseline and the checks run. The customer downloads are `bundle.tar.gz` and
-its checksum.
+## Publish
 
-Use **Re-run failed jobs** while the original inputs and exports are still
-available and main has not moved. Inspect partial publication before retrying.
-Published tags, assets and digests are immutable. See
-[download and image access](../distribution.md) for the customer path.
+Verify the GitHub account, repository origin, visibility, and exact head of
+`main`. The GHCR package visibility must match the repository. Run the
+workflow on `main` with **Publish** enabled. After the checks pass, the
+workflow publishes image indexes and creates the prerelease. Customers
+[download the archive and checksum](../distribution.md).
+
+Use **Re-run failed jobs** while the original artifacts are still available and
+`main` is at the same commit. Check for partially published assets before
+retrying. Published tags, assets, and digests are immutable.
