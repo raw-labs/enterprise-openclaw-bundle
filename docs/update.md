@@ -46,6 +46,19 @@ Review differences in sources, patches, plugins and presets between the bundles'
 [upgrade checklist](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/upgrade-checklist.md) and
 [baseline and backup procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/upgrade-baseline.md).
 
+Before the upgrade, run the read-only [target check](install.md#check-the-target)
+using the live Installation export and computed Helm values
+(`helm get values --all` for the intended release and context):
+
+```bash
+bin/prepare preflight --live-values "$LIVE_COMPUTED_VALUES" \
+  --live-installation "$LIVE_INSTALLATION" --architecture "$ARCHITECTURE" \
+  --kubeconfig "$KUBECONFIG_FILE" --context "$CONTEXT" \
+  --pg-service "$PG_SERVICE" --api-policy-destination "$API_POLICY_DESTINATION"
+```
+
+Keep the original live values and Installation for OCE's upgrade helper.
+
 ## Follow OCE's upgrade procedure
 
 Run from the candidate's `oce/` and follow its

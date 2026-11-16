@@ -14,10 +14,9 @@ digests from `metadata/release.json`.
 
 ## Prerequisites
 
-Use Python 3.12+, Node 24+, Bash, Helm 3 and kubectl compatible with the cluster.
+Use Python 3.12+, Node 24+, Bash, Helm 3, psql and kubectl compatible with the cluster.
 OCE's production procedures also use jq, Mike Farah yq v4 and openssl;
 its image-upgrade compatibility probe requires Docker on a Linux workstation.
-Database baseline and recovery procedures require psql.
 
 Prepare Kubernetes, PostgreSQL roles and CA trust, DNS/TLS, storage, disjoint
 control/runtime node pools, enforced NetworkPolicies, cert-manager and Envoy
@@ -42,7 +41,7 @@ credentials in a protected directory outside the package.
 ```bash
 umask 077
 : "${SITE:?Set SITE to an absolute installation directory}"
-mkdir -m 700 "$SITE"
+mkdir -p -m 700 "$SITE"
 : "${KUBECONFIG_FILE:?Set KUBECONFIG_FILE to an absolute protected kubeconfig}"
 : "${CONTEXT:?Set CONTEXT to the reviewed Kubernetes context}"
 export KUBECONFIG_FILE CONTEXT
@@ -50,7 +49,7 @@ chmod 600 "$KUBECONFIG_FILE"
 bin/prepare verify
 export PATH="$PWD/bin:$PATH"
 occ --version
-cp examples/installations/site.json "$SITE/site.json"
+test -e "$SITE/site.json" || cp examples/installations/site.json "$SITE/site.json"
 ```
 
 Edit `site.json` using OCE's [installation input format](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/installation-profiles.md).
@@ -68,12 +67,39 @@ For a mirror, add `--mirrors "$SITE/mirrors.json"` to `render`. Map
 `controller`, `runtime` and `repositoryCredentials` to destinations retaining
 the release's exact digests. The tool rejects conflicting images and confinement.
 
+Pass YAML or JSON overrides with `--helm-overrides FILE` and
+`--installation-overrides FILE`. Helm accepts `cluster.port` and the channel
+listener settings. Installation accepts Namespace pod quota, native session
+capacity, `repository.configuration.sessionDurationSeconds` and the callback
+hostname. For callbacks, use the same hostname in both files. For repository
+sessions, stay within the site's broker policy. Render again when inputs change.
+
 Review `preflight.json`, `values.yaml`, `installation.yaml` and `rendered.yaml`.
 The tool only prepares files. It does not create Kubernetes resources or credentials.
 For Codex, provision the packaged architecture-specific seccomp file at the
 node path selected in `installation.yaml`. The selected Codex profile uses RAW's
 curated catalog; original OCE profiles are under `oce/deploy/profiles/`.
 The delivered seccomp policies are under `security/seccomp/`.
+
+## Check the target
+
+Set `PG_SERVICE` to the target database's libpq service and
+`BOOTSTRAP_STORAGE_CLASS` to the class selected for the bootstrap PVC. Set
+`API_POLICY_DESTINATION` to `service`, `endpoint` or `both` according to what
+your CNI evaluates. For K3s with policy applied after translation, use
+`endpoint`, the backend CIDR in `controlPlane.clusterCidrs`, and the backend
+port (commonly `6443`) as `cluster.port`.
+
+```bash
+bin/prepare preflight --directory "$SITE/rendered" \
+  --kubeconfig "$KUBECONFIG_FILE" --context "$CONTEXT" \
+  --pg-service "$PG_SERVICE" --api-policy-destination "$API_POLICY_DESTINATION" \
+  --bootstrap-storage-class "$BOOTSTRAP_STORAGE_CLASS"
+```
+
+Resolve failures before installing. This checks configuration and target
+metadata. Use OCE's [network probes](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/operate/network-isolation.md)
+and node confinement checks separately for runtime proof.
 
 ## Install and bootstrap
 
@@ -89,11 +115,7 @@ cd oce
 The prepared files replace that guide's build and profile-rendering steps.
 Its chart path, bootstrap PVC example and `scripts/prepare-bootstrap-volume`
 are included. Follow its protected Secret creation, volume preparation, Helm
-installation and authenticated `occ installation get` check. Keep the paired
-Installation checksum; change site inputs and rerender instead of editing the pair.
-For documented chart options outside the profile input format, such as
-`cluster.port`, update `values.yaml` and rerun `check`. Preserve the selected
-images, profile, confinement and paired Installation checksum.
+installation and authenticated `occ installation get` check.
 
 The upstream runbook uses example names `oce`, `openclaw-system` and
 `/secure/occ`. Substitute the release/namespace from your site inputs and your

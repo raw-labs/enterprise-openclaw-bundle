@@ -3,31 +3,31 @@
 For release maintainers and sales engineers arranging artifact access or customer
 mirrors. Installation operators use the access handoff with the delivered install guide.
 
-Download `bundle.tar.gz` and `bundle.tar.gz.sha256` from the selected
-GitHub release. While the repository is private, use authorized GitHub CLI access
-and an empty download directory:
+Keep a reviewed `bundle.lock.json` in the site repository. Copy the release tag
+and the `bundleCommit` and `artifactSha256` from its `provenance.json`.
 
-```bash
-: "${VERSION:?Set VERSION to the selected bundle tag}"
-: "${DOWNLOAD:?Set DOWNLOAD to an absolute empty download directory}"
-gh release download "$VERSION" --repo raw-labs/enterprise-openclaw-bundle \
-  --pattern 'bundle.tar.gz*' --dir "$DOWNLOAD"
+```json
+{
+  "repository": "raw-labs/enterprise-openclaw-bundle",
+  "tag": "<release tag>",
+  "commit": "<bundleCommit>",
+  "archive": "bundle.tar.gz",
+  "sha256": "<artifactSha256>"
+}
 ```
 
-After the owner makes the repository public, download the same two assets without
-credentials from the selected release page, or use:
+Use Python 3.12+ and GitHub CLI access. Run [fetch.py](../delivery/fetch.py)
+from a reviewed source revision. Set `SITE` to the protected site directory and
+`FETCH` to the path to that script.
 
 ```bash
-curl --fail --location --output "$DOWNLOAD/bundle.tar.gz" \
-  "https://github.com/raw-labs/enterprise-openclaw-bundle/releases/download/$VERSION/bundle.tar.gz"
-curl --fail --location --output "$DOWNLOAD/bundle.tar.gz.sha256" \
-  "https://github.com/raw-labs/enterprise-openclaw-bundle/releases/download/$VERSION/bundle.tar.gz.sha256"
+BUNDLE=$(python3 "$FETCH" fetch --lock "$SITE/bundle.lock.json" \
+  --cache "$SITE/bundle-cache") && cd "$BUNDLE"
 ```
 
-In that directory, verify with `sha256sum -c bundle.tar.gz.sha256` (macOS:
-`shasum -a 256 -c bundle.tar.gz.sha256`), extract with `tar -xzf bundle.tar.gz`,
-and enter the extracted version directory. Start with its `INSTALL.md`.
-Other release assets provide provenance and test evidence.
+Open `INSTALL.md` or `UPDATE.md` in the verified archive. For an offline
+archive, add `--archive FILE`. For offline cache reuse, run `verify` with the
+same lock and cache before running bundled tools.
 
 Bundle versions are independent of the upstream chart version. Use immutable
 SemVer prerelease tags with numbered `alpha`, `beta` or `rc` suffixes. Alpha denotes

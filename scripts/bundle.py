@@ -363,7 +363,7 @@ def package(args, release):
     for name in ["THIRD_PARTY_NOTICES.md"]:
         if (source / name).exists():
             files["notices/OCE-" + name] = ((source / name).read_bytes(), 0o644)
-    for name in ("integrity.py", "prepare.py", "upgrade_source.py"):
+    for name in ("integrity.py", "prepare.py", "preflight.py", "upgrade_source.py"):
         files["lib/" + name] = ((ROOT / "delivery" / name).read_bytes(), 0o644)
     for name in release["payloadFiles"]:
         payload = release_file(args.release, ROOT, name)
@@ -374,6 +374,8 @@ def package(args, release):
     copy = json.loads(json.dumps(release))
     copy["operatorCli"] = cli
     copy["chart"]["artifact"] = chart_name
+    # Matches the version floor in OCE's migration-history check.
+    copy["postgresMinimumMajor"] = 17
     copy["profiles"] = {
         "openclaw": "oce/deploy/profiles/openclaw.json",
         "codex": "defaults/codex-profile.json",

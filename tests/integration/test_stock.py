@@ -1,6 +1,9 @@
 """Packaging and negative input checks; synthetic OCI fixtures never qualify runtime."""
 
+import contextlib
 import copy
+import io
+import json
 import os
 import re
 import subprocess
@@ -490,7 +493,7 @@ class StockArtifact(unittest.TestCase):
         help_text = subprocess.check_output(
             [sys.executable, self.artifact / "bin/prepare", "--help"], text=True
         )
-        self.assertIn("{verify,render,check}", help_text)
+        self.assertIn("{verify,render,check,preflight}", help_text)
         for removed in ("tenant-resources", "bootstrap-read", "public-egress"):
             result = subprocess.run(
                 [sys.executable, self.artifact / "bin/prepare", removed],
@@ -682,6 +685,165 @@ class StockArtifact(unittest.TestCase):
                 profile="codex",
             )
             with self.assertRaisesRegex(ValueError, "selected by the bundle"):
+                installer.render(args, release, admit=False)
+
+    def test_staging_override_and_read_only_preflight(self):
+        release = load(self.artifact / "metadata/release.json")
+        for role, image in release["images"].items():
+            image["reference"] = "fixture.invalid/" + role + "@sha256:" + "0" * 64
+        site = load(self.artifact / "examples/installations/site.json")
+        site["controlPlane"]["clusterCidrs"] = ["10.43.0.1/32", "10.50.0.2/32"]
+        source = self.out / "preflight-site.json"
+        save(source, site)
+        override = self.out / "preflight-helm.yaml"
+        override.write_text("cluster:\n  port: 6443\n")
+        installation_override = self.out / "preflight-installation.json"
+        save(installation_override, {"drivers": {"compute": {"configuration": {
+            "runtime": {"nativeOpenClawSessionCapacity": 50},
+        }}}})
+        bins = self.out / "preflight-bin"
+        bins.mkdir()
+        for tool, body in {
+            "psql": """
+import os, sys
+assert sys.argv[-1] == "SHOW server_version_num"
+assert os.environ["PGSERVICE"] == "disposable"
+print(os.environ["TEST_POSTGRES_VERSION"])
+""",
+            "kubectl": """
+import json, os, sys
+assert sys.argv[1:7] == ["--kubeconfig", "unused", "--context", "disposable",
+                         "--request-timeout=15s", "get"]
+kind = sys.argv[7]
+nodes = [
+    {"metadata": {"labels": {
+        "oce-role": pool, "kubernetes.io/os": "linux", "kubernetes.io/arch": "arm64",
+    }}, "spec": {}, "status": {"conditions": [{"type": "Ready", "status": "True"}]}}
+    for pool in ("control", "agents")
+]
+if kind == "endpointslices.discovery.k8s.io":
+    backend_port = os.environ["TEST_API_BACKEND_PORT"]
+    result = {"items": [{
+        "ports": [{"name": "https", "port": int(backend_port or "6443")}],
+        "endpoints": [{"addresses": ["10.50.0.2"]}] if backend_port else [],
+    }]}
+elif kind == "service":
+    result = {"spec": {"clusterIP": "10.43.0.1", "ports": [{"name": "https", "port": 443}]}}
+elif kind == "nodes":
+    result = {"items": nodes}
+else:
+    assert kind == "storageclass" and sys.argv[8] in {"occ-gateway-rwo", "bootstrap"}
+    result = {"metadata": {"name": sys.argv[8]}}
+print(json.dumps(result))
+""",
+        }.items():
+            command = bins / tool
+            command.write_text(f"#!{sys.executable}\n" + body)
+            command.chmod(0o700)
+        args = SimpleNamespace(
+            input=source, profile="openclaw", mirrors=None, architecture="linux/arm64",
+            output=self.out / "preflight-443", installation_overrides=installation_override,
+        )
+        with patch.object(installer, "ROOT", self.artifact):
+            installer.render(args, release, admit=False)
+            without_port = args.output
+            args.helm_overrides = override
+            args.output = self.out / "preflight-6443"
+            installer.render(args, release, admit=False)
+            self.assertIn("port: 6443", (args.output / "rendered.yaml").read_text())
+            config = helm_values(args.output / "installation.yaml")
+            self.assertEqual(config["drivers"]["compute"]["configuration"]["runtime"]
+                             ["nativeOpenClawSessionCapacity"], 50)
+
+            for directory, version, mode, backend_port, failure in (
+                (args.output, "160010", "endpoint", "6443", "postgres"),
+                (without_port, "180006", "endpoint", "6443", "kubernetesApiPolicy"),
+                (without_port, "170010", "service", "6443", None),
+                (without_port, "170010", "both", "", "kubernetesApiPolicy"),
+                (without_port, "170010", "both", "6443", "kubernetesApiPolicy"),
+                (without_port, "170010", "both", "443", None),
+                (args.output, "180006", "endpoint", "6443", None),
+                (None, "170010", "endpoint", "6443", None),
+            ):
+                with (self.subTest(version=version, mode=mode, backend_port=backend_port, directory=directory),
+                      patch.dict(os.environ, {"PATH": f"{bins}{os.pathsep}{os.environ['PATH']}",
+                                              "TEST_API_BACKEND_PORT": backend_port,
+                                              "TEST_POSTGRES_VERSION": version}),
+                      contextlib.redirect_stdout(io.StringIO()) as output):
+                    preflight = SimpleNamespace(
+                        directory=directory, live_values=None if directory else args.output / "values.yaml",
+                        live_installation=None if directory else args.output / "installation.yaml",
+                        architecture=None if directory else "linux/arm64", bootstrap_storage_class="bootstrap",
+                        kubeconfig="unused", context="disposable", pg_service="disposable",
+                        api_policy_destination=mode,
+                    )
+                    if failure:
+                        with self.assertRaises(SystemExit):
+                            installer.preflight(preflight, release)
+                    else:
+                        installer.preflight(preflight, release)
+                    report = json.loads(output.getvalue())
+                    self.assertEqual(report["ok"], failure is None, report)
+                    self.assertFalse(report["workloadConnectivityVerified"])
+                    if failure:
+                        self.assertEqual([k for k, v in report["checks"].items() if not v["ok"]], [failure])
+                    if mode == "both" and not backend_port:
+                        self.assertIn("could not discover both", report["checks"][failure]["error"])
+
+            values = args.output / "values.yaml"
+            values.write_bytes(values.read_bytes() + b"\n")
+            with self.assertRaisesRegex(ValueError, "values changed"):
+                installer.check(SimpleNamespace(directory=args.output), release)
+            save(override, {"images": {"controller": "fixture.invalid/wrong"}})
+            args.output = self.out / "override-controller-refused"
+            with self.assertRaisesRegex(ValueError, "unsupported site override: images"):
+                installer.render(args, release, admit=False)
+
+    def test_site_overrides_match_current_repository_and_callback_settings(self):
+        release = load(self.artifact / "metadata/release.json")
+        for role, image in release["images"].items():
+            image["reference"] = "fixture.invalid/" + role.lower() + "@sha256:" + "0" * 64
+        site = load(self.artifact / "examples/installations/site.json")
+        site["repository"] = {
+            "enabled": True, "authority": "prepared-git", "backendId": "github",
+            "upstreamCidrs": ["192.0.2.10/32"], "registryConfigMapName": "repo-registry",
+            **{key: name for key, name in (
+                ("preparedCustodySecretName", "repo-custody"),
+                ("serviceConfigSecretName", "repo-service-config"),
+                ("appKeySecretName", "repo-app-key"),
+                ("tlsSecretName", "repo-tls"),
+                ("publicCaSecretName", "repo-ca"),
+            )},
+        }
+        hostname = "channels.example.invalid"
+        source = self.out / "site-overrides.json"
+        helm = self.out / "callback-helm.json"
+        installation = self.out / "callback-installation.json"
+        save(source, site)
+        save(helm, {"gatewayRouting": {"channels": {
+            "enabled": True, "hostname": hostname, "tlsSecretName": "channels-tls",
+            "listenerPort": 8444, "ingressPeers": [{"ipBlock": {"cidr": "192.0.2.1/32"}}],
+        }}})
+        patch_config = {
+            "repository": {"configuration": {"sessionDurationSeconds": 7200}},
+            "drivers": {"compute": {"configuration": {
+                "gatewayRouting": {"channels": {"hostname": hostname}},
+            }}},
+        }
+        save(installation, patch_config)
+        args = SimpleNamespace(input=source, profile="openclaw", mirrors=None,
+                               architecture="linux/amd64", helm_overrides=helm,
+                               installation_overrides=installation, output=self.out / "site-pair")
+        with patch.object(installer, "ROOT", self.artifact):
+            installer.render(args, release, admit=False)
+            rendered = helm_values(args.output / "installation.yaml")
+            self.assertEqual(rendered["repository"]["configuration"]["sessionDurationSeconds"], 7200)
+            patch_config["drivers"]["compute"]["configuration"]["gatewayRouting"]["channels"]["hostname"] = (
+                "wrong.example.invalid"
+            )
+            save(installation, patch_config)
+            args.output = self.out / "site-pair-mismatch"
+            with self.assertRaisesRegex(ValueError, "callback hostname must match"):
                 installer.render(args, release, admit=False)
 
     def test_packaged_upgrade_source_gate_without_git(self):

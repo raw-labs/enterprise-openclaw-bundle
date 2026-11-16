@@ -10,11 +10,10 @@ OCE curation and release factory.
 - [Review and ownership](docs/maintainers.md): contributor and release review responsibilities.
 - [Public transition](docs/public-readiness.md): private preparation and final clearance.
 
-- [Install a release](https://github.com/raw-labs/enterprise-openclaw-bundle/releases): download the archive and checksum, then start with its `INSTALL.md`.
+- [Install a release](docs/distribution.md): fetch and verify the archive, then start with its `INSTALL.md`.
 - [Installation procedure](docs/install.md): installers.
 - [Update procedure](docs/update.md): existing installations.
 - [Operations procedure](docs/operate.md): installation owners.
-- [Download, access and mirrors](docs/distribution.md): release retrieval, image access and mirrors.
 
 - [Bundle definitions](bundles/): versioned ingredients.
 - [Bundle schema](docs/bundle-schema.md): supported fields and how to extend them.
