@@ -849,21 +849,13 @@ def publish_release(args):
         "handoff belongs to another build",
     )
     preflight(version, sha)
-    notes_text = (
-        "Download **bundle.tar.gz** and **bundle.tar.gz.sha256** to install; "
-        "extract it and start with **INSTALL.md**. The archive includes the OCE chart, "
-        "input preparation tool, upstream installation/upgrade helpers, presets and matched occ "
-        "for macOS/Linux AMD64/ARM64. Container images are pulled separately from GHCR. "
-        "The remaining assets are generated provenance and verification records.\n\n"
-        "Native AMD64 and ARM64 shipping artifacts passed all build and confinement checks. "
-        "The archive passed inventory verification, reproducibility and real chart rendering. "
-        "A disposable k3d installation passed migration/bootstrap and an authenticated packaged occ request. "
-        "Provider access and customer installation acceptance remain separate. "
-        "Exact ingredients and evidence are in the attached bundle definition and provenance.\n"
+    release_notes = archived_release_notes(out, version).rstrip()
+    download = (
+        "Download and verify the bundle using the [download guide]"
+        f"(https://github.com/{REPOSITORY}/blob/{version}/docs/distribution.md). "
+        "Open `INSTALL.md` for a new installation or `UPDATE.md` for an upgrade."
     )
-    release_notes = archived_release_notes(out, version)
-    if release_notes:
-        notes_text += "\n" + release_notes
+    notes_text = f"{release_notes}\n\n{download}\n" if release_notes else f"{download}\n"
     # Draft holds every asset until the entire upload succeeds. Never replace an existing tag/asset.
     with tempfile.TemporaryDirectory(prefix="bundle-release-notes-") as temporary:
         notes = Path(temporary) / "release-notes.txt"

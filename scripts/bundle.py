@@ -35,6 +35,41 @@ HANDOFF_DOCUMENTS = {
 }
 
 
+# Keep the installation, upgrade and recovery paths available offline.
+OCE_OPERATOR_GUIDES = (
+    "docs/flows/coordinated-production-upgrade.md",
+    "docs/flows/production-startup.md",
+    "docs/guides/cli.md",
+    "docs/guides/deploy.md",
+    "docs/guides/deploy/auth-maintenance.md",
+    "docs/guides/deploy/codex-sandbox.md",
+    "docs/guides/deploy/installation-profiles.md",
+    "docs/guides/deploy/native-admin.md",
+    "docs/guides/deploy/private-registry-images.md",
+    "docs/guides/deploy/production-agents.md",
+    "docs/guides/deploy/production-handoff.md",
+    "docs/guides/deploy/production-installation-changes.md",
+    "docs/guides/deploy/production-installation.md",
+    "docs/guides/deploy/production-upgrade-recovery.md",
+    "docs/guides/deploy/production-upgrade.md",
+    "docs/guides/deploy/upgrade-baseline.md",
+    "docs/guides/deploy/upgrade-checklist.md",
+    "docs/guides/deploy/upgrade-dispositions.md",
+    "docs/guides/deploy/workspace-routing.md",
+    "docs/guides/observability.md",
+    "docs/guides/operate/model-verification.md",
+    "docs/guides/operate/network-isolation.md",
+    "docs/guides/repository-credentials/installation.md",
+    "docs/guides/topics/agent-presets.md",
+    "docs/guides/topics/standard-codex-preset.md",
+    "docs/reference/authentication/service-api-keys.md",
+    "docs/reference/configuration/secrets.md",
+    "docs/reference/drivers/kubernetes-compute.md",
+    "docs/reference/drivers/kubernetes-compute/storage-and-credentials.md",
+    "docs/reference/settings/operations.md",
+)
+
+
 def preparation_tool(artifact):
     """Load the extracted renderer without creating unlisted Python cache files."""
     artifact = Path(artifact)
@@ -49,6 +84,26 @@ def preparation_tool(artifact):
         sys.path.pop(0)
         sys.dont_write_bytecode = bytecode
     return module
+
+
+def rewrite_document_links(document, replace_link):
+    """Rewrite Markdown links while preserving fenced command examples."""
+    links = re.compile(r"\]\(([^)\n]+)\)")
+    fence = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+    opening = ""
+    result = []
+    for line in document.splitlines(keepends=True):
+        match = fence.match(line)
+        if opening:
+            if match and match[1].startswith(opening) and not match[2].strip():
+                opening = ""
+            result.append(line)
+        elif match:
+            opening = match[1]
+            result.append(line)
+        else:
+            result.append(links.sub(replace_link, line))
+    return "".join(result)
 
 
 def handoff_document(document, release, files):
@@ -76,7 +131,7 @@ def handoff_document(document, release, files):
                 return "](" + repository + "/blob/" + plugin["source"]["commit"] + "/README.md" + suffix + ")"
         return match[0]
 
-    return re.sub(r"\]\(([^)]+)\)", link, document.read_text()).encode()
+    return rewrite_document_links(document.read_text(), link).encode()
 
 
 def source_files(release, selection):
@@ -249,15 +304,7 @@ def package(args, release):
         "scripts/prepare-bootstrap-volume",
         "deploy/profiles/openclaw.json",
         "deploy/profiles/codex.json",
-        "docs/guides/deploy/installation-profiles.md",
-        "docs/guides/deploy/production-installation.md",
-        "docs/guides/deploy/production-agents.md",
-        "docs/guides/deploy/production-upgrade.md",
-        "docs/guides/deploy/production-upgrade-recovery.md",
-        "docs/guides/deploy/upgrade-baseline.md",
-        "docs/guides/deploy/upgrade-checklist.md",
-        "docs/flows/coordinated-production-upgrade.md",
-        "docs/guides/repository-credentials/installation.md",
+        *OCE_OPERATOR_GUIDES,
     ]
     for preset in release.get("presets", []):
         shipped.append(preset["path"].removeprefix("/app/"))
@@ -301,25 +348,6 @@ def package(args, release):
                 shipped.append(relative)
             if relative.endswith((".mjs", ".ts")):
                 pending_modules.append(relative)
-    # Follow operator guides and product reference, excluding development manuals.
-    pending = [name for name in shipped if name.endswith(".md")]
-    while pending:
-        name = pending.pop()
-        for target in re.findall(r"\]\(([^)]+)\)", (source / name).read_text()):
-            if "://" in target or target.startswith("#"):
-                continue
-            relative = posixpath.normpath(
-                posixpath.join(posixpath.dirname(name), target.split("#")[0])
-            )
-            if (
-                relative.startswith(("docs/guides/", "docs/reference/"))
-                and relative != "docs/reference/README.md"
-                and relative.endswith(".md")
-                and relative not in shipped
-                and (source / relative).is_file()
-            ):
-                shipped.append(relative)
-                pending.append(relative)
     for name in shipped:
         data = (source / name).read_bytes()
         files["oce/" + name] = (
@@ -356,7 +384,7 @@ def package(args, release):
 
             data, mode = files["oce/" + name]
             files["oce/" + name] = (
-                re.sub(r"\]\(([^)]+)\)", link, data.decode()).encode(),
+                rewrite_document_links(data.decode(), link).encode(),
                 mode,
             )
     files["notices/OCE-LICENSE"] = ((source / "LICENSE").read_bytes(), 0o644)

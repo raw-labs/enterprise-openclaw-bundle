@@ -1,131 +1,57 @@
-# Update an installation
+# Update OpenClaw Enterprise
 
-Read `RELEASE_NOTES.md` in the selected archive, when present, before installing
-or upgrading. The same compatibility notes appear on its GitHub release.
+Keep the installed bundle and download the candidate beside it. Start in the
+candidate's root and read `RELEASE_NOTES.md` if present. Use the operator tools
+in [INSTALL.md](install.md). OCE's image probe additionally needs native Linux
+AMD64 or ARM64, UID 1000, and Docker CLI and Engine 28.1+ with the containerd
+image store enabled.
 
-For owners of an existing production Kubernetes/Helm installation. The bundle
-packages OCE's upgrade tools; OCE defines migration and recovery behavior.
-Native artifact checks and fresh-install tests do not prove an upgrade between
-two bundle versions. Check the selected OCE's supported starting state before
-scheduling the update.
+## Back up and check the candidate
 
-Run OCE's image probe on native Linux AMD64 or ARM64 as UID 1000, with
-Python 3, Node.js and OpenSSL available. Docker CLI and Engine must be 28.1 or
-newer (API 1.49+) with the
-[containerd image store](https://docs.docker.com/engine/storage/containerd/) enabled.
-The probe uses platform-specific `docker image inspect` and `docker image save`;
-updating only the CLI or enabling only the image store is insufficient. This is
-an upgrade-host requirement, not a Kubernetes node Docker requirement.
-
-## Prepare the candidate
-
-Extract the new bundle alongside the retained old bundle. Keep live Helm values,
-Installation YAML, site inputs, credentials and backups in their protected site
-directory. Start in the new bundle root:
+1. Follow OCE's [upgrade checklist](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/upgrade-checklist.md)
+   and [baseline and backup procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/upgrade-baseline.md).
+   Keep the live Helm values and Installation as the upgrade baseline.
+2. Set `SITE`, `KUBECONFIG_FILE`, `CONTEXT` and `ARCHITECTURE` as in
+   [INSTALL.md](install.md#render-site-inputs), plus `PG_SERVICE` and
+   `API_POLICY_DESTINATION` from its [preflight steps](install.md#check-the-target).
+   Set `RELEASE` and `NAMESPACE` to the installed Helm release and namespace,
+   and `LIVE_INSTALLATION` to the captured Installation file.
 
 ```bash
+umask 077
 bin/prepare verify
 export PATH="$PWD/bin:$PATH"
-read -r RELEASE_SOURCE_SHA CONTROLLER_IMAGE RUNTIME_IMAGE BROKER_IMAGE < <(
-  python3 - <<'PY'
-import json
-with open("metadata/release.json") as f:
-    release = json.load(f)
-print(release["sources"]["oce"]["commit"], *(
-    release["images"][role]["reference"]
-    for role in ("controller", "runtime", "repositoryCredentials")
-))
-PY
-)
-export RELEASE_SOURCE_SHA CONTROLLER_IMAGE RUNTIME_IMAGE BROKER_IMAGE
-```
-
-For registry mirrors, use authorized references retaining those exact digests.
-Review differences in sources, patches, plugins and presets between the bundles'
-`metadata/release.json`, and complete OCE's
-[upgrade checklist](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/upgrade-checklist.md) and
-[baseline and backup procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/upgrade-baseline.md).
-
-Before the upgrade, run the read-only [target check](install.md#check-the-target)
-using the live Installation export and computed Helm values
-(`helm get values --all` for the intended release and context):
-
-```bash
-bin/prepare preflight --live-values "$LIVE_COMPUTED_VALUES" \
+helm get values "$RELEASE" --all --output yaml --namespace "$NAMESPACE" \
+  --kubeconfig "$KUBECONFIG_FILE" --kube-context "$CONTEXT" > "$SITE/live-computed-values.yaml"
+bin/prepare preflight --live-values "$SITE/live-computed-values.yaml" \
   --live-installation "$LIVE_INSTALLATION" --architecture "$ARCHITECTURE" \
   --kubeconfig "$KUBECONFIG_FILE" --context "$CONTEXT" \
   --pg-service "$PG_SERVICE" --api-policy-destination "$API_POLICY_DESTINATION"
 ```
 
-Keep the original live values and Installation for OCE's upgrade helper.
+Resolve these conditions if they apply:
 
-## Follow OCE's upgrade procedure
+- If the candidate needs `drivers.plugin` as an array, wrap the existing entry
+  unchanged in a copy of the live Installation. Pass the copy as
+  `--candidate-installation` and keep the original as `--installation`.
+- If the live Installation uses the retired `runtime.gatewayOutbound` and the
+  candidate uses the shared proxy, plan the outbound-policy change separately
+  with the installation owner. The image upgrade refuses this setting; do not
+  remove it without a replacement policy for the workloads that rely on it.
+- If a seed file in `presets.files` will be absent in the candidate image, remove
+  the path using OCE's [Installation change procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-installation-changes.md)
+  while the old controller is running. Refresh the baseline. Stored presets remain.
 
-Run from the candidate's `oce/` and follow its
-[production image upgrade procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-upgrade.md).
-This directory replaces the release source checkout in that guide; skip its Git
-checkout and CLI build steps. The packaged helper verifies the complete kit file
-inventory and its selected OCE revision before using the chart. Keep the extracted
-kit unchanged throughout the upgrade. Use `--occ occ`, your actual release/namespace and
-protected site paths, and the variables above for its source and image arguments.
-The matched helper, probes, chart and Collector configuration are packaged.
+## Run the upgrade
 
-Retain the live values and Installation as the baseline. An image update preserves
-existing Installation settings; rerendered inputs are comparison material, not a
-replacement baseline. The helper supports only the candidate setting changes
-listed in OCE's guide. Apply other Installation changes separately with its
-[documented procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-installation-changes.md).
-Use the bundle matching the currently installed controller for that step.
+Follow OCE's [production upgrade procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-upgrade.md).
+Run the helper from `oce/` with `--occ occ`; skip the source checkout and CLI
+build. Use `sources.oce.commit` and `images.*.reference` in
+`metadata/release.json`. Pass the original live files to OCE's helper. The
+computed values above are for preflight only.
 
-When the selected controller requires `drivers.plugin` as an array, copy the live
-Installation to a separate protected candidate file and wrap its existing single
-registration in an array without changing its `id` or `configuration`. Review the
-diff and pass `--candidate-installation` as described in OCE's guide. Keep the
-original file as `--installation`; the helper does not convert it automatically.
-
-The retired `drivers.compute.configuration.runtime.gatewayOutbound` setting is
-not accepted by controllers using the shared Installation proxy. Startup preflight
-refuses that baseline before stopping OCC writers. It is not an allowed
-`--candidate-installation` change. Plan the outbound-policy transition separately
-with the installation owner; do not simply delete a working fleet's policy or
-assume the shared proxy preserves its destinations and credentials.
-
-The package rehearsal covers an Agent-free Installation: it first verifies this
-refusal, then removes the unused optional setting through the installed controller's
-separate Installation-change procedure, keeping its images unchanged. Only then
-does it exercise the image upgrade. This does not qualify an active fleet's
-outbound-policy migration or a replacement proxy.
-
-In particular, newly selected preset files require adding their image paths to
-the existing Installation's `presets.files`. First update the controller so it
-contains those files, then apply that separate settings change. Paths are recorded
-under `presets` in `metadata/release.json`. If the candidate removes a referenced
-file, remove that seed reference separately while the old controller still runs;
-otherwise the image helper refuses before stopping OCC. Removing a seed reference
-preserves stored presets. Existing same-name presets, including
-edits, are preserved. Adopt plugin settings and Secret bindings as described in
-[OPERATE.md](operate.md#presets-and-native-plugins). Review plugin state compatibility
-and verify provider access after the runtime update.
-
-To adopt changed preset templates, first read and retain the installed copies
-with `occ preset get ID -o json`. Compare the selected files in
-`oce/deploy/presets/raw/`; merge intended settings while retaining site Secret
-references and customizations. Update through OCE's Preset HTTP API. Disable
-unwanted default seeding in the Installation before using `occ preset delete ID`
-to remove reviewed obsolete copies, or startup can recreate them. Deleting a
-preset leaves copied Configurations and Agents intact. Template updates affect
-future creation only; update/redeploy existing Agent drafts separately.
-
-The helper stops the API and worker while Helm runs database migrations and
-bootstrap before rollout. Runtime updates redeploy all running Agents concurrently
-from their current drafts. There is no automatic rollback or batching. Plan an
-interruption window and backups; Helm rollback does not reverse database changes.
-
-## Verify or recover
-
-Follow OCE's workload checks and the acceptance checks in
-[OPERATE.md](operate.md#accept-and-retain). Retain the previous bundle, site baseline,
-backups and private upgrade evidence. For a partial failure, follow the packaged
-[recovery procedure](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-upgrade-recovery.md) before
-attempting another update. Optional source-level diagnostics in that guide require
-an OCE checkout.
+Schedule the interruption and retain the backup. Helm rollback does not undo
+database migrations. After the update, follow [OPERATE.md](operate.md). If the
+update stops partway through, keep the baseline, backup and evidence and follow
+OCE's [recovery guide](https://github.com/raw-labs/openclaw-enterprise/blob/main/docs/guides/deploy/production-upgrade-recovery.md)
+before retrying.

@@ -202,8 +202,11 @@ class ReleaseAssets(unittest.TestCase):
             if command[2] == "create":
                 notes = Path(command[command.index("--notes-file") + 1])
                 self.assertFalse(notes.is_relative_to(self.out))
-                self.assertIn("Download", notes.read_text())
-                self.assertIn("Compatibility note", notes.read_text())
+                body = notes.read_text()
+                self.assertTrue(body.startswith("Compatibility note\n\n"))
+                self.assertIn(f"/blob/{VERSION}/docs/distribution.md", body)
+                self.assertIn("`INSTALL.md`", body)
+                self.assertIn("`UPDATE.md`", body)
 
         with patch.dict(os.environ, GITHUB_SHA="1" * 40, GITHUB_RUN_ID="synthetic-run"):
             with (
