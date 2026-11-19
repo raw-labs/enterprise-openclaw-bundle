@@ -1,0 +1,1 @@
+Updates Connections from 0.2.4 to 0.3.1.
