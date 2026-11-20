@@ -831,18 +831,36 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                              "--occ", candidate / "bin/occ", "--timeout-seconds", "600"]
                         candidate_chart = candidate / candidate_release["chart"]["artifact"]
                         native_admin = live.get("agentNativeAdmin", {})
+                        candidate_values = None
+                        candidate_values_path = rendered / "candidate-values.yaml"
                         if ("sharedCookieDomain" in native_admin
                                 and "sharedCookieDomain" not in helm_values(candidate_chart / "values.yaml")["agentNativeAdmin"]):
                             candidate_values = {**live, "agentNativeAdmin": dict(native_admin)}
                             del candidate_values["agentNativeAdmin"]["sharedCookieDomain"]
-                            values_path = rendered / "candidate-values.yaml"
-                            save(values_path, candidate_values)
-                            upgrade_command.extend(["--candidate-values", values_path])
+                            save(candidate_values_path, candidate_values)
+                            upgrade_command.extend(["--candidate-values", candidate_values_path])
                             steps.append("candidate drops the retired explicit browser cookie domain")
                         upgrade_env = dict(os.environ, OCC_URL=api_origin,
                                            OCC_SERVICE_KEY_FILE=str(key_path), OCC_CA_BUNDLE=str(api_ca))
                         runtime = upgraded_installation["drivers"]["compute"]["configuration"]["runtime"]
+                        retired_runtime_settings = []
                         if "gatewayOutbound" in runtime:
+                            retired_runtime_settings.append("gatewayOutbound")
+                        if runtime.get("channels") == {"experimentalEmbeddedChannels": False}:
+                            candidate_site = work / "candidate-site.json"
+                            candidate_input = load(path)
+                            if candidate_values is not None:
+                                candidate_input["controlPlane"].pop("sharedCookieDomain", None)
+                            save(candidate_site, candidate_input)
+                            candidate_rendered = work / "candidate-rendered"
+                            render_rehearsal_site(run, candidate, candidate_release, candidate_site,
+                                                  candidate_rendered, "linux/" + arch,
+                                                  endpoint["ports"][0]["port"])
+                            fresh_installation = helm_values(candidate_rendered / "installation.yaml")
+                            fresh_runtime = fresh_installation["drivers"]["compute"]["configuration"]["runtime"]
+                            if "channels" not in fresh_runtime:
+                                retired_runtime_settings.append("channels")
+                        if retired_runtime_settings:
                             # Exercise the real incompatible baseline first. The helper
                             # must refuse it without stopping either installed writer.
                             writers = {role: resource("deployment", "openclaw-enterprise-" + role)["spec"]
@@ -854,7 +872,7 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                             for role, spec in writers.items():
                                 require(resource("deployment", "openclaw-enterprise-" + role)["spec"] == spec,
                                         "refused upgrade changed an installed writer")
-                            steps.append("legacy gatewayOutbound startup refusal leaves installed writer specifications unchanged")
+                            steps.append("retired Compute settings are refused before the installed writers change")
 
                             # This fixture has no Agents or outbound consumers. Apply
                             # the documented separate Installation change with the OLD
@@ -863,7 +881,10 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                             require((agents if isinstance(agents, list) else agents["items"]) == [],
                                     "outbound fixture change requires an Agent-free Namespace")
                             baseline_installation = helm_values(rendered / "installation.yaml")
-                            del baseline_installation["drivers"]["compute"]["configuration"]["runtime"]["gatewayOutbound"]
+                            baseline_runtime = baseline_installation["drivers"]["compute"]["configuration"]["runtime"]
+                            for setting in retired_runtime_settings:
+                                del baseline_runtime[setting]
+                                del runtime[setting]
                             save(rendered / "installation.yaml", baseline_installation)
                             document = (rendered / "installation.yaml").read_bytes()
                             kubectl("-n", cp["namespace"], "patch", "secret", installation_settings["secretName"],
@@ -872,6 +893,9 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                                     }}).encode(), log_output=False)
                             live["controlPlane"]["installationChecksum"] = digest(document)
                             save(rendered / "values.yaml", live)
+                            if candidate_values is not None:
+                                candidate_values["controlPlane"] = live["controlPlane"]
+                                save(candidate_values_path, candidate_values)
                             run(["helm", "upgrade", cp["releaseName"], "deploy/helm/openclaw-enterprise",
                                  "--kubeconfig", kubeconfig, "--kube-context", context, "--namespace", cp["namespace"],
                                  "-f", rendered / "values.yaml", "--wait", "--timeout", "10m"],
@@ -881,9 +905,8 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                                         == controller, "separate Installation change moved the baseline image")
                             require(occ("installation", "get")["id"] == installation_id,
                                     "separate Installation change replaced the Installation")
-                            del runtime["gatewayOutbound"]
                             save(rendered / "candidate-installation.yaml", upgraded_installation)
-                            steps.append("Agent-free fixture retires optional gatewayOutbound through old-chart Installation change before image upgrade; no replacement proxy qualified")
+                            steps.append("Agent-free fixture removes retired Compute settings on the installed release before the image upgrade")
                         run([*upgrade_command, "--evidence-dir", work / "upgrade-evidence"],
                             cwd=candidate / "oce", timeout=900, env=upgrade_env, diagnostics=True)
                         actual_installation = json.loads(kubectl(
