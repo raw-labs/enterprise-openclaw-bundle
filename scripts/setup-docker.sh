@@ -3,7 +3,11 @@
 set -euo pipefail
 test "${GITHUB_ACTIONS:-}" = true
 printf 'Native runner UID: %s\n' "$(id -u)"
-test "$(. /etc/os-release; echo "$ID/$VERSION_CODENAME")" = ubuntu/noble
+ubuntu_release="$(. /etc/os-release; printf '%s/%s' "$ID" "$VERSION_CODENAME")"
+case "$ubuntu_release" in
+  ubuntu/jammy|ubuntu/noble) ;;
+  *) printf 'Unsupported Docker runner OS: %s\n' "$ubuntu_release" >&2; exit 1 ;;
+esac
 
 sudo apt-get -o Acquire::Retries=3 update
 sudo apt-get install --no-install-recommends -y ca-certificates curl gnupg
@@ -11,7 +15,8 @@ if ! grep -Rqs 'download.docker.com/linux/ubuntu' /etc/apt/sources.list.d; then
   sudo install -d -m 0755 /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg |
     sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/bundle-docker.gpg
-  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/bundle-docker.gpg] https://download.docker.com/linux/ubuntu noble stable\n' "$(dpkg --print-architecture)" |
+  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/bundle-docker.gpg] https://download.docker.com/linux/ubuntu %s stable\n' \
+    "$(dpkg --print-architecture)" "${ubuntu_release#ubuntu/}" |
     sudo tee /etc/apt/sources.list.d/bundle-docker.list >/dev/null
 fi
 sudo apt-get -o Acquire::Retries=3 update
