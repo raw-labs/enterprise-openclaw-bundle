@@ -179,7 +179,38 @@ test("Connections loads in the native Gateway and retains state across Kubernete
     assert.ok(restored); assert.equal(restored.name, "Bundle persistence check"); assert.deepEqual(restored.grant, {mode: "selected", agentIds: []});
     if (previousImage) {
       phase = "upgrade retained Connections state to the candidate runtime";
-      stop(); pod.spec.containers[0].image = tag; start();
+      const { openClawStateMigrationHelper, startupPhaseHelper } = await import(
+        pathToFileURL(resolve("apps/controller/src/drivers/compute/runtime-startup.ts"))
+      );
+      // Use the pinned OCE migration gate with the same state and config mounts as the Gateway.
+      const startup = `
+        const { spawn } = require("node:child_process");
+        const publishRuntimeFailure = (check, code) => console.error(check, code);
+        ${startupPhaseHelper("gateway")}
+        ${openClawStateMigrationHelper("Gateway", "restart the Pod")}
+        (async () => {
+          const stateDirectory = process.env.OPENCLAW_STATE_DIR;
+          const outdated = outdatedOpenClawDatabases(stateDirectory);
+          if ((outdated.length > 0 || openClawMaintenancePending(stateDirectory)) &&
+              !(await migrateOpenClawState(stateDirectory, outdated, process.env))) {
+            process.exitCode = 1;
+            return;
+          }
+          const gateway = await runOpenClawStateOwner(
+            ["gateway", "run"], { stdio: "inherit" }, { forwardStop: true },
+          );
+          if (gateway.error) throw gateway.error;
+          process.exitCode = gateway.terminating ? 0 : (gateway.status ?? 1);
+        })().catch(error => {
+          console.error(error);
+          process.exitCode = 1;
+        });
+      `;
+      stop();
+      const gateway = pod.spec.containers[0];
+      gateway.image = tag;
+      gateway.command = ["node", "--input-type=commonjs", "-e", startup];
+      start();
       assert.equal(call("connections.status").userId, before.userId);
       const upgraded = call("connections.list").items.find(p => p.id === connection.id);
       assert.ok(upgraded); assert.equal(upgraded.name, restored.name); assert.deepEqual(upgraded.grant, restored.grant);
