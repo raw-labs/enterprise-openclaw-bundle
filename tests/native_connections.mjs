@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
+import { reportNativeFailure } from "../scripts/native-diagnostics.mjs";
 
 const release = JSON.parse(await readFile(process.env.BUNDLE_TEST_SELECTION, "utf8"));
 const plugins = release.pluginPackages ?? [];
@@ -309,6 +310,8 @@ test("Connections loads in the native Gateway and retains state across Kubernete
         catch (diagnostic) { logs += "\n" + [diagnostic.stdout, diagnostic.stderr].filter(Boolean).join("\n"); }
       }
     }
+    console.error("[bundle-connections-phase] " + phase.replace(/ selected preset .+$/, " selected preset"));
+    reportNativeFailure(error.cause ?? error);
     const detail = `${String(error.message)}\n${logs}`
       .replaceAll(token, "[synthetic token]").replaceAll("synthetic-never-sent-project-key", "[synthetic key]");
     throw new Error(`Synthetic Connections check failed at ${phase}: ${detail}`, {cause: error});
