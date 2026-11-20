@@ -21,6 +21,7 @@ from common import (
     require,
     run,
     safe_path,
+    source_module,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -299,13 +300,18 @@ def package(args, release):
     for name, content in chart_files.items():
         files[chart_name + "/" + name] = content
     shipped = [
-        "scripts/render-installation-profile.mjs",
-        "scripts/render-repository-credentials-origin.mjs",
+        source_module(source, "scripts/render-installation-profile"),
+        source_module(source, "scripts/render-repository-credentials-origin"),
         "scripts/prepare-bootstrap-volume",
         "deploy/profiles/openclaw.json",
         "deploy/profiles/codex.json",
         *OCE_OPERATOR_GUIDES,
     ]
+    preparation = "docs/guides/deploy/production-installation-preparation.md"
+    if (source / preparation).is_file():
+        shipped.append(preparation)
+    if "scripts/render-installation-profile.ts" in shipped:
+        shipped.append("apps/controller/src/auth/configuration.ts")
     for preset in release.get("presets", []):
         shipped.append(preset["path"].removeprefix("/app/"))
     shipped.extend(
@@ -317,9 +323,14 @@ def package(args, release):
         name
         for name in (
             "scripts/split-layout-adopt.mjs",
+            "scripts/split-layout-adopt.ts",
             "scripts/split-layout-tenants.mjs",
+            "scripts/split-layout-tenants.ts",
             "scripts/lib/image-reference-problem.mjs",
+            "scripts/lib/image-reference-problem.ts",
+            "scripts/lib/upgrade-preflight-cleanup.sh",
             "apps/controller/src/drivers/compute/kubernetes/resource-name.ts",
+            "apps/controller/src/drivers/compute/kubernetes/resource-quantities.ts",
             "apps/controller/src/drivers/openai-endpoint.ts",
             "packages/occ/src/image-reference.ts",
             "packages/contracts/src/api/plain-text.ts",

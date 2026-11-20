@@ -29,6 +29,7 @@ from common import (
     run,
     safe_path,
     save,
+    source_module,
     validate,
     verify_files,
     verify_repository_visibility,
@@ -64,6 +65,29 @@ RUN node /tmp/bundle-inventory.mjs inventory /app/node_modules/openclaw /opt/oce
     && rm -rf /tmp/lib
 USER node
 """
+
+
+INGREDIENT_LAYER_TYPESCRIPT = b"""
+FROM __UPSTREAM_TARGET__ AS bundle-ingredients
+USER root
+COPY --from=bundle-plugins --chown=node:node / /app/node_modules/openclaw/dist/extensions/
+COPY scripts/build-runtime-assets.ts /tmp/bundle-inventory.ts
+COPY deploy/runtime/additional-download-clients.json /tmp/additional-download-clients.json
+COPY scripts/lib/ /tmp/lib/
+COPY deploy/bundle/runtime.mjs /tmp/bundle-runtime.mjs
+COPY deploy/bundle/plugins.json /tmp/bundle-plugins.json
+RUN node /tmp/bundle-inventory.ts inventory /app/node_modules/openclaw /opt/oce/runtime /usr/local/share/oce-node/provenance.json /tmp/additional-download-clients.json \\
+    && node /tmp/bundle-runtime.mjs \\
+    && rm /tmp/additional-download-clients.json /tmp/bundle-inventory.ts /tmp/bundle-runtime.mjs /tmp/bundle-plugins.json \\
+    && rm -rf /tmp/lib
+USER node
+"""
+
+
+def ingredient_layer(inventory_helper):
+    if inventory_helper == "scripts/build-runtime-assets.ts":
+        return INGREDIENT_LAYER_TYPESCRIPT
+    return INGREDIENT_LAYER
 
 
 def snapshot_inputs(release, selection, directory):
@@ -424,9 +448,10 @@ def build(args, release):
             upstream_target = recipe["target"]
             ingredients = b""
             if role == "runtime" and release.get("pluginPackages"):
-                require(digest(INGREDIENT_LAYER) == release["build"]["ingredientLayerSha256"], "ingredient build code changed")
+                layer = ingredient_layer(release["runtime"]["inventoryHelper"])
+                require(digest(layer) == release["build"]["ingredientLayerSha256"], "ingredient build code changed")
                 cmd.extend(["--build-context", f"bundle-plugins={Path(args.source).resolve() / 'deploy/bundle/plugins'}"])
-                ingredients = INGREDIENT_LAYER.replace(b"__UPSTREAM_TARGET__", upstream_target.encode())
+                ingredients = layer.replace(b"__UPSTREAM_TARGET__", upstream_target.encode())
                 upstream_target = "bundle-ingredients"
             dockerfile.write_bytes(
                 (Path(args.source) / recipe["dockerfile"]).read_bytes()
@@ -688,7 +713,7 @@ def check(args, release):
                 require(digest(subprocess.check_output(command)) == release["payloadFiles"]["notices/" + name],
                         "shipping bundle notice mismatch: " + name)
         log = logs / "upgrade-probe.json"
-        command = ["node", source / "scripts/upgrade-repository-image-probe.mjs",
+        command = ["node", source / source_module(source, "scripts/upgrade-repository-image-probe"),
                    staged["controller"], staged["repositoryCredentials"], record["platform"]]
         if os.getuid() != 1000:
             command = ["sudo", "--user=#1000", "--", "env", "PATH=" + env["PATH"], *command]
@@ -793,8 +818,8 @@ def check(args, release):
         receipt["lanes"]["repositoryCredentials"] = tests(
             [
                 *node,
-                "tests/integration/repository-runtime-volume.test.mjs",
-                "tests/integration/repository-credentials-isolation.test.mjs",
+                source_module(source, "tests/integration/repository-runtime-volume.test"),
+                source_module(source, "tests/integration/repository-credentials-isolation.test"),
             ],
             source,
             dict(

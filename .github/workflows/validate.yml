@@ -53,6 +53,9 @@ jobs:
       - name: Build and test the unchanged exact-source CLI
         run: python3 scripts/cli.py build --selection .work/resolved/candidate.json --source .work/resolved/source --output .work/resolved/cli
       - name: Test selected source confinement preparation
-        run: env -u OCC_TEST_CODEX_APPARMOR_PROFILE node --test .work/resolved/source/tests/conformance/codex-seccomp-profile.test.mjs
+        run: |
+          suite=.work/resolved/source/tests/conformance/codex-seccomp-profile.test
+          if test -f "$suite.mjs"; then suite="$suite.mjs"; else suite="$suite.ts"; fi
+          env -u OCC_TEST_CODEX_APPARMOR_PROFILE node --test "$suite"
       - name: Check rejection paths, provenance, reproducibility and actual chart rendering
         run: python3 scripts/check.py --integration

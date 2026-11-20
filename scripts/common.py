@@ -49,11 +49,21 @@ def confinement_profile(inputs):
     policies = set(inputs) & APPARMOR_PROFILES.keys()
     require(len(policies) == 1
             and set(inputs) in ({"scripts/lib/codex-seccomp-profile.mjs", *policies},
+                                {"scripts/lib/codex-seccomp-profile.ts", *policies},
                                 {"scripts/lib/codex-seccomp-profile.mjs", "scripts/lib/codex-seccomp-profile.ts", *policies})
             and all(isinstance(h, str) and HASH.fullmatch(h) for h in inputs.values()),
             "pin reviewed source confinement inputs in bundle.json")
     path = next(iter(policies))
     return path, APPARMOR_PROFILES[path]
+
+
+def source_module(source, stem):
+    """Find a selected OCE helper across its JavaScript and TypeScript layouts."""
+    for extension in (".mjs", ".ts"):
+        name = stem + extension
+        if (Path(source) / name).is_file():
+            return name
+    raise ValueError(f"missing OCE module: {stem}")
 
 
 def openclaw_source(source):

@@ -829,6 +829,16 @@ tls.createServer({cert:fs.readFileSync('/tls/server.crt'),key:fs.readFileSync('/
                              "--controller-image", candidate_controller,
                              "--source-revision", candidate_release["sources"]["oce"]["commit"],
                              "--occ", candidate / "bin/occ", "--timeout-seconds", "600"]
+                        candidate_chart = candidate / candidate_release["chart"]["artifact"]
+                        native_admin = live.get("agentNativeAdmin", {})
+                        if ("sharedCookieDomain" in native_admin
+                                and "sharedCookieDomain" not in helm_values(candidate_chart / "values.yaml")["agentNativeAdmin"]):
+                            candidate_values = {**live, "agentNativeAdmin": dict(native_admin)}
+                            del candidate_values["agentNativeAdmin"]["sharedCookieDomain"]
+                            values_path = rendered / "candidate-values.yaml"
+                            save(values_path, candidate_values)
+                            upgrade_command.extend(["--candidate-values", values_path])
+                            steps.append("candidate drops the retired explicit browser cookie domain")
                         upgrade_env = dict(os.environ, OCC_URL=api_origin,
                                            OCC_SERVICE_KEY_FILE=str(key_path), OCC_CA_BUNDLE=str(api_ca))
                         runtime = upgraded_installation["drivers"]["compute"]["configuration"]["runtime"]

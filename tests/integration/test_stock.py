@@ -29,6 +29,7 @@ from common import (  # noqa: E402
     load,
     read_release,
     save,
+    source_module,
 )
 from release import verify_handoff_layout  # noqa: E402
 from stock import (  # noqa: E402
@@ -127,6 +128,7 @@ class StockArtifact(unittest.TestCase):
         with tarfile.open(cls.out / "one.tgz") as tar:
             tar.extractall(cls.out, filter="data")
         cls.artifact = cls.out / read_release(SELECTION, ROOT)["id"]
+        cls.renderer = cls.artifact / source_module(cls.artifact, "oce/scripts/render-installation-profile")
 
     @classmethod
     def tearDownClass(cls):
@@ -182,7 +184,7 @@ class StockArtifact(unittest.TestCase):
                 original,
             )
         self.assertFalse((self.artifact / "scripts").exists())
-        image_check = self.artifact / "oce/scripts/lib/image-reference-problem.mjs"
+        image_check = self.artifact / source_module(self.artifact, "oce/scripts/lib/image-reference-problem")
         for image, expected in (
             ("fixture.invalid/controller@sha256:" + "0" * 64, b""),
             ("fixture.invalid/INVALID@sha256:" + "0" * 64, b"uppercase-repository"),
@@ -419,7 +421,7 @@ class StockArtifact(unittest.TestCase):
             subprocess.run(
                 [
                     "node",
-                    str(self.artifact / "oce/scripts/render-installation-profile.mjs"),
+                    str(self.renderer),
                     "--profile",
                     profile,
                     "--input",
@@ -444,7 +446,7 @@ class StockArtifact(unittest.TestCase):
             self.assertIn(b"kind: NetworkPolicy", rendered)
             installation = helm_values(output / "installation.yaml")
             runtime = installation["drivers"]["compute"]["configuration"]["runtime"]
-            self.assertFalse(runtime["channels"]["experimentalEmbeddedChannels"])
+            self.assertFalse(runtime.get("channels", {}).get("experimentalEmbeddedChannels", False))
             self.assertTrue(runtime["proxy"]["proxyUrl"])
             for changes, error in (
                 (
@@ -467,10 +469,7 @@ class StockArtifact(unittest.TestCase):
                 result = subprocess.run(
                     [
                         "node",
-                        str(
-                            self.artifact
-                            / "oce/scripts/render-installation-profile.mjs"
-                        ),
+                        str(self.renderer),
                         "--profile",
                         profile,
                         "--input",
@@ -491,7 +490,7 @@ class StockArtifact(unittest.TestCase):
             result = subprocess.run(
                 [
                     "node",
-                    str(self.artifact / "oce/scripts/render-installation-profile.mjs"),
+                    str(self.renderer),
                     "--profile",
                     profile,
                     "--input",
@@ -503,7 +502,7 @@ class StockArtifact(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "requires a selected Gateway proxy",
+                "channels.experimentalEmbeddedChannels requires",
                 " ".join(load(output / "preflight.json")["errors"]),
             )
 
@@ -546,7 +545,7 @@ class StockArtifact(unittest.TestCase):
             subprocess.run(
                 [
                     "node",
-                    self.artifact / "oce/scripts/render-installation-profile.mjs",
+                    self.renderer,
                     "--profile",
                     "codex",
                     "--profile-file",
@@ -584,8 +583,9 @@ class StockArtifact(unittest.TestCase):
             image["reference"] = "fixture.invalid/" + role + "@sha256:" + "0" * 64
         site = load(self.artifact / "examples/installations/site.json")
         cp = site["controlPlane"]
-        cp.pop("agentNativeAdminDomain")
-        cp.pop("sharedCookieDomain")
+        if self.renderer.suffix == ".mjs":
+            cp.pop("agentNativeAdminDomain")
+        cp.pop("sharedCookieDomain", None)
         cp["recoveryUserId"] = "verified-admin"
         cp["oidc"] = {
             "issuer": "https://idp.example.invalid",
