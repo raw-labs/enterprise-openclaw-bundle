@@ -29,7 +29,6 @@
     "gatewayClassName": "eg",
     "gatewayApiKeySecretName": "occ-private-gateway-key",
     "agentNativeAdminDomain": "agents.example.invalid",
-    "sharedCookieDomain": "example.invalid",
     "gatewayTrustedProxyCidrs": [
       "10.46.0.0/24"
     ],

@@ -37,11 +37,13 @@ class SourcePins(unittest.TestCase):
             with self.assertRaises(ValueError):
                 openclaw_source(self.root)
 
-    def test_typescript_policy_requires_wrapper_and_reviewed_apparmor(self):
+    def test_typescript_policy_accepts_both_upstream_layouts(self):
         inputs = {"scripts/lib/codex-seccomp-profile.mjs": "1" * 64,
                   "scripts/lib/codex-seccomp-profile.ts": "2" * 64,
                   "scripts/ci/codex-bwrap.apparmor": "3" * 64}
         confinement_profile(inputs)
         del inputs['scripts/lib/codex-seccomp-profile.mjs']
+        confinement_profile(inputs)
+        del inputs['scripts/ci/codex-bwrap.apparmor']
         with self.assertRaises(ValueError):
             confinement_profile(inputs)

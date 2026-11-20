@@ -1,7 +1,7 @@
 // Run the selected source's unchanged tests against the caller's exact image ID.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { reportNativeFailure } from "./native-diagnostics.mjs";
 import { pathToFileURL } from "node:url";
@@ -9,7 +9,10 @@ import { pathToFileURL } from "node:url";
 async function main() {
   const [source, image, state, output] = process.argv.slice(2);
   const { prepareRuntimeImageSmoke } = await import(pathToFileURL(resolve(source, "scripts/ci/prepare.mjs")));
-  const { runtimeImageSmokeTests } = await import(pathToFileURL(resolve(source, "scripts/ci/container-release.mjs")));
+  const releaseModule = resolve(source, "scripts/ci/container-release.mjs");
+  const { runtimeImageSmokeTests } = await import(pathToFileURL(
+    existsSync(releaseModule) ? releaseModule : resolve(source, "scripts/ci/container-release.ts"),
+  ));
   console.log("[bundle-runtime-phase] prepare");
   const prepared = await prepareRuntimeImageSmoke({ image, statePath: resolve(state) });
   try {

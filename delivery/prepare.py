@@ -177,13 +177,16 @@ def render(args, release, admit=True):
         )
         runtime["codexSeccompProfile"] = expected
     out.mkdir(parents=True, mode=0o700)
+    renderer = ROOT / "oce/scripts/render-installation-profile.mjs"
+    if not renderer.is_file():
+        renderer = renderer.with_suffix(".ts")
     with tempfile.TemporaryDirectory() as temporary:
         effective = Path(temporary) / "input.json"
         save(effective, site)
         subprocess.run(
             [
                 "node",
-                ROOT / "oce/scripts/render-installation-profile.mjs",
+                renderer,
                 "--profile",
                 args.profile,
                 "--profile-file",

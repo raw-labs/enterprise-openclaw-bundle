@@ -39,6 +39,7 @@ from common import (
     run,
     safe_path,
     save,
+    source_module,
     verify_repository_visibility,
 )
 from ingredients import plugin_selections, resolve_plugins
@@ -282,7 +283,9 @@ def resolve(args):
             digest(safe_path(source, path).read_bytes()) == expected,
             "confinement input changed; review and repin bundle.json",
         )
-    seccomp_module = source / "scripts/lib/codex-seccomp-profile.mjs"
+    seccomp_module = source_module(source, "scripts/lib/codex-seccomp-profile")
+    require(seccomp_module in spec["build"]["confinement"], "pin the selected seccomp generator")
+    seccomp_module = source / seccomp_module
     if './codex-seccomp-profile.ts' in seccomp_module.read_text():
         require("scripts/lib/codex-seccomp-profile.ts" in spec["build"]["confinement"],
                 "pin the TypeScript confinement implementation, not only its wrapper")
@@ -314,7 +317,7 @@ def resolve(args):
     dockerfile = (source / "deploy/runtime/Dockerfile").read_text()
     require(
         "--profile-file"
-        in (source / "scripts/render-installation-profile.mjs").read_text(),
+        in (source / source_module(source, "scripts/render-installation-profile")).read_text(),
         "selected renderer requires explicit profile-file support; select a compatible source or pinned patch",
     )
 
@@ -359,9 +362,10 @@ def resolve(args):
         },
         noticeLayerSha256=digest(LICENSE_LAYER),
     )
+    inventory_helper = source_module(source, "scripts/build-runtime-assets")
     if plugin_packages:
-        from stock import INGREDIENT_LAYER
-        build["ingredientLayerSha256"] = digest(INGREDIENT_LAYER)
+        from stock import ingredient_layer
+        build["ingredientLayerSha256"] = digest(ingredient_layer(inventory_helper))
     patches = {
         p: h
         for p, h in files.items()
@@ -467,8 +471,8 @@ def resolve(args):
             "selection": "upstream-stock",
             "overlay": None,
             "codexVersion": codex,
-            "inventoryHelper": "scripts/build-runtime-assets.mjs",
-            "inventoryHelperSha256": files["scripts/build-runtime-assets.mjs"],
+            "inventoryHelper": inventory_helper,
+            "inventoryHelperSha256": files[inventory_helper],
             "bridgePatches": patches,
         },
         "build": build,
