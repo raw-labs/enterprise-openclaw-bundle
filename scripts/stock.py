@@ -538,13 +538,30 @@ def tests(command, source, env, log):
         ):
             print(f"Native preparation phase completed: {phase} ({elapsed} ms)", file=sys.stderr)
         for kind, value in re.findall(
-            r"^\[bundle-native-(command|operation|exit|failure|probe)\] "
+            r"^(?:# )?\[bundle-native-(command|operation|exit|failure|probe)\] "
             r"(docker|kubectl|k3d|exec|get|apply|create|delete|cp|wait|"
             r"[0-9]{1,3}|timeout|ENOENT|EACCES|EPERM|permission-denied|apparmor|"
             r"version-mismatch|missing-executable|connection-refused|"
             r"VERSION|PREPARE|SANDBOX|ASSERTIONS|CLEANUP|DONE)$", output, re.MULTILINE
         ):
             print(f"Native diagnostic {kind}: {value}", file=sys.stderr)
+        connections_phases = (
+            "create disposable cluster",
+            "start Gateway with native plugin configuration",
+            "inspect native plugin",
+            "administrator management and UI catalog",
+            "private volume permissions and Pod replacement",
+            "upgrade retained Connections state to the candidate runtime",
+            "UI asset, read-only authority and unconnected tools",
+            "unconfigured selected preset",
+            "Assistant headless browser in the confined runtime",
+            "missing native capability SecretRef",
+            "configured selected preset",
+            "explicitly disabled plugin",
+        )
+        for phase in re.findall(r"^# \[bundle-connections-phase\] ([^\n]+)$", output, re.MULTILINE):
+            if phase in connections_phases:
+                print(f"Native Connections phase failed: {phase}", file=sys.stderr)
         for location in failure_locations(output, source):
             print("Native test source location: " + location, file=sys.stderr)
         # Test names and assertion values can both contain runtime secrets.
