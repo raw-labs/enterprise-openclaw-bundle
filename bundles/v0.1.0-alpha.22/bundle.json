@@ -57,7 +57,7 @@
       },
       {
         "path": "bundles/v0.1.0-alpha.22/archive-renderer.patch",
-        "sha256": "ae046a49c67f4656581153dc748999a2a911c61cebb41ad8bb8b8591e2fc6971"
+        "sha256": "e9587814a3b8b04161c19ce102268b3ad12a188c0630dd829acf54fb1da8e31c"
       }
     ],
     "confinement": {
